@@ -1,0 +1,565 @@
+#ifndef MPI_CRITICAL_H
+#define MPI_CRITICAL_H 1
+
+#define NUM_UC_TIMERS 4
+#define REF_RANK 0
+
+#include "criticalPath.h"
+#include "tracking.h"
+
+void MpiHappensAfter(ipcData *uc, int remote = 0);
+void MpiHappensAfter(ipcData &uc, int remote = 0);
+double *loadThreadTimers(ipcData *uc, int remote = -1);
+double *loadThreadTimers(ipcData &uc, int remote = -1);
+
+void completePBWC(RequestData *uc, MPI_Status *status);
+void completePBHB(RequestData *uc, MPI_Status *status);
+void completePersPBHB(RequestData *uc, MPI_Status *status);
+void startPersPBHB(RequestData *uc);
+
+void completePBnoHB(RequestData *uc, MPI_Status *status);
+void completePersPBnoHB(RequestData *uc, MPI_Status *status);
+void startPersPBnoHB(RequestData *uc);
+
+struct mpiTimer;
+void init_processes(mpiTimer &mt);
+
+/*
+ * RAII class for timing MPI functions
+ */
+struct mpiTimer {
+  const char *loc;
+  mpiTimer(bool openmp_thread = false, const char *loc = NULL) : loc(loc) {
+    if (thread_local_clock == nullptr) {
+      thread_local_clock = new THREAD_CLOCK(my_next_id(), 0, openmp_thread);
+      if (thread_local_clock->stopped_mpi_clock == false)
+        resetMpiClock(thread_local_clock);
+      if (thread_local_clock->stopped_omp_clock == true)
+        thread_local_clock->Start(CLOCK_OMP_ONLY, __func__);
+    } else {
+      thread_local_clock->Stop(CLOCK_MPI, loc);
+    }
+    assert(thread_local_clock->stopped_mpi_clock == true);
+  }
+  ~mpiTimer() { thread_local_clock->Start(CLOCK_MPI, loc); }
+};
+
+/*
+ * RAII classes for MPI piggybacking
+ */
+#define OnlyActivePB 1
+
+struct mpiIcollBcastPBImpl {
+  RequestData *rData;
+  MPI_Request *send_req;
+  int rank;
+
+  mpiIcollBcastPBImpl(MPI_Comm comm, MPI_Request *request, int root) {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    auto cData = cf.findData(comm);
+    rank = cData->getRank();
+    send_req = request;
+    rData = rf.newData();
+
+    if (root == rank)
+      loadThreadTimers(rData, REF_RANK);
+    rData->IBcast(root, cData, rData->pb_reqs);
+  }
+  ~mpiIcollBcastPBImpl() {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    rData->init(*send_req, IBCAST, REF_RANK);
+    rData->setCompletionCallback(completePBHB);
+    *send_req = rf.newHandle(*send_req, rData);
+  }
+};
+
+#ifdef HAVE_PCOLL /* Have persistent collective support in MPI */
+struct mpiCollBcastInitPBImpl {
+  RequestData *rData;
+  MPI_Request *send_req;
+  int rank;
+
+  mpiCollBcastInitPBImpl(MPI_Comm comm, MPI_Request *request, int root) {
+    auto cData = cf.findData(comm);
+    rank = cData->getRank();
+    send_req = request;
+    rData = rf.newData();
+
+    if (root == rank)
+      rData->setStartCallback(startPersPBHB);
+    else
+      rData->setStartCallback(startPersPBnoHB);
+    rData->setCompletionCallback(completePersPBHB);
+    rData->BcastInit(root, cData, rData->pb_reqs);
+  }
+  ~mpiCollBcastInitPBImpl() {
+    rData->init(*send_req, PBCAST, REF_RANK);
+    *send_req = rf.newHandle(*send_req, rData);
+  }
+};
+#endif
+
+struct mpiCollBcastPBImpl {
+  RequestData rData;
+  int rank;
+
+  mpiCollBcastPBImpl(MPI_Comm comm, int root) {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    auto cData = cf.findData(comm);
+    rank = cData->getRank();
+    if (root == rank)
+      loadThreadTimers(rData, REF_RANK);
+    rData.IBcast(root, cData, rData.pb_reqs);
+  }
+  ~mpiCollBcastPBImpl() {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    PMPI_Waitall(2, rData.pb_reqs, MPI_STATUSES_IGNORE);
+    MpiHappensAfter(rData, REF_RANK);
+  }
+};
+
+struct mpiIcollAllreducePBImpl {
+  RequestData *rData;
+  MPI_Request *send_req;
+  int rank;
+
+  mpiIcollAllreducePBImpl(MPI_Comm comm, MPI_Request *request, int root = 0) {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    auto cData = cf.findData(comm);
+    rank = cData->getRank();
+    send_req = request;
+    rData = rf.newData();
+    rData->IAllreduce(cData, rData->pb_reqs);
+  }
+  ~mpiIcollAllreducePBImpl() {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    rData->init(*send_req, IALLREDUCE, REF_RANK);
+    rData->setCompletionCallback(completePBHB);
+    *send_req = rf.newHandle(*send_req, rData);
+  }
+};
+
+#ifdef HAVE_PCOLL /* Have persistent collective support in MPI */
+struct mpiCollAllreduceInitPBImpl {
+  RequestData *rData;
+  MPI_Request *send_req;
+  int rank;
+
+  mpiCollAllreduceInitPBImpl(MPI_Comm comm, MPI_Request *request,
+                             int root = 0) {
+    auto cData = cf.findData(comm);
+    rank = cData->getRank();
+    send_req = request;
+    rData = rf.newData();
+    rData->setStartCallback(startPersPBHB);
+    rData->setCompletionCallback(completePersPBHB);
+    rData->AllreduceInit(cData, rData->pb_reqs);
+  }
+  ~mpiCollAllreduceInitPBImpl() {
+    rData->init(*send_req, PALLREDUCE, REF_RANK);
+    *send_req = rf.newHandle(*send_req, rData);
+  }
+};
+#endif
+
+struct mpiCollAllreducePBImpl {
+  RequestData rData;
+  int rank;
+
+  mpiCollAllreducePBImpl(MPI_Comm comm, int root = 0) {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    auto cData = cf.findData(comm);
+    rank = cData->getRank();
+    rData.IAllreduce(cData, rData.pb_reqs);
+  }
+  ~mpiCollAllreducePBImpl() {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    PMPI_Waitall(2, rData.pb_reqs, MPI_STATUSES_IGNORE);
+    MpiHappensAfter(rData, REF_RANK);
+  }
+};
+
+struct mpiIcollReducePBImpl {
+  RequestData *rData;
+  MPI_Request *send_req;
+  int rank;
+  int root;
+
+  mpiIcollReducePBImpl(MPI_Comm comm, MPI_Request *request, int root)
+      : root(root) {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    auto cData = cf.findData(comm);
+    rank = cData->getRank();
+    send_req = request;
+    rData = rf.newData();
+    rData->IReduce(root, cData, rData->pb_reqs);
+    if (root == rank) {
+      rData->setCompletionCallback(completePBHB);
+    } else {
+      rData->setCompletionCallback(completePBnoHB);
+    }
+  }
+  ~mpiIcollReducePBImpl() {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    rData->init(*send_req, IREDUCE, REF_RANK, rank, nullptr, root);
+    *send_req = rf.newHandle(*send_req, rData);
+  }
+};
+
+#ifdef HAVE_PCOLL /* Have persistent collective support in MPI */
+struct mpiCollReduceInitPBImpl {
+  RequestData *rData;
+  MPI_Request *send_req;
+  int rank;
+  int root;
+
+  mpiCollReduceInitPBImpl(MPI_Comm comm, MPI_Request *request, int root)
+      : root(root) {
+    auto cData = cf.findData(comm);
+    rank = cData->getRank();
+    send_req = request;
+    rData = rf.newData();
+    rData->setStartCallback(startPersPBHB);
+    rData->ReduceInit(root, cData, rData->pb_reqs);
+    if (root == rank) {
+      rData->setCompletionCallback(completePersPBHB);
+    } else {
+      rData->setCompletionCallback(completePersPBnoHB);
+    }
+  }
+  ~mpiCollReduceInitPBImpl() {
+    rData->init(*send_req, PREDUCE, REF_RANK, rank, nullptr, root);
+    *send_req = rf.newHandle(*send_req, rData);
+  }
+};
+#endif
+struct mpiCollReducePBImpl {
+  RequestData rData;
+  int rank;
+  int root;
+
+  mpiCollReducePBImpl(MPI_Comm comm, int root) : root(root) {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    auto cData = cf.findData(comm);
+    rank = cData->getRank();
+    rData.IReduce(root, cData, rData.pb_reqs);
+  }
+  ~mpiCollReducePBImpl() {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    PMPI_Waitall(2, rData.pb_reqs, MPI_STATUSES_IGNORE);
+    if (root == rank)
+      MpiHappensAfter(rData, REF_RANK);
+  }
+};
+
+// Decide whether to use Allreduce or Bcast/Reduce for 1-all/all-1 collectives
+#if 0
+// Use Allreduce for all collective functions
+typedef mpiCollAllreducePBImpl mpiCollReducePB;
+typedef mpiIcollAllreducePBImpl mpiIcollReducePB;
+typedef mpiCollAllreducePBImpl mpiCollAllreducePB;
+typedef mpiIcollAllreducePBImpl mpiIcollAllreducePB;
+typedef mpiCollAllreducePBImpl mpiCollBcastPB;
+typedef mpiIcollAllreducePBImpl mpiIcollBcastPB;
+#ifdef HAVE_PCOLL /* Have persistent collective support in MPI */
+typedef mpiCollAllreduceInitPBImpl mpiCollReduceInitPB;
+typedef mpiCollAllreduceInitPBImpl mpiCollAllreduceInitPB;
+typedef mpiCollAllreduceInitPBImpl mpiCollBcastInitPB;
+#endif
+#else
+// Use Bcast/Reduce for 1-all/all-1 collectives
+typedef mpiCollReducePBImpl mpiCollReducePB;
+typedef mpiIcollReducePBImpl mpiIcollReducePB;
+typedef mpiCollAllreducePBImpl mpiCollAllreducePB;
+typedef mpiIcollAllreducePBImpl mpiIcollAllreducePB;
+typedef mpiCollBcastPBImpl mpiCollBcastPB;
+typedef mpiIcollBcastPBImpl mpiIcollBcastPB;
+#ifdef HAVE_PCOLL /* Have persistent collective support in MPI */
+typedef mpiCollReduceInitPBImpl mpiCollReduceInitPB;
+typedef mpiCollAllreduceInitPBImpl mpiCollAllreduceInitPB;
+typedef mpiCollBcastInitPBImpl mpiCollBcastInitPB;
+#endif
+#endif
+
+struct mpiIsendPB {
+  double *uc;
+  RequestData *rData;
+  MPI_Request *send_req;
+  int dest;
+  int rank;
+
+  mpiIsendPB(int dest, int tag, MPI_Comm comm, MPI_Request *request)
+      : dest(dest) {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    if (dest == MPI_PROC_NULL)
+      return;
+    rData = rf.newData();
+    auto cData = cf.findData(comm);
+    rank = cData->getRank();
+    send_req = request;
+    uc = loadThreadTimers(rData);
+    PMPI_Isend(uc, 1, ipcData::ipcMpiType, dest, tag, cData->getDupComm(),
+               rData->pb_reqs);
+  }
+  ~mpiIsendPB() {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    if (dest == MPI_PROC_NULL)
+      return;
+    rData->init(*send_req, ISEND, dest);
+    rData->setCompletionCallback(completePBnoHB);
+    *send_req = rf.newHandle(*send_req, rData);
+  }
+};
+
+struct mpiSendInitPB {
+  double *uc;
+  RequestData *rData;
+  MPI_Request *send_req;
+  int dest;
+  int rank;
+
+  mpiSendInitPB(int dest, int tag, MPI_Comm comm, MPI_Request *request)
+      : dest(dest) {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    if (dest == MPI_PROC_NULL)
+      return;
+    auto cData = cf.findData(comm);
+    rank = cData->getRank();
+    send_req = request;
+    rData = rf.newData();
+    rData->setStartCallback(startPersPBHB);
+    rData->setCompletionCallback(completePersPBnoHB);
+    PMPI_Send_init(uc, 1, ipcData::ipcMpiType, dest, tag, cData->getDupComm(),
+                   rData->pb_reqs);
+  }
+  ~mpiSendInitPB() {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    if (dest == MPI_PROC_NULL)
+      return;
+    rData->init(*send_req, PSEND, dest);
+    *send_req = rf.newHandle(*send_req, rData);
+  }
+};
+
+struct mpiSendPB {
+  double *uc;
+  RequestData rData{};
+  int dest;
+  int rank;
+
+  mpiSendPB(int dest, int tag, MPI_Comm comm) : dest(dest) {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    if (dest == MPI_PROC_NULL)
+      return;
+    auto cData = cf.findData(comm);
+    rank = cData->getRank();
+    uc = loadThreadTimers(rData);
+    PMPI_Isend(uc, 1, ipcData::ipcMpiType, dest, tag, cData->getDupComm(),
+               rData.pb_reqs);
+  }
+  ~mpiSendPB() {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    if (dest == MPI_PROC_NULL)
+      return;
+    PMPI_Waitall(2, rData.pb_reqs, MPI_STATUSES_IGNORE);
+  }
+};
+
+struct mpiRecvPB {
+  double *uc;
+  RequestData rData;
+  CommData *cData;
+  MPI_Status tStatus;
+  MPI_Status *pStatus;
+  int src;
+  int tag;
+  MPI_Comm dComm;
+  int rank;
+
+  mpiRecvPB(int src, int tag, MPI_Comm comm, MPI_Status **status)
+      : pStatus(*status), src(src), tag(tag) {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    if (src == MPI_PROC_NULL)
+      return;
+    cData = cf.findData(comm);
+    rank = cData->getRank();
+    uc = rData.uc_double;
+    if (src != MPI_ANY_SOURCE && tag != MPI_ANY_TAG) {
+      PMPI_Irecv(uc, 1, ipcData::ipcMpiType, src, tag, cData->getDupComm(),
+                 rData.pb_reqs);
+    } else {
+      if (*status == MPI_STATUS_IGNORE) {
+        pStatus = *status = &tStatus;
+      }
+    }
+  }
+  ~mpiRecvPB() {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    if (src == MPI_PROC_NULL)
+      return;
+    if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
+      src = pStatus->MPI_SOURCE;
+      tag = pStatus->MPI_TAG;
+      PMPI_Recv(uc, 1, ipcData::ipcMpiType, src, tag, dComm, MPI_STATUS_IGNORE);
+    } else {
+      PMPI_Waitall(2, rData.pb_reqs, MPI_STATUSES_IGNORE);
+    }
+    MpiHappensAfter(rData, src);
+  }
+};
+
+struct mpiIrecvPB {
+  double *uc;
+  RequestData *rData;
+  CommData *cData;
+  MPI_Request *send_req;
+  int rank;
+  int src;
+  int tag;
+
+  mpiIrecvPB(int src, int tag, MPI_Comm comm, MPI_Request *request)
+      : send_req(request), src(src), tag(tag) {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    if (src == MPI_PROC_NULL)
+      return;
+    rData = rf.newData();
+    cData = cf.findData(comm);
+    rank = cData->getRank();
+    send_req = request;
+    uc = rData->uc_double;
+    if (src != MPI_ANY_SOURCE && tag != MPI_ANY_TAG) {
+      PMPI_Irecv(uc, 1, ipcData::ipcMpiType, src, tag, cData->getDupComm(),
+                 rData->pb_reqs);
+    }
+  }
+  ~mpiIrecvPB() {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    if (src == MPI_PROC_NULL)
+      return;
+    if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
+      rData->init(*send_req, IRECV, src, tag, cData);
+      rData->setCompletionCallback(completePBWC);
+    } else {
+      rData->init(*send_req, IRECV, src);
+      rData->setCompletionCallback(completePBHB);
+    }
+    *send_req = rf.newHandle(*send_req, rData);
+  }
+};
+
+struct mpiRecvInitPB {
+  double *uc;
+  RequestData *rData;
+  CommData *cData;
+  MPI_Request *send_req;
+  int rank;
+  int src;
+  int tag;
+
+  mpiRecvInitPB(int src, int tag, MPI_Comm comm, MPI_Request *request)
+      : send_req(request), src(src), tag(tag) {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    if (src == MPI_PROC_NULL)
+      return;
+    rData = rf.newData();
+    cData = cf.findData(comm);
+    rank = cData->getRank();
+    send_req = request;
+    uc = rData->uc_double;
+    if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
+      rData->setCompletionCallback(completePBWC);
+    } else {
+      rData->setStartCallback(startPersPBnoHB);
+      rData->setCompletionCallback(completePersPBHB);
+      PMPI_Recv_init(uc, 1, ipcData::ipcMpiType, src, tag, cData->getDupComm(),
+                     rData->pb_reqs);
+    }
+    if (src != MPI_ANY_SOURCE && tag != MPI_ANY_TAG) {
+    }
+  }
+  ~mpiRecvInitPB() {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    if (src == MPI_PROC_NULL)
+      return;
+    if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
+      rData->init(*send_req, IRECV, src, tag, cData);
+    } else {
+      rData->init(*send_req, IRECV, src);
+    }
+    *send_req = rf.newHandle(*send_req, rData);
+  }
+};
+
+#endif

@@ -1,0 +1,8 @@
+add_executable(test test.cpp)
+target_link_libraries(test ${MPI_C_LIBRARIES})
+add_executable(test-wc-source test-wc-source.cpp)
+target_link_libraries(test-wc-source ${MPI_C_LIBRARIES})
+add_executable(test-wc-tag test-wc-tag.cpp)
+target_link_libraries(test-wc-tag ${MPI_C_LIBRARIES})
+add_executable(test-group test-group.cpp)
+target_link_libraries(test-group ${MPI_C_LIBRARIES})
