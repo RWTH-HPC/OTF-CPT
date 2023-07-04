@@ -60,6 +60,7 @@ public:
   int report_data_leak{0};
   int ignore_serial{0};
   int analyze_pattern{1};
+  int colorize{1};
 
   AnalysisFlags(const char *env) {
     if (env) {
@@ -85,6 +86,8 @@ public:
         if (sscanf(it->c_str(), "report_data_leak=%d", &report_data_leak))
           continue;
         if (sscanf(it->c_str(), "enable=%d", &enabled))
+          continue;
+        if (sscanf(it->c_str(), "colorize=%d", &colorize))
           continue;
         if (sscanf(it->c_str(), "ignore_serial=%d", &ignore_serial))
           continue;

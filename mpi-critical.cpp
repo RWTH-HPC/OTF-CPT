@@ -145,23 +145,25 @@ void init_timer_offsets() {
   }
   PMPI_Bcast(timeOffsets.data(), size, MPI_DOUBLE, 0, cw_dup);
   localTimeOffset = localTime = timeOffsets[rank];
-  if (rank == 0)
+  if (rank == 0 && analysis_flags->verbose)
     printf("Timer Offsets:");
   for (auto &v : timeOffsets) {
     v -= localTime;
-    if (rank == 0)
+    if (rank == 0 && analysis_flags->verbose)
       printf("%lf, ", v);
   }
-  if (rank == 0)
+  if (rank == 0 && analysis_flags->verbose)
     printf("\n");
 }
 
 void init_processes(mpiTimer &mt) {
   PMPI_Comm_rank(MPI_COMM_WORLD, &myProcId);
-  char processor_name[MPI_MAX_PROCESSOR_NAME];
-  int name_len;
-  PMPI_Get_processor_name(processor_name, &name_len);
-  printf("Process %i at %s\n", myProcId, processor_name);
+  if (analysis_flags->verbose) {
+    char processor_name[MPI_MAX_PROCESSOR_NAME];
+    int name_len;
+    PMPI_Get_processor_name(processor_name, &name_len);
+    printf("Process %i at %s\n", myProcId, processor_name);
+  }
   init_timer_offsets();
   if (!analysis_flags->running) {
     startTool(false, CLOCK_ALL);

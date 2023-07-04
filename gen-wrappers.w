@@ -14,12 +14,14 @@
     const char *options = getenv(ANALYSIS_FLAGS);
     analysis_flags = new AnalysisFlags(options);
   }
-  std::cout << "Starting critPathAnalysis tool" << std::endl;
+  if (analysis_flags->verbose)
+     std::cout << "Starting critPathAnalysis tool" << std::endl;
   useMpi = true;
 
   mpiTimer mt{true, __func__};
 
-  std::cout << "MPI Init" << std::endl;
+  if (analysis_flags->verbose)
+     std::cout << "MPI Init" << std::endl;
 
    {{ret_val}} = P{{fn_name}}({{args}});
 #ifdef HANDLE_OP

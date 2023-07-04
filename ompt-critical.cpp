@@ -716,7 +716,7 @@ static void ompt_tsan_task_create(
 static void
 ompt_tsan_task_creation(ompt_scope_endpoint_t endpoint,
                         ompt_data_t *parent_task_data, /* id of parent task */
-                        ompt_data_t *new_task_data)    /* id of created task    */
+                        ompt_data_t *new_task_data) /* id of created task    */
 {
   switch (endpoint) {
   case ompt_scope_begin:
@@ -984,8 +984,9 @@ static int ompt_tsan_initialize(ompt_function_lookup_t lookup, int device_num,
 
 static void ompt_tsan_finalize(ompt_data_t *tool_data) {
   if (!useMpi) {
-    std::cout << "Max Useful Computation -- " << crit_path_useful_time
-              << std::endl;
+    if (analysis_flags->verbose)
+      std::cout << "Max Useful Computation -- " << crit_path_useful_time
+                << std::endl;
     finishMeasurement();
   }
   if (analysis_flags->print_max_rss) {
@@ -1003,7 +1004,8 @@ ompt_start_tool(unsigned int omp_version, const char *runtime_version) {
     const char *options = getenv(ANALYSIS_FLAGS);
     analysis_flags = new AnalysisFlags(options);
   }
-  std::cout << "Starting critPathAnalysis OMPT tool" << std::endl;
+  if (analysis_flags->verbose)
+    std::cout << "Starting critPathAnalysis OMPT tool" << std::endl;
   if (!analysis_flags->enabled) {
     if (analysis_flags->verbose)
       std::cout << "Tool disabled, stopping operation" << std::endl;

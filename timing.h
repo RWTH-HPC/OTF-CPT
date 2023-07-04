@@ -1,5 +1,6 @@
 #include <math.h>
 #include <mpi.h>
+#include <string>
 #include <time.h>
 
 #define BILLION 1000000000

@@ -79,12 +79,19 @@ void resetMpiClock(THREAD_CLOCK *thread_clock) {
 void startMeasurement(double time) {
   auto initialStart = startProgrammTime;
   startProgrammTime = time;
-  printf("Initialize after %lf s\n", startProgrammTime - initialStart);
+  if (analysis_flags->verbose)
+    printf("Initialize after %lf s\n", startProgrammTime - initialStart);
 }
 
 void stopMeasurement(double time) { endProgrammTime = time; }
 
 #define NUM_SHARED_METRICS 7
+
+std::string colorize(std::string text) {
+  if (!analysis_flags->colorize)
+    return text;
+  return "\033[1;35m" + text + "\033[0m";
+}
 
 void finishMeasurement() {
   int number_of_procs = 1;
@@ -202,79 +209,82 @@ void finishMeasurement() {
     double ompPE = ompLB * ompCommE;
     double mpiPE = mpiLB * mpiCommE;
 
-    std::string pop_string_total =
-        "\n[pop] sere:" + std::to_string(SerE) + ":te:" + std::to_string(TE) +
-        ":comme:" + std::to_string(CommE) + ":lb:" + std::to_string(LB) +
-        ":pe:" + std::to_string(PE) +
-        ":crittime:" + std::to_string(totalRuntimeIdeal) +
-        ":totaltime:" + std::to_string(totalRuntimeReal) +
-        ":avgcomputation:" + std::to_string(avgComputation[0]) +
-        ":maxcomputation:" + std::to_string(maxComputation[0]) + "\n";
-    std::cout << pop_string_total;
-    std::cout << "\n\n--------MPI stats:--------\n";
-    if (total_counts.send)
-      std::cout << "MPI_*send: " << total_counts.send << std::endl;
-    if (total_counts.isend)
-      std::cout << "MPI_I*send: " << total_counts.isend << std::endl;
-    if (total_counts.recv)
-      std::cout << "MPI_Recv: " << total_counts.recv << std::endl;
-    if (total_counts.irecv)
-      std::cout << "MPI_Irecv: " << total_counts.irecv << std::endl;
-    if (total_counts.coll)
-      std::cout << "MPI_*coll: " << total_counts.coll << std::endl;
-    if (total_counts.coll)
-      std::cout << "MPI_I*coll: " << total_counts.coll << std::endl;
-    if (total_counts.test)
-      std::cout << "MPI_Test*: " << total_counts.test << std::endl;
-    if (total_counts.wait)
-      std::cout << "MPI_Wait*: " << total_counts.wait << std::endl << std::endl;
+    if (analysis_flags->verbose) {
+      std::string pop_string_total =
+          "\n[pop] sere:" + std::to_string(SerE) + ":te:" + std::to_string(TE) +
+          ":comme:" + std::to_string(CommE) + ":lb:" + std::to_string(LB) +
+          ":pe:" + std::to_string(PE) +
+          ":crittime:" + std::to_string(totalRuntimeIdeal) +
+          ":totaltime:" + std::to_string(totalRuntimeReal) +
+          ":avgcomputation:" + std::to_string(avgComputation[0]) +
+          ":maxcomputation:" + std::to_string(maxComputation[0]) + "\n";
+      std::cout << pop_string_total;
+      std::cout << "\n\n--------MPI stats:--------\n";
+      if (total_counts.send)
+        std::cout << "MPI_*send: " << total_counts.send << std::endl;
+      if (total_counts.isend)
+        std::cout << "MPI_I*send: " << total_counts.isend << std::endl;
+      if (total_counts.recv)
+        std::cout << "MPI_Recv: " << total_counts.recv << std::endl;
+      if (total_counts.irecv)
+        std::cout << "MPI_Irecv: " << total_counts.irecv << std::endl;
+      if (total_counts.coll)
+        std::cout << "MPI_*coll: " << total_counts.coll << std::endl;
+      if (total_counts.coll)
+        std::cout << "MPI_I*coll: " << total_counts.coll << std::endl;
+      if (total_counts.test)
+        std::cout << "MPI_Test*: " << total_counts.test << std::endl;
+      if (total_counts.wait)
+        std::cout << "MPI_Wait*: " << total_counts.wait << std::endl
+                  << std::endl;
 
-    std::cout << "\n\n--------CritPath Analysis Tool results:--------\n";
-    std::cout << "=> Number of processes:          " +
-                     std::to_string(number_of_procs) + "\n";
-    std::cout << "=> Number of threads:            " +
-                     std::to_string(total_threads) + "\n";
-    std::cout << "=> Average Computation (in s):   " +
-                     std::to_string(avgComputation[0]) + "\n";
-    std::cout << "=> Maximum Computation (in s):   " +
-                     std::to_string(maxComputation[0]) + "\n";
-    std::cout << "=> Max crit. computation (in s): " +
-                     std::to_string(totalRuntimeIdeal) + "\n";
-    std::cout << "=> Average crit. proc-local computation (in s):   " +
-                     std::to_string(avgComputation[3]) + "\n";
-    std::cout << "=> Maximum crit. proc-local computation (in s):   " +
-                     std::to_string(maxComputation[3]) + "\n";
-    std::cout << "=> Average crit. proc-local Outside OpenMP (in s):   " +
-                     std::to_string(avgComputation[4]) + "\n";
-    std::cout << "=> Maximum crit. proc-local Outside OpenMP (in s):   " +
-                     std::to_string(maxComputation[4]) + "\n";
-    std::cout << "=> Average proc-local rumtime (in s):   " +
-                     std::to_string(avgComputation[5]) + "\n";
-    std::cout << "=> Maximum proc-local runtime (in s):   " +
-                     std::to_string(maxComputation[5]) + "\n";
-    std::cout << "=> Average PL-max Computation (in s):   " +
-                     std::to_string(avgComputation[6]) + "\n";
-    std::cout << "=> Maximum PL-max Computation (in s):   " +
-                     std::to_string(maxComputation[6]) + "\n";
-    /*    std::cout << "=> Average Outside MPI (in s):   " +
-                         std::to_string(avgComputation[1]) + "\n";
-        std::cout << "=> Maximum Outside MPI (in s):   " +
-                         std::to_string(maxComputation[1]) + "\n";
-        std::cout << "=> Max crit. Outside MPI (in s): " +
-                         std::to_string(totalOutsideMPIIdeal) + "\n";*/
-    std::cout << "=> Average Outside OpenMP (in s):   " +
-                     std::to_string(avgComputation[2]) + "\n";
-    std::cout << "=> Maximum Outside OpenMP (in s):   " +
-                     std::to_string(maxComputation[2]) + "\n";
-    std::cout << "=> Max crit. Outside OpenMP (in s): " +
-                     std::to_string(totalOutsideOMPIdeal) + "\n";
-    std::cout << "=> Max crit. Outside OpenMP w/o offset (in s): " +
-                     std::to_string(totalOutsideOMPIdealNoOffset) + "\n";
-    std::cout << "=> Total runtime (in s):         " +
-                     std::to_string(totalRuntimeReal) + "\n\n";
+      std::cout << "\n\n--------CritPath Analysis Tool results:--------\n";
+      std::cout << "=> Number of processes:          " +
+                       std::to_string(number_of_procs) + "\n";
+      std::cout << "=> Number of threads:            " +
+                       std::to_string(total_threads) + "\n";
+      std::cout << "=> Average Computation (in s):   " +
+                       std::to_string(avgComputation[0]) + "\n";
+      std::cout << "=> Maximum Computation (in s):   " +
+                       std::to_string(maxComputation[0]) + "\n";
+      std::cout << "=> Max crit. computation (in s): " +
+                       std::to_string(totalRuntimeIdeal) + "\n";
+      std::cout << "=> Average crit. proc-local computation (in s):   " +
+                       std::to_string(avgComputation[3]) + "\n";
+      std::cout << "=> Maximum crit. proc-local computation (in s):   " +
+                       std::to_string(maxComputation[3]) + "\n";
+      std::cout << "=> Average crit. proc-local Outside OpenMP (in s):   " +
+                       std::to_string(avgComputation[4]) + "\n";
+      std::cout << "=> Maximum crit. proc-local Outside OpenMP (in s):   " +
+                       std::to_string(maxComputation[4]) + "\n";
+      std::cout << "=> Average proc-local rumtime (in s):   " +
+                       std::to_string(avgComputation[5]) + "\n";
+      std::cout << "=> Maximum proc-local runtime (in s):   " +
+                       std::to_string(maxComputation[5]) + "\n";
+      std::cout << "=> Average PL-max Computation (in s):   " +
+                       std::to_string(avgComputation[6]) + "\n";
+      std::cout << "=> Maximum PL-max Computation (in s):   " +
+                       std::to_string(maxComputation[6]) + "\n";
+      /*    std::cout << "=> Average Outside MPI (in s):   " +
+                          std::to_string(avgComputation[1]) + "\n";
+          std::cout << "=> Maximum Outside MPI (in s):   " +
+                          std::to_string(maxComputation[1]) + "\n";
+          std::cout << "=> Max crit. Outside MPI (in s): " +
+                          std::to_string(totalOutsideMPIIdeal) + "\n";*/
+      std::cout << "=> Average Outside OpenMP (in s):   " +
+                       std::to_string(avgComputation[2]) + "\n";
+      std::cout << "=> Maximum Outside OpenMP (in s):   " +
+                       std::to_string(maxComputation[2]) + "\n";
+      std::cout << "=> Max crit. Outside OpenMP (in s): " +
+                       std::to_string(totalOutsideOMPIdeal) + "\n";
+      std::cout << "=> Max crit. Outside OpenMP w/o offset (in s): " +
+                       std::to_string(totalOutsideOMPIdealNoOffset) + "\n";
+      std::cout << "=> Total runtime (in s):         " +
+                       std::to_string(totalRuntimeReal) + "\n\n";
+    }
 
     std::string pop_string =
-        "\n\033[1;35m----------------POP metrics----------------\033[0m\n";
+        colorize("\n----------------POP metrics----------------\n");
     pop_string +=
         "Parallel Efficiency:                " + std::to_string(PE) + "\n";
     pop_string +=
@@ -323,8 +333,7 @@ void finishMeasurement() {
        "\n";*/
     pop_string +=
         "      OMP Transfer Efficiency:      " + std::to_string(ompTE) + "\n";
-    pop_string +=
-        "\033[1;35m-------------------------------------------\033[0m\n";
+    pop_string += colorize("-------------------------------------------\n");
     std::cout << pop_string;
   }
 }
@@ -414,7 +423,8 @@ void startTool(bool toolControl, ClockContext cc) {
     assert(thread_local_clock->outsideomp_critical_nooffset == 0);
     assert(thread_local_clock->outsideomp_proc == 0);
 
-    printf("starting tool\n");
+    if (analysis_flags->verbose)
+      printf("starting tool\n");
     double time = getTime();
     analysis_flags->running = true;
     startMeasurement(time);
@@ -424,7 +434,8 @@ void startTool(bool toolControl, ClockContext cc) {
 
 void stopTool() {
   if (analysis_flags->running) {
-    printf("ending tool\n");
+    if (analysis_flags->verbose)
+      printf("ending tool\n");
     double time = getTime();
     thread_local_clock->Stop(time, CLOCK_ALL, __func__);
     analysis_flags->running = false;

@@ -2,8 +2,8 @@
 #include <mpi.h>
 #include <stdio.h>
 
-#include "tracking.h"
 #include "mpi-critical.h"
+#include "tracking.h"
 
 /* Start & Completion */
 
