@@ -16,7 +16,7 @@ class RaiiTimer {
 
   struct timespec start {};
   struct timespec istart {};
-  double total{0}, sumsqr{0};
+  double total{0}, sumsqr{0}, imin{1e10}, imax{0};
   int samples{0};
   std::string description{};
 
@@ -39,6 +39,10 @@ public:
     double elapsed = endd - startd;
     total += elapsed;
     sumsqr += elapsed * elapsed;
+    if (elapsed < imin)
+      imin = elapsed;
+    if (elapsed > imax)
+      imax = elapsed;
     samples++;
   }
   ~RaiiTimer() {
@@ -51,8 +55,10 @@ public:
     double mean = total / samples;
     double stddev2 = (sumsqr / samples) - (mean * mean);
     double error = sqrt(stddev2);
-    printf("%s total = %f, iter runtime (ms) = %f +/- %1.9f (%2.1f%%)\n",
-           description.c_str(), total, mean * 1000, error * 1000,
-           error / mean * 100);
+    printf(
+        "%-25s total = %f, iter runtime (ms) = %f +/- %1.9f (%2.1f%%), min / max "
+        "(ms) = %f / %f\n",
+        description.c_str(), total, mean * 1000, error * 1000,
+        error / mean * 100, imin * 1000, imax * 1000);
   }
 };
