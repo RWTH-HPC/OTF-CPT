@@ -71,3 +71,5 @@ add_library(OTFCPT_static STATIC ${OTFCPT_SOURCES})
 target_link_libraries(OTFCPT_static ${MPI_C_LIBRARIES})
 
 add_subdirectory(tests)
+
+install(TARGETS OTFCPT OTFCPT_static)
