@@ -1,4 +1,6 @@
 # On-the-fly critical-path tool
+<img src="media/OTF-CPT.png" hspace="5" vspace="5" height="45%" width="45%" alt="OTF-CPT Logo" title="OTF-CPT" align="right" />
+
 Tool to collect and report model factors (aka. fundamental performance factors) for hybrid MPI + OpenMP applications on-the-fly.
 
 ## Build with CMake
