@@ -68,7 +68,7 @@ int MPI_Type_get_contents(MPI_Datatype datatype, int max_integers,
   return _wrap_py_return_val;
 }
 
-#ifdef HAVE_COUNT
+#if MPI_VERSION < 3
 /* ================== C Wrappers for MPI_Type_struct ================== */
 int PMPI_Type_struct(int count, int array_of_blocklengths[],
                      MPI_Aint array_of_displacements[],
@@ -93,7 +93,10 @@ int MPI_Type_struct(int count, int array_of_blocklengths[],
 
   return _wrap_py_return_val;
 }
+#endif
 
+
+#ifdef HAVE_COUNT
 /* ================== C Wrappers for MPI_Type_create_struct_c ==================
  */
 int PMPI_Type_create_struct_c(MPI_Count count,
