@@ -793,7 +793,7 @@ extern MapListRequestFactory mrf;
 #if defined(HAVE_SESSION) && defined(HANDLE_SESSION)
 extern SessionFactory sf;
 extern MapListSessionFactory msf;
-#else
+#elif !defined(HAVE_SESSION)
 typedef int MPI_Session;
 #endif
 
