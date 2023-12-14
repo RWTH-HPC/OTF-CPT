@@ -282,7 +282,7 @@ struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
 
 typedef SYNC_CLOCK ompt_tsan_clockid;
 extern thread_local THREAD_CLOCK *thread_local_clock;
-extern std::vector<THREAD_CLOCK *> thread_clocks;
+extern std::vector<THREAD_CLOCK *> *thread_clocks;
 extern double startProgrammTime;
 extern double crit_path_useful_time;
 

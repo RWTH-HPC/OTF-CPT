@@ -45,7 +45,7 @@ double totalProgrammTime = 0;
 double startProgrammTime = getTime(), endProgrammTime;
 double crit_path_useful_time = 0;
 
-std::vector<THREAD_CLOCK *> thread_clocks{};
+std::vector<THREAD_CLOCK *> *thread_clocks = nullptr;
 thread_local THREAD_CLOCK *thread_local_clock = nullptr;
 
 void resetMpiClock(THREAD_CLOCK *thread_clock) {
@@ -96,7 +96,9 @@ std::string colorize(std::string text) {
 void finishMeasurement() {
   int number_of_procs = 1;
   int total_threads = 0;
-  int num_threads = thread_clocks.size();
+  int num_threads = 0;
+  if (thread_clocks)
+    num_threads = thread_clocks->size();
 
   double avgComputation[NUM_SHARED_METRICS] = {0};
   double maxComputation[NUM_SHARED_METRICS] = {0};
@@ -114,11 +116,12 @@ void finishMeasurement() {
   MPI_COUNTS proc_counts, total_counts;
   if (num_threads > 0) {
     for (int i = 0; i < num_threads; i++) {
-      proc_counts.add(*thread_clocks[i]);
-      assert(thread_clocks[i]->stopped_clock == true);
-      assert(thread_clocks[i]->stopped_omp_clock == true);
-      double curr_uc = thread_clocks[i]->useful_computation_thread.load();
-      double curr_oot = thread_clocks[i]->outsideomp_thread.load();
+      auto *tclock = (*thread_clocks)[i];
+      proc_counts.add(*tclock);
+      assert(tclock->stopped_clock == true);
+      assert(tclock->stopped_omp_clock == true);
+      double curr_uc = tclock->useful_computation_thread.load();
+      double curr_oot = tclock->outsideomp_thread.load();
       if (curr_uc > uc_max[0]) {
         uc_max[0] = curr_uc;
       }
