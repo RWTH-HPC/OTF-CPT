@@ -98,7 +98,7 @@ void finishMeasurement() {
   int total_threads = 0;
   int num_threads = 0;
   if (thread_clocks)
-    num_threads = thread_clocks->size();
+    total_threads = num_threads = thread_clocks->size();
 
   double avgComputation[NUM_SHARED_METRICS] = {0};
   double maxComputation[NUM_SHARED_METRICS] = {0};
@@ -175,6 +175,10 @@ void finishMeasurement() {
     maxComputation[i] = uc_max[i];
     avgComputation[i] = uc_avg[i];
   }
+  avgComputation[0]/=num_threads;
+  avgComputation[2]/=num_threads;
+  avgComputation[5]/=num_threads;
+  avgComputation[6]/=num_threads;
 #endif
 
   if (myProcId == 0) { // display results on master thread
