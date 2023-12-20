@@ -37,6 +37,8 @@ check_mpi_type_exists_pp(MPI_Session)
 check_mpi_type_exists_pp(MPI_Count)
 check_mpi_function_exists_pp(MPI_Barrier_init)
 
+add_definitions(-DUSE_MPI)
+
 if(HAVE_MPI_SESSION)
     add_definitions(-DHAVE_SESSION)
 endif()

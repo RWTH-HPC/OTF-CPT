@@ -469,7 +469,7 @@ static void ompt_tsan_thread_begin(ompt_thread_t thread_type,
   thread_data->ptr = thread_local_clock;
   {
     const std::lock_guard<std::mutex> lock(tcmutex);
-    thread_clocks.push_back(thread_local_clock);
+    thread_clocks->push_back(thread_local_clock);
   }
 }
 
@@ -551,9 +551,16 @@ static void ompt_tsan_implicit_task(ompt_scope_endpoint_t endpoint,
     Data->Delete();
     if (type & ompt_task_initial) {
       ToParallelData(parallel_data)->Delete();
-    }
-    if (team_size == 1 && !(type & ompt_task_initial))
+      if (!thread_local_clock->stopped_clock) {
+        if (!thread_local_clock->stopped_mpi_clock) {
+          thread_local_clock->Stop(CLOCK_ALL, __func__);
+        } else {
+          thread_local_clock->Stop(CLOCK_OMP, __func__);
+        }
+      }
+    } else if (team_size == 1) {
       thread_local_clock->Stop(CLOCK_OMP, __func__);
+    }
 
     assert(thread_local_clock->stopped_clock == true);
 
@@ -1004,8 +1011,6 @@ ompt_start_tool(unsigned int omp_version, const char *runtime_version) {
     const char *options = getenv(ANALYSIS_FLAGS);
     analysis_flags = new AnalysisFlags(options);
   }
-  if (analysis_flags->verbose)
-    std::cout << "Starting critPathAnalysis OMPT tool" << std::endl;
   if (!analysis_flags->enabled) {
     if (analysis_flags->verbose)
       std::cout << "Tool disabled, stopping operation" << std::endl;
@@ -1013,11 +1018,15 @@ ompt_start_tool(unsigned int omp_version, const char *runtime_version) {
     delete analysis_flags;
     return NULL;
   }
+  if (analysis_flags->verbose)
+    std::cout << "Starting critPathAnalysis OMPT tool" << std::endl;
 
   pagesize = getpagesize();
 
   static ompt_start_tool_result_t ompt_start_tool_result = {
       &ompt_tsan_initialize, &ompt_tsan_finalize, {0}};
+  if (!thread_clocks)
+    thread_clocks = new std::vector<THREAD_CLOCK *>{};
 
   // The OMPT start-up code uses dlopen with RTLD_LAZY. Therefore, we cannot
   // rely on dlopen to fail if TSan is missing, but would get a runtime error

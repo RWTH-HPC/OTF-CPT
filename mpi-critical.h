@@ -144,6 +144,7 @@ struct mpiIcollAllreducePBImpl {
     rank = cData->getRank();
     send_req = request;
     rData = rf.newData();
+    loadThreadTimers(rData, REF_RANK);
     rData->IAllreduce(cData, rData->pb_reqs);
   }
   ~mpiIcollAllreducePBImpl() {
@@ -191,6 +192,7 @@ struct mpiCollAllreducePBImpl {
 #endif
     auto cData = cf.findData(comm);
     rank = cData->getRank();
+    loadThreadTimers(rData, REF_RANK);
     rData.IAllreduce(cData, rData.pb_reqs);
   }
   ~mpiCollAllreducePBImpl() {
@@ -219,6 +221,7 @@ struct mpiIcollReducePBImpl {
     rank = cData->getRank();
     send_req = request;
     rData = rf.newData();
+    loadThreadTimers(rData, REF_RANK);
     rData->IReduce(root, cData, rData->pb_reqs);
     if (root == rank) {
       rData->setCompletionCallback(completePBHB);
@@ -275,6 +278,7 @@ struct mpiCollReducePBImpl {
 #endif
     auto cData = cf.findData(comm);
     rank = cData->getRank();
+    loadThreadTimers(rData, REF_RANK);
     rData.IReduce(root, cData, rData.pb_reqs);
   }
   ~mpiCollReducePBImpl() {
