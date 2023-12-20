@@ -49,9 +49,6 @@ extern ompt_finalize_tool_t critical_ompt_finalize_tool;
 
 class AnalysisFlags {
 public:
-#if (LLVM_VERSION) >= 40
-  int flush_shadow{0};
-#endif
   int print_max_rss{0};
   int verbose{0};
   int enabled{1};
@@ -73,10 +70,6 @@ public:
 
       for (std::vector<std::string>::iterator it = tokens.begin();
            it != tokens.end(); ++it) {
-#if (LLVM_VERSION) >= 40
-        if (sscanf(it->c_str(), "flush_shadow=%d", &flush_shadow))
-          continue;
-#endif
         if (sscanf(it->c_str(), "print_max_rss=%d", &print_max_rss))
           continue;
         if (sscanf(it->c_str(), "verbose=%d", &verbose))
@@ -91,7 +84,7 @@ public:
           continue;
         if (sscanf(it->c_str(), "ignore_serial=%d", &ignore_serial))
           continue;
-        std::cerr << "Illegal values for ANALYSIS_OPTIONS variable: " << token
+        std::cerr << "Illegal values for " ANALYSIS_FLAGS " variable: " << token
                   << std::endl;
       }
     }
@@ -282,7 +275,7 @@ struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
 
 typedef SYNC_CLOCK ompt_tsan_clockid;
 extern thread_local THREAD_CLOCK *thread_local_clock;
-extern std::vector<THREAD_CLOCK *> thread_clocks;
+extern std::vector<THREAD_CLOCK *> *thread_clocks;
 extern double startProgrammTime;
 extern double crit_path_useful_time;
 

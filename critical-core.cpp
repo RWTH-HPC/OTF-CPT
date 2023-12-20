@@ -45,7 +45,7 @@ double totalProgrammTime = 0;
 double startProgrammTime = getTime(), endProgrammTime;
 double crit_path_useful_time = 0;
 
-std::vector<THREAD_CLOCK *> thread_clocks{};
+std::vector<THREAD_CLOCK *> *thread_clocks = nullptr;
 thread_local THREAD_CLOCK *thread_local_clock = nullptr;
 
 void resetMpiClock(THREAD_CLOCK *thread_clock) {
@@ -96,7 +96,9 @@ std::string colorize(std::string text) {
 void finishMeasurement() {
   int number_of_procs = 1;
   int total_threads = 0;
-  int num_threads = thread_clocks.size();
+  int num_threads = 0;
+  if (thread_clocks)
+    total_threads = num_threads = thread_clocks->size();
 
   double avgComputation[NUM_SHARED_METRICS] = {0};
   double maxComputation[NUM_SHARED_METRICS] = {0};
@@ -114,11 +116,12 @@ void finishMeasurement() {
   MPI_COUNTS proc_counts, total_counts;
   if (num_threads > 0) {
     for (int i = 0; i < num_threads; i++) {
-      proc_counts.add(*thread_clocks[i]);
-      assert(thread_clocks[i]->stopped_clock == true);
-      assert(thread_clocks[i]->stopped_omp_clock == true);
-      double curr_uc = thread_clocks[i]->useful_computation_thread.load();
-      double curr_oot = thread_clocks[i]->outsideomp_thread.load();
+      auto *tclock = (*thread_clocks)[i];
+      proc_counts.add(*tclock);
+      assert(tclock->stopped_clock == true);
+      assert(tclock->stopped_omp_clock == true);
+      double curr_uc = tclock->useful_computation_thread.load();
+      double curr_oot = tclock->outsideomp_thread.load();
       if (curr_uc > uc_max[0]) {
         uc_max[0] = curr_uc;
       }
@@ -146,34 +149,39 @@ void finishMeasurement() {
   uc_avg[6] = uc_max[0] * num_threads;
 
 #ifdef USE_MPI
-  // aggregate all max and avg computations on the master thread
-  PMPI_Reduce(&uc_max, &maxComputation, NUM_SHARED_METRICS, MPI_DOUBLE, MPI_MAX,
-              0, MPI_COMM_WORLD);
-  PMPI_Reduce(&uc_avg, &avgComputation, NUM_SHARED_METRICS, MPI_DOUBLE, MPI_SUM,
-              0, MPI_COMM_WORLD);
-  PMPI_Reduce(&num_threads, &total_threads, 1, MPI_INT, MPI_SUM, 0,
-              MPI_COMM_WORLD);
-  PMPI_Reduce(&proc_counts, &total_counts, sizeof(proc_counts) / sizeof(int),
-              MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-  double localRuntimeReal = totalRuntimeReal;
-  PMPI_Reduce(&localRuntimeReal, &totalRuntimeReal, 1, MPI_DOUBLE, MPI_MAX, 0,
-              MPI_COMM_WORLD);
-  PMPI_Comm_size(MPI_COMM_WORLD, &number_of_procs);
-  avgComputation[1] = avgComputation[1] / number_of_procs;
-  avgComputation[3] = avgComputation[3] / number_of_procs;
-  avgComputation[4] = avgComputation[4] / number_of_procs;
-  avgComputation[0] = avgComputation[0] / total_threads;
-  avgComputation[2] = avgComputation[2] / total_threads;
-  avgComputation[5] = avgComputation[5] / total_threads;
-  avgComputation[6] = avgComputation[6] / total_threads;
-
-#else
-  for (int i = 0; i < NUM_SHARED_METRICS; i++) {
-    maxComputation[i] = uc_max[i];
-    avgComputation[i] = uc_avg[i];
-  }
+  if (useMpi) {
+    // aggregate all max and avg computations on the master thread
+    PMPI_Reduce(&uc_max, &maxComputation, NUM_SHARED_METRICS, MPI_DOUBLE,
+                MPI_MAX, 0, MPI_COMM_WORLD);
+    PMPI_Reduce(&uc_avg, &avgComputation, NUM_SHARED_METRICS, MPI_DOUBLE,
+                MPI_SUM, 0, MPI_COMM_WORLD);
+    PMPI_Reduce(&num_threads, &total_threads, 1, MPI_INT, MPI_SUM, 0,
+                MPI_COMM_WORLD);
+    PMPI_Reduce(&proc_counts, &total_counts, sizeof(proc_counts) / sizeof(int),
+                MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    double localRuntimeReal = totalRuntimeReal;
+    PMPI_Reduce(&localRuntimeReal, &totalRuntimeReal, 1, MPI_DOUBLE, MPI_MAX, 0,
+                MPI_COMM_WORLD);
+    PMPI_Comm_size(MPI_COMM_WORLD, &number_of_procs);
+    avgComputation[1] = avgComputation[1] / number_of_procs;
+    avgComputation[3] = avgComputation[3] / number_of_procs;
+    avgComputation[4] = avgComputation[4] / number_of_procs;
+    avgComputation[0] = avgComputation[0] / total_threads;
+    avgComputation[2] = avgComputation[2] / total_threads;
+    avgComputation[5] = avgComputation[5] / total_threads;
+    avgComputation[6] = avgComputation[6] / total_threads;
+  } else
 #endif
-
+  {
+    for (int i = 0; i < NUM_SHARED_METRICS; i++) {
+      maxComputation[i] = uc_max[i];
+      avgComputation[i] = uc_avg[i];
+    }
+    avgComputation[0]/=num_threads;
+    avgComputation[2]/=num_threads;
+    avgComputation[5]/=num_threads;
+    avgComputation[6]/=num_threads;
+  }
   if (myProcId == 0) { // display results on master thread
                        // calculate pop metrics
     double totalRuntimeIdeal =
