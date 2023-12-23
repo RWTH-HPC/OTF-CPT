@@ -2,6 +2,12 @@ cmake_minimum_required(VERSION 3.0)
 
 project(OTFCPT C CXX)
 
+SET(CMAKE_MODULE_PATH
+    "${CMAKE_SOURCE_DIR}/cmakemodules"
+    ${CMAKE_MODULE_PATH}
+    )
+
+
 find_package(MPI REQUIRED)
 find_package(OpenMP REQUIRED)
 
@@ -62,6 +68,13 @@ set(OTFCPT_SOURCES
     gen-wrappers.cpp
 )
 
+set(OTFCPT_OMP_SOURCES
+    critical-core.cpp
+    ompt-critical.cpp
+    tracking.cpp
+)
+
+
 set(WRAP_FLAGS -s -n)
 add_wrapped_file(gen-nb-wrappers.cpp gen-nb-wrappers.w)
 add_wrapped_file(gen-wrappers.cpp gen-wrappers.w)
@@ -69,9 +82,20 @@ add_wrapped_file(gen-wrappers.cpp gen-wrappers.w)
 add_library(OTFCPT SHARED ${OTFCPT_SOURCES})
 target_link_libraries(OTFCPT ${MPI_C_LIBRARIES})
 
+add_library(OTFCPT_omp SHARED ${OTFCPT_OMP_SOURCES})
+
 add_library(OTFCPT_static STATIC ${OTFCPT_SOURCES})
 target_link_libraries(OTFCPT_static ${MPI_C_LIBRARIES})
 
 add_subdirectory(tests)
 
-install(TARGETS OTFCPT OTFCPT_static)
+if (EXISTS ${CMAKE_CURRENT_LIST_DIR}/external/FileCheck/CMakeLists.txt)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/external/FileCheck EXCLUDE_FROM_ALL)
+endif()
+
+
+install(TARGETS 
+        OTFCPT 
+        OTFCPT_omp
+        OTFCPT_static
+        )

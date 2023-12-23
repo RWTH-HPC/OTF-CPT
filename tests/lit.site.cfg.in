@@ -1,0 +1,17 @@
+config.test_filecheck = "@FILECHECK_EXECUTABLE@"
+config.project_obj_root = "@EXECUTABLE_OUTPUT_PATH@"
+config.operating_system = "@CMAKE_SYSTEM_NAME@"
+config.compiler_id = "@CMAKE_CXX_COMPILER_ID@"
+config.mpiexec = "@MPIEXEC_EXECUTABLE@"
+config.mpiexec_numproc_flag = "@MPIEXEC_NUMPROC_FLAG@"
+config.testdir = "@CMAKE_CURRENT_BINARY_DIR@"
+
+config.otfcptlib = "@OTFCPT_LIB@"
+config.otfcptomplib = "@OTFCPT_OMP_LIB@"
+
+# Booleans must not have quotes! ("False" is true!)
+config.openmp_found = @OpenMP_FOUND@
+config.forward_full_env = @LIT_FORWARD_FULL_ENV@
+
+# Let the main config do the real work.
+lit_config.load_config(config, "@CMAKE_CURRENT_SOURCE_DIR@/lit.cfg")

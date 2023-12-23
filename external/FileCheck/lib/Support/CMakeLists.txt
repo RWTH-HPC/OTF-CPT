@@ -1,0 +1,170 @@
+# Do BLAKE3 a favour and include the cmake module for it.
+include(CheckSymbolExists)
+# Disable the llvm macro in BLAKE3
+macro(llvm_update_compile_flags)
+endmacro()
+add_subdirectory(BLAKE3)
+macro(llvm_update_compile_flags)
+  _llvm_update_compile_flags(${ARGN})
+endmacro()
+
+add_library(LLVMSupport_Standalone
+        #AddressRanges.cpp
+        #AArch64TargetParser.cpp
+        ABIBreak.cpp
+        ARMTargetParser.cpp
+        #AMDGPUMetadata.cpp
+        #APFixedPoint.cpp
+        APFloat.cpp
+        APInt.cpp
+        #APSInt.cpp
+        #ARMBuildAttrs.cpp
+        #ARMAttributeParser.cpp
+        #ARMWinEH.cpp
+        #Allocator.cpp
+        #AutoConvert.cpp
+        #BinaryStreamError.cpp
+        #BinaryStreamReader.cpp
+        #BinaryStreamRef.cpp
+        #BinaryStreamWriter.cpp
+        #BlockFrequency.cpp
+        #BranchProbability.cpp
+        #BuryPointer.cpp
+        #CachePruning.cpp
+        #Caching.cpp
+        circular_raw_ostream.cpp
+        #Chrono.cpp
+        #COM.cpp
+        #CodeGenCoverage.cpp
+        CommandLine.cpp
+        #Compression.cpp
+        #CRC.cpp
+        ConvertUTF.cpp
+        ConvertUTFWrapper.cpp
+        CrashRecoveryContext.cpp
+        #CSKYAttributes.cpp
+        #CSKYAttributeParser.cpp
+        #CSKYTargetParser.cpp
+        #DataExtractor.cpp
+        Debug.cpp
+        DebugCounter.cpp
+        #DeltaAlgorithm.cpp
+        #DivisionByConstantInfo.cpp
+        #DAGDeltaAlgorithm.cpp
+        #DJB.cpp
+        #ELFAttributeParser.cpp
+        #ELFAttributes.cpp
+        Error.cpp
+        ErrorHandling.cpp
+        #ExtensibleRTTI.cpp
+        #FileCollector.cpp
+        #FileUtilities.cpp
+        #FileOutputBuffer.cpp
+        #FoldingSet.cpp
+        #FormattedStream.cpp
+        FormatVariadic.cpp
+        #GlobPattern.cpp
+        GraphWriter.cpp
+        Hashing.cpp
+        InitLLVM.cpp
+        #InstructionCost.cpp
+        #IntEqClasses.cpp
+        #IntervalMap.cpp
+        #ItaniumManglingCanonicalizer.cpp
+        #JSON.cpp
+        #KnownBits.cpp
+        #LEB128.cpp
+        #LineIterator.cpp
+        Locale.cpp
+        #LockFileManager.cpp
+        #LowLevelType.cpp
+        ManagedStatic.cpp
+        #MathExtras.cpp
+        MemAlloc.cpp
+        MemoryBuffer.cpp
+        #MemoryBufferRef.cpp
+        MD5.cpp
+        #MSP430Attributes.cpp
+        #MSP430AttributeParser.cpp
+        NativeFormatting.cpp
+        #OptimizedStructLayout.cpp
+        #Optional.cpp
+        #Parallel.cpp
+        #PluginLoader.cpp
+        PrettyStackTrace.cpp
+        RandomNumberGenerator.cpp
+        Regex.cpp
+        #RISCVAttributes.cpp
+        #RISCVAttributeParser.cpp
+        #RISCVISAInfo.cpp
+        #ScaledNumber.cpp
+        #ScopedPrinter.cpp
+        #SHA1.cpp
+        #SHA256.cpp
+        Signposts.cpp
+        SmallPtrSet.cpp
+        SmallVector.cpp
+        SourceMgr.cpp
+        #SpecialCaseList.cpp
+        Statistic.cpp
+        StringExtras.cpp
+        StringMap.cpp
+        StringSaver.cpp
+        StringRef.cpp
+        #SuffixTree.cpp
+        #SymbolRemappingReader.cpp
+        #SystemUtils.cpp
+        #TarWriter.cpp
+        #TargetParser.cpp
+        #ThreadPool.cpp
+        #TimeProfiler.cpp
+        Timer.cpp
+        #ToolOutputFile.cpp
+        #TrigramIndex.cpp
+        Triple.cpp
+        Twine.cpp
+        TypeSize.cpp
+        Unicode.cpp
+        UnicodeCaseFold.cpp
+        #UnicodeNameToCodepoint.cpp
+        #UnicodeNameToCodepointGenerated.cpp
+        VersionTuple.cpp
+        VirtualFileSystem.cpp
+        WithColor.cpp
+        #X86TargetParser.cpp
+        YAMLParser.cpp
+        #YAMLTraits.cpp
+        #raw_os_ostream.cpp
+        raw_ostream.cpp
+        regcomp.c
+        regerror.c
+        regexec.c
+        regfree.c
+        regstrlcpy.c
+        #xxhash.cpp
+        #Z3Solver.cpp
+
+        #${ALLOCATOR_FILES}
+        #$<TARGET_OBJECTS:LLVMSupportBlake3>
+
+        # System
+        #Atomic.cpp
+        #DynamicLibrary.cpp
+        Errno.cpp
+        Host.cpp
+        #Memory.cpp
+        Path.cpp
+        Process.cpp
+        Program.cpp
+        #RWMutex.cpp
+        Signals.cpp
+        ThreadLocal.cpp
+        Threading.cpp
+        #Valgrind.cpp
+        #Watchdog.cpp
+        )
+
+target_include_directories(LLVMSupport_Standalone PUBLIC include)
+target_link_libraries(LLVMSupport_Standalone
+        PRIVATE LLVMADT_Standalone LLVMDemangle_Standalone
+        PUBLIC FileCheckConfig_Standalone llvm-c_Standalone)

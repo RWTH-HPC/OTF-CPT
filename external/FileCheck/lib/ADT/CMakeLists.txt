@@ -1,0 +1,4 @@
+add_library(LLVMADT_Standalone INTERFACE)
+
+target_include_directories(LLVMADT_Standalone INTERFACE include)
+target_link_libraries(LLVMADT_Standalone INTERFACE LLVMSupport_Standalone)
