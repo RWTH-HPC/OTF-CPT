@@ -431,7 +431,6 @@ struct mpiRecvPB {
   MPI_Status *pStatus;
   int src;
   int tag;
-  MPI_Comm dComm;
   int rank;
 
   mpiRecvPB(int src, int tag, MPI_Comm comm, MPI_Status **status)
@@ -464,7 +463,8 @@ struct mpiRecvPB {
     if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
       src = pStatus->MPI_SOURCE;
       tag = pStatus->MPI_TAG;
-      PMPI_Recv(uc, 1, ipcData::ipcMpiType, src, tag, dComm, MPI_STATUS_IGNORE);
+      PMPI_Recv(uc, 1, ipcData::ipcMpiType, src, tag, cData->getDupComm(),
+                MPI_STATUS_IGNORE);
     } else {
       PMPI_Waitall(2, rData.pb_reqs, MPI_STATUSES_IGNORE);
     }
