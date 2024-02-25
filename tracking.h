@@ -6,6 +6,8 @@
 #include <assert.h>
 #include <mpi.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #include <functional>
 #include <list>
@@ -20,10 +22,20 @@
 #define HANDLE_REQUEST 1
 // use memory management for tool data
 #define REAL_DATAPOOL 1
+#define USE_ERRHANDLER 1
 
 #ifdef __cplusplus
 #define _EXTERN_C_ extern "C"
 #endif
+
+#ifdef USE_ERRHANDLER
+#define errHandlerComm(c) registerErrHandler(*c)
+void createErrHandler();
+void registerErrHandler(MPI_Comm comm);
+#else
+#define errHandlerComm(c) (void)c
+#endif
+
 
 #ifdef HANDLE_OP
 #define preOp(o) o = of.getHandle(o)
