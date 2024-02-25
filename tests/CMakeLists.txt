@@ -9,14 +9,17 @@ if (EXISTS "${shipped_lit_executable}")
 endif()
 unset(shipped_lit_executable)
 
+set(OTFCPT_Test_avail TRUE)
+
 find_package(LIT 12.0.0)
 
 if(NOT LIT_FOUND)
-    message(SEND_ERROR "Could not find llvm's lit executable needed for testing. \
+    message(STATUS "Could not find llvm's lit executable needed for testing. \
 Please make sure that either the LLVM package is in your CMake module search \
 path or that the executable is in your PATH environment variable. \
 Alternatively you might want to set the CMake variable LLVM_TOOLS_BINARY_DIR \
 to the path containing the lit executable.")
+set(OTFCPT_Test_avail FALSE)
 endif()
 
 set(shipped_filecheck_executable "$<TARGET_FILE:FileCheck_Standalone>")
@@ -33,12 +36,20 @@ endif()
 find_package(FileCheck)
 
 if(NOT FileCheck_FOUND)
-    message(SEND_ERROR "Could not find llvm's FileCheck executable needed for \
+    message(STATUS "Could not find llvm's FileCheck executable needed for \
     testing. Please make sure that either the LLVM package is in your CMake \
     module search path or that the executable is in your PATH environment \
     variable. Alternatively you might want to set the CMake variable \
     LLVM_TOOLS_BINARY_DIR to the path containing the FileCheck executable.")
+set(OTFCPT_Test_avail FALSE)
 endif()
+
+if(NOT OTFCPT_Test_avail)
+set(OTFCPT_Test_avail FALSE)
+    message(STATUS "No tests available with missing lit/FileCheck")
+    return()
+endif()
+
 
 set(FILECHECK_EXECUTABLE "${LLVM_FILECHECK_PATH}")
 set(LIT_EXECUTABLE "${LLVM_LIT_PATH}")
