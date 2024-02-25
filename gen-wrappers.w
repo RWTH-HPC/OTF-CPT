@@ -24,6 +24,11 @@
      std::cout << "MPI Init" << std::endl;
 
    {{ret_val}} = P{{fn_name}}({{args}});
+
+#ifdef USE_ERRHANDLER
+   createErrHandler();
+   registerErrHandler(MPI_COMM_WORLD);
+#endif
 #ifdef HANDLE_OP
    of.initPredefined();
 #endif
@@ -57,6 +62,7 @@
    {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Datatype preType}} {{apply_to_type MPI_Group preGroup}} {{apply_to_type MPI_File preFile}} {{apply_to_type MPI_Win preWin}} {{apply_to_type MPI_Op preOp}} {{apply_to_type MPI_Session preSession}}
    {{ret_val}} = P{{fn_name}}({{args}});
    {{apply_to_type MPI_Comm* postComm}} {{apply_to_type MPI_Datatype* postType}} {{apply_to_type MPI_Group* postGroup}} {{apply_to_type MPI_Win* postWin}} {{apply_to_type MPI_File* postFile}} {{apply_to_type MPI_Op* postOp}} {{apply_to_type MPI_Session* postSession}}
+   {{apply_to_type MPI_Comm* errHandlerComm}}
 {{endfnallntype}}
 
 #endif

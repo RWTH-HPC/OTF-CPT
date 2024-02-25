@@ -1,5 +1,23 @@
 #include "tracking.h"
 
+#ifdef USE_ERRHANDLER
+#include <sys/types.h>
+#include <unistd.h>
+static MPI_Errhandler CommErrHandler{MPI_ERRHANDLER_NULL};
+
+static void myMpiErrHandler(MPI_Comm* comm, int* errCode, ...){
+  printf("Handling MPI Error %i at pid %i\n", *errCode, getpid());
+  sleep(100);
+  abort();
+}
+void createErrHandler(){ 
+   MPI_Comm_create_errhandler(myMpiErrHandler, &CommErrHandler);
+}
+void registerErrHandler(MPI_Comm comm){
+  MPI_Comm_set_errhandler(comm, CommErrHandler);
+}
+#endif
+
 #ifdef HANDLE_OP
 template <> MPI_Op OpData::nullHandle{MPI_OP_NULL};
 OpFactory of;
