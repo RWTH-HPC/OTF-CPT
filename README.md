@@ -67,7 +67,68 @@ MPI_Pcontrol(1); // start
 MPI_Pcontrol(0); // stop
 ```
 
+or alternatively for OpenMP-only:
+```
+omp_control_tool(omp_control_tool_start, 0, NULL); // start
+// region of interest
+omp_control_tool(omp_control_tool_stop, 0, NULL); // stop
+```
 
+In both cases the runtime option `start_stopped=1` should be used, see below.
+
+### Runtime options
+The behavior of OTF-CPT can be changed with different runtime options. All
+runtime options are exported as a space separated string assigned to
+`OTFCPT_OPTIONS`.
+
+E.g.:
+```
+export OTFCPT_OPTIONS="verbose=1 start_stopped=1"
+```
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-right" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Flag Name</th>
+<th scope="col" class="org-right">Default value</th>
+<th scope="col" class="org-left">Description</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td class="org-left">start_stopped</td>
+<td class="org-right">0</td>
+<td class="org-left">Delay the start of measurement until a start marker is
+encountered.</td>
+</tr>
+</tbody>
+
+<tbody>
+<tr>
+<td class="org-left">verbose</td>
+<td class="org-right">0</td>
+<td class="org-left">Print additional statistics.</td>
+</tr>
+</tbody>
+
+<tbody>
+<tr>
+<td class="org-left">enable</td>
+<td class="org-right">1</td>
+<td class="org-left">Use OTF-CPT during execution.</td>
+</tr>
+</tbody>
+</table>
 
 ## Files
 ### MPI Function Wrappers
@@ -89,3 +150,8 @@ MPI_Pcontrol(0); // stop
 ```
 external/wrap/wrap.py -s -n gen-wrappers.w -o gen-wrappers.cpp
 ```
+
+## Publications
+
+- **Joachim Protze, Fabian Orland, Kingshuk Haldar, Thore Koritzius, Christian Terboven**: *On-the-Fly Calculation of Model Factors for Multi-paradigm Applications*. Euro-Par 2022
+- **Joachim Jenke, Michael Knobloch, Marc-André Hermanns, Simon Schwitanski**: *A Shim Layer for Transparently Adding Meta Data to MPI Handles*. EuroMPI 2023
