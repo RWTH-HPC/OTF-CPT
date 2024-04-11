@@ -81,6 +81,10 @@ void completePBnoHB(RequestData *uc, MPI_Status *status) {
 
 // completion callback function for persistent request with clock update
 void completePersPBHB(RequestData *uc, MPI_Status *status) {
+#if OnlyActivePB
+  if (!analysis_flags->running)
+    return;
+#endif
   if (uc->pb_reqs[1] == MPI_REQUEST_NULL)
     PMPI_Wait(uc->pb_reqs, MPI_STATUS_IGNORE);
   else
@@ -90,6 +94,10 @@ void completePersPBHB(RequestData *uc, MPI_Status *status) {
 
 // completion callback function for persistent request without clock update
 void completePersPBnoHB(RequestData *uc, MPI_Status *status) {
+#if OnlyActivePB
+  if (!analysis_flags->running)
+    return;
+#endif
   if (uc->pb_reqs[1] == MPI_REQUEST_NULL)
     PMPI_Wait(uc->pb_reqs, MPI_STATUS_IGNORE);
   else
@@ -98,12 +106,22 @@ void completePersPBnoHB(RequestData *uc, MPI_Status *status) {
 
 // start callback function for persistent request with clock update
 void startPersPBHB(RequestData *uc) {
+#if OnlyActivePB
+  if (!analysis_flags->running)
+    return;
+#endif
   loadThreadTimers(uc);
   PMPI_Startall(2, uc->pb_reqs);
 }
 
 // start callback function for persistent request without clock update
-void startPersPBnoHB(RequestData *uc) { PMPI_Startall(2, uc->pb_reqs); }
+void startPersPBnoHB(RequestData *uc) {
+#if OnlyActivePB
+  if (!analysis_flags->running)
+    return;
+#endif
+  PMPI_Startall(2, uc->pb_reqs);
+}
 
 void init_timer_offsets() {
   auto cw_dup_data = cf.findData(MPI_COMM_WORLD);
@@ -181,8 +199,6 @@ extern "C" {
 
 int MPI_Finalize(void) {
   mpiTimer mt{false, __func__};
-  if (critical_ompt_finalize_tool)
-    critical_ompt_finalize_tool();
   assert(thread_local_clock->stopped_clock == true);
   assert(thread_local_clock->stopped_mpi_clock == true);
   ipcData max_uc;

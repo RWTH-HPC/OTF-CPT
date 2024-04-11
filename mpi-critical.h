@@ -55,14 +55,14 @@ struct mpiIcollBcastPBImpl {
   int rank;
 
   mpiIcollBcastPBImpl(MPI_Comm comm, MPI_Request *request, int root) {
+    rData = rf.newData();
+    send_req = request;
 #if OnlyActivePB
     if (!analysis_flags->running)
       return;
 #endif
     auto cData = cf.findData(comm);
     rank = cData->getRank();
-    send_req = request;
-    rData = rf.newData();
 
     if (root == rank)
       loadThreadTimers(rData, REF_RANK);
@@ -70,11 +70,12 @@ struct mpiIcollBcastPBImpl {
   }
   ~mpiIcollBcastPBImpl() {
 #if OnlyActivePB
-    if (!analysis_flags->running)
-      return;
+    if (analysis_flags->running)
 #endif
-    rData->init(*send_req, IBCAST, REF_RANK);
-    rData->setCompletionCallback(completePBHB);
+    {
+      rData->init(*send_req, IBCAST, REF_RANK);
+      rData->setCompletionCallback(completePBHB);
+    }
     *send_req = rf.newHandle(*send_req, rData);
   }
 };
@@ -136,24 +137,25 @@ struct mpiIcollAllreducePBImpl {
   int rank;
 
   mpiIcollAllreducePBImpl(MPI_Comm comm, MPI_Request *request, int root = 0) {
+    rData = rf.newData();
+    send_req = request;
 #if OnlyActivePB
     if (!analysis_flags->running)
       return;
 #endif
     auto cData = cf.findData(comm);
     rank = cData->getRank();
-    send_req = request;
-    rData = rf.newData();
     loadThreadTimers(rData, REF_RANK);
     rData->IAllreduce(cData, rData->pb_reqs);
   }
   ~mpiIcollAllreducePBImpl() {
 #if OnlyActivePB
-    if (!analysis_flags->running)
-      return;
+    if (analysis_flags->running)
 #endif
-    rData->init(*send_req, IALLREDUCE, REF_RANK);
-    rData->setCompletionCallback(completePBHB);
+    {
+      rData->init(*send_req, IALLREDUCE, REF_RANK);
+      rData->setCompletionCallback(completePBHB);
+    }
     *send_req = rf.newHandle(*send_req, rData);
   }
 };
@@ -213,14 +215,14 @@ struct mpiIcollReducePBImpl {
 
   mpiIcollReducePBImpl(MPI_Comm comm, MPI_Request *request, int root)
       : root(root) {
+    rData = rf.newData();
+    send_req = request;
 #if OnlyActivePB
     if (!analysis_flags->running)
       return;
 #endif
     auto cData = cf.findData(comm);
     rank = cData->getRank();
-    send_req = request;
-    rData = rf.newData();
     loadThreadTimers(rData, REF_RANK);
     rData->IReduce(root, cData, rData->pb_reqs);
     if (root == rank) {
@@ -231,10 +233,11 @@ struct mpiIcollReducePBImpl {
   }
   ~mpiIcollReducePBImpl() {
 #if OnlyActivePB
-    if (!analysis_flags->running)
-      return;
+    if (analysis_flags->running)
 #endif
-    rData->init(*send_req, IREDUCE, REF_RANK, rank, nullptr, root);
+    {
+      rData->init(*send_req, IREDUCE, REF_RANK, rank, nullptr, root);
+    }
     *send_req = rf.newHandle(*send_req, rData);
   }
 };
@@ -330,29 +333,30 @@ struct mpiIsendPB {
 
   mpiIsendPB(int dest, int tag, MPI_Comm comm, MPI_Request *request)
       : dest(dest) {
+    rData = rf.newData();
+    send_req = request;
 #if OnlyActivePB
     if (!analysis_flags->running)
       return;
 #endif
     if (dest == MPI_PROC_NULL)
       return;
-    rData = rf.newData();
     auto cData = cf.findData(comm);
     rank = cData->getRank();
-    send_req = request;
     uc = loadThreadTimers(rData);
     PMPI_Isend(uc, 1, ipcData::ipcMpiType, dest, tag, cData->getDupComm(),
                rData->pb_reqs);
   }
   ~mpiIsendPB() {
 #if OnlyActivePB
-    if (!analysis_flags->running)
-      return;
+    if (analysis_flags->running)
 #endif
-    if (dest == MPI_PROC_NULL)
-      return;
-    rData->init(*send_req, ISEND, dest);
-    rData->setCompletionCallback(completePBnoHB);
+    {
+      if (dest == MPI_PROC_NULL) {
+        rData->init(*send_req, ISEND, dest);
+        rData->setCompletionCallback(completePBnoHB);
+      }
+    }
     *send_req = rf.newHandle(*send_req, rData);
   }
 };
@@ -366,29 +370,21 @@ struct mpiSendInitPB {
 
   mpiSendInitPB(int dest, int tag, MPI_Comm comm, MPI_Request *request)
       : dest(dest) {
-#if OnlyActivePB
-    if (!analysis_flags->running)
-      return;
-#endif
+    rData = rf.newData();
+    send_req = request;
     if (dest == MPI_PROC_NULL)
       return;
     auto cData = cf.findData(comm);
     rank = cData->getRank();
-    send_req = request;
-    rData = rf.newData();
     rData->setStartCallback(startPersPBHB);
     rData->setCompletionCallback(completePersPBnoHB);
     PMPI_Send_init(uc, 1, ipcData::ipcMpiType, dest, tag, cData->getDupComm(),
                    rData->pb_reqs);
   }
   ~mpiSendInitPB() {
-#if OnlyActivePB
-    if (!analysis_flags->running)
-      return;
-#endif
-    if (dest == MPI_PROC_NULL)
-      return;
-    rData->init(*send_req, PSEND, dest);
+    if (dest == MPI_PROC_NULL) {
+      rData->init(*send_req, PSEND, dest);
+    }
     *send_req = rf.newHandle(*send_req, rData);
   }
 };
@@ -483,16 +479,16 @@ struct mpiIrecvPB {
 
   mpiIrecvPB(int src, int tag, MPI_Comm comm, MPI_Request *request)
       : send_req(request), src(src), tag(tag) {
+    rData = rf.newData();
+    send_req = request;
 #if OnlyActivePB
     if (!analysis_flags->running)
       return;
 #endif
     if (src == MPI_PROC_NULL)
       return;
-    rData = rf.newData();
     cData = cf.findData(comm);
     rank = cData->getRank();
-    send_req = request;
     uc = rData->uc_double;
     if (src != MPI_ANY_SOURCE && tag != MPI_ANY_TAG) {
       PMPI_Irecv(uc, 1, ipcData::ipcMpiType, src, tag, cData->getDupComm(),
@@ -501,17 +497,18 @@ struct mpiIrecvPB {
   }
   ~mpiIrecvPB() {
 #if OnlyActivePB
-    if (!analysis_flags->running)
-      return;
+    if (analysis_flags->running)
 #endif
-    if (src == MPI_PROC_NULL)
-      return;
-    if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
-      rData->init(*send_req, IRECV, src, tag, cData);
-      rData->setCompletionCallback(completePBWC);
-    } else {
-      rData->init(*send_req, IRECV, src);
-      rData->setCompletionCallback(completePBHB);
+    {
+      if (src == MPI_PROC_NULL) {
+        if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
+          rData->init(*send_req, IRECV, src, tag, cData);
+          rData->setCompletionCallback(completePBWC);
+        } else {
+          rData->init(*send_req, IRECV, src);
+          rData->setCompletionCallback(completePBHB);
+        }
+      }
     }
     *send_req = rf.newHandle(*send_req, rData);
   }
@@ -528,16 +525,12 @@ struct mpiRecvInitPB {
 
   mpiRecvInitPB(int src, int tag, MPI_Comm comm, MPI_Request *request)
       : send_req(request), src(src), tag(tag) {
-#if OnlyActivePB
-    if (!analysis_flags->running)
-      return;
-#endif
+    rData = rf.newData();
+    send_req = request;
     if (src == MPI_PROC_NULL)
       return;
-    rData = rf.newData();
     cData = cf.findData(comm);
     rank = cData->getRank();
-    send_req = request;
     uc = rData->uc_double;
     if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
       rData->setCompletionCallback(completePBWC);
@@ -551,16 +544,12 @@ struct mpiRecvInitPB {
     }
   }
   ~mpiRecvInitPB() {
-#if OnlyActivePB
-    if (!analysis_flags->running)
-      return;
-#endif
-    if (src == MPI_PROC_NULL)
-      return;
-    if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
-      rData->init(*send_req, IRECV, src, tag, cData);
-    } else {
-      rData->init(*send_req, IRECV, src);
+    if (src == MPI_PROC_NULL) {
+      if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
+        rData->init(*send_req, IRECV, src, tag, cData);
+      } else {
+        rData->init(*send_req, IRECV, src);
+      }
     }
     *send_req = rf.newHandle(*send_req, rData);
   }
