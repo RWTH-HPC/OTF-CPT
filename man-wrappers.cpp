@@ -49,7 +49,6 @@ int MPI_Type_get_contents(MPI_Datatype datatype, int max_integers,
   mpiTimer mt{false, __func__};
   int _wrap_py_return_val = 0;
 
-  preType(datatype);
 #ifdef HANDLE_TYPE
   MPI_Datatype myTypes[max_datatypes] = {MPI_DATATYPE_NULL};
 #else
@@ -145,7 +144,6 @@ int MPI_Type_get_contents_c(MPI_Datatype datatype, MPI_Count max_integers,
   mpiTimer mt{false, __func__};
   int _wrap_py_return_val = 0;
 
-  preType(datatype);
 #ifdef HANDLE_TYPE
   MPI_Datatype myTypes[max_datatypes] = {MPI_DATATYPE_NULL};
 #else
@@ -283,9 +281,7 @@ int MPI_Type_commit(MPI_Datatype *datatype) {
   mpiTimer mt{false, __func__};
   int _wrap_py_return_val = 0;
 
-  preType(*datatype);
   _wrap_py_return_val = PMPI_Type_commit(datatype);
-  postType(datatype);
 
   return _wrap_py_return_val;
 }

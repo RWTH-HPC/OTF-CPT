@@ -216,240 +216,6 @@ template <typename D> class RequestFactoryInst {
   }
 };
 
-// Specialized template of HandleFactory using nested list to handle duplicate
-// handles
-template <typename M, typename T>
-class HandleFactory<M, T, std::multimap<M, T *>>
-    : public virtual AbstractHandleFactory<M, T>, public DataPool<M, T> {
-protected:
-  mutable std::shared_mutex MapMutex{};
-  std::unordered_map<M, std::list<T *>> handleMap{};
-
-public:
-  T *newData() { return this->getData(); }
-  M newHandle(M &handle) {
-    if (this->isPredefined(handle))
-      return handle;
-    T *ret = this->getData();
-    return newHandle(handle, ret);
-  }
-  M newHandle(M &handle, T *ret) {
-    ret->init(handle);
-    {
-      std::unique_lock<std::shared_mutex> lock(MapMutex);
-      auto retEmplace = handleMap.emplace(handle, std::list<T *>{});
-      retEmplace.first->second.emplace_back(ret);
-    }
-    return handle;
-  }
-  M freeHandle(M handle) {
-    if (this->isPredefined(handle))
-      return handle;
-    T *rData;
-    {
-      std::unique_lock<std::shared_mutex> lock(MapMutex);
-      auto hList = handleMap[handle];
-      rData = hList.front();
-      hList.pop_front();
-      if (hList.empty())
-        handleMap.erase(handle);
-    }
-    rData->fini();
-    this->returnData(rData);
-    return T::nullHandle;
-  }
-  T *findData(M handle) {
-    T *ret = this->findPredefinedData(handle);
-    if (ret != nullptr)
-      return ret;
-    std::shared_lock<std::shared_mutex> lock(MapMutex);
-    return handleMap[handle].front();
-  }
-  M &getHandle(M &handle) { return handle; }
-  M &getHandleLocked(M &handle) { return handle; }
-  std::shared_lock<std::shared_mutex> getSharedLock() {
-    return std::shared_lock<std::shared_mutex>{MapMutex, std::defer_lock};
-  }
-  virtual ~HandleFactory<M, T, std::multimap<M, T *>>() {}
-};
-
-// Specialized template of RequestFactory using nested list to handle duplicate
-// handles
-template <>
-class RequestFactoryInst<std::multimap<MPI_Request, RequestData *>>
-    : public HandleFactory<MPI_Request, RequestData,
-                           std::multimap<MPI_Request, RequestData *>>,
-      public AbstractRequestFactory {
-  template <typename D>
-  MPI_Request _newRequest(MPI_Request req, D &reqData, bool persistent) {
-    if (req == MPI_REQUEST_NULL)
-      return MPI_REQUEST_NULL;
-    RequestData *ret = this->getData();
-    {
-      std::unique_lock<std::shared_mutex> lock(MapMutex);
-      handleMap[req].emplace_back(ret);
-    }
-    ret->init(req, reqData, persistent);
-    assert(!ret->isFreed());
-    return req;
-  }
-
-public:
-  // get data from the pool
-  MPI_Request newRequest(MPI_Request req, bool persistent) {
-    const void *reqData = nullptr;
-    return _newRequest(req, reqData, persistent);
-  }
-
-  // returning to the datapool using lock
-  MPI_Request completeRequest(MPI_Request req, MPI_Status *status) {
-    if (req == MPI_REQUEST_NULL)
-      return MPI_REQUEST_NULL;
-    RequestData *rData;
-    {
-      std::unique_lock<std::shared_mutex> lock(MapMutex);
-      rData = handleMap[req].front();
-      if (!rData->isPersistent()) {
-        handleMap[req].pop_front();
-        if (handleMap[req].empty())
-          handleMap.erase(req);
-      }
-    }
-    if (rData->isPersistent()) {
-      rData->complete(status);
-      return req;
-    }
-    rData->fini(status);
-    this->returnData(rData);
-    return MPI_REQUEST_NULL;
-  }
-  MPI_Request startRequest(MPI_Request req) {
-    if (req == MPI_REQUEST_NULL)
-      return MPI_REQUEST_NULL;
-    RequestData *ret;
-    {
-      std::shared_lock<std::shared_mutex> lock(MapMutex);
-      ret = handleMap[req].front();
-    }
-    assert(ret->isPersistent());
-    ret->start();
-    return req;
-  }
-};
-
-// Specialized template of HandleFactory using a simple map, fails with
-// duplicate handles
-template <typename M, typename T>
-class HandleFactory<M, T, std::map<M, T *>>
-    : public virtual AbstractHandleFactory<M, T>, public DataPool<M, T> {
-protected:
-  mutable std::shared_mutex MapMutex{};
-  std::unordered_map<M, T *> handleMap{};
-
-public:
-  T *newData() { return this->getData(); }
-  M newHandle(M &handle) {
-    if (this->isPredefined(handle))
-      return handle;
-    T *ret = this->getData();
-    return newHandle(handle, ret);
-  }
-  M newHandle(M &handle, T *ret) {
-    {
-      std::unique_lock<std::shared_mutex> lock(MapMutex);
-      auto retEmplace = handleMap.emplace(handle, ret);
-    }
-    ret->init(handle);
-    return handle;
-  }
-  // returning to the datapool using lock
-  M freeHandle(M handle) {
-    if (this->isPredefined(handle))
-      return T::nullHandle;
-    T *rData;
-    {
-      std::unique_lock<std::shared_mutex> lock(MapMutex);
-      rData = handleMap[handle];
-      handleMap.erase(handle);
-    }
-    rData->fini();
-    this->returnData(rData);
-    return T::nullHandle;
-  }
-  T *findData(M handle) {
-    T *ret = this->findPredefinedData(handle);
-    if (ret != nullptr)
-      return ret;
-    std::shared_lock<std::shared_mutex> lock(MapMutex);
-    return handleMap[handle];
-  }
-  M &getHandle(M &handle) { return handle; }
-  M &getHandleLocked(M &handle) { return handle; }
-  std::shared_lock<std::shared_mutex> getSharedLock() {
-    return std::shared_lock<std::shared_mutex>{MapMutex, std::defer_lock};
-  }
-  virtual ~HandleFactory<M, T, std::map<M, T *>>() {}
-};
-
-// Specialized template of RequestFactory using a simple map, fails with
-// duplicate handles
-template <>
-class RequestFactoryInst<std::map<MPI_Request, RequestData *>>
-    : public HandleFactory<MPI_Request, RequestData,
-                           std::map<MPI_Request, RequestData *>>,
-      public AbstractRequestFactory {
-  template <typename D>
-  MPI_Request _newRequest(MPI_Request req, D &reqData, bool persistent) {
-    if (req == MPI_REQUEST_NULL)
-      return MPI_REQUEST_NULL;
-    RequestData *ret = this->getData();
-    ret->init(req, reqData, persistent);
-    {
-      std::unique_lock<std::shared_mutex> lock(MapMutex);
-      auto retEmplace = handleMap.emplace(req, ret);
-      assert(retEmplace.second);
-    }
-    return req;
-  }
-
-public:
-  // get data from the pool
-  MPI_Request newRequest(MPI_Request req, bool persistent) {
-    const void *reqData = nullptr;
-    return _newRequest(req, reqData, persistent);
-  }
-  MPI_Request completeRequest(MPI_Request req, MPI_Status *status) {
-    if (req == MPI_REQUEST_NULL)
-      return MPI_REQUEST_NULL;
-    RequestData *rData;
-    {
-      std::unique_lock<std::shared_mutex> lock(MapMutex);
-      rData = handleMap[req];
-      if (!rData->isPersistent())
-        handleMap.erase(req);
-    }
-    if (rData->isPersistent()) {
-      rData->complete(status);
-      return req;
-    }
-    rData->fini(status);
-    this->returnData(rData);
-    return MPI_REQUEST_NULL;
-  }
-  MPI_Request startRequest(MPI_Request req) {
-    if (req == MPI_REQUEST_NULL)
-      return MPI_REQUEST_NULL;
-    RequestData *ret;
-    {
-      std::shared_lock<std::shared_mutex> lock(MapMutex);
-      ret = handleMap[req];
-    }
-    assert(ret->isPersistent());
-    ret->start();
-    return req;
-  }
-};
-
 // Specialized template of HandleFactory for pointer-type handles
 template <typename M, typename T, typename MI>
 class HandleFactory<M, T, MI *> : public virtual AbstractHandleFactory<M, T>,
@@ -719,40 +485,22 @@ using SessionData = HandleData<MPI_Session, toolSessionData>;
 #endif
 
 using OpFactory = HandleFactory<MPI_Op, OpData, MPI_Op>;
-using MapListOpFactory =
-    HandleFactory<MPI_Op, OpData, std::multimap<MPI_Op, OpData *>>;
 
 using WinFactory = HandleFactory<MPI_Win, WinData, MPI_Win>;
-using MapListWinFactory =
-    HandleFactory<MPI_Win, WinData, std::multimap<MPI_Win, WinData *>>;
 
 using TypeFactory = HandleFactory<MPI_Datatype, TypeData, MPI_Datatype>;
-using MapListTypeFactory =
-    HandleFactory<MPI_Datatype, TypeData,
-                  std::multimap<MPI_Datatype, TypeData *>>;
 
 using FileFactory = HandleFactory<MPI_File, FileData, MPI_File>;
-using MapListFileFactory =
-    HandleFactory<MPI_File, FileData, std::multimap<MPI_File, FileData *>>;
 
 using CommFactory = HandleFactory<MPI_Comm, CommData, MPI_Comm>;
-using MapListCommFactory =
-    HandleFactory<MPI_Comm, CommData, std::multimap<MPI_Comm, CommData *>>;
 
 #ifdef HAVE_SESSION
 using SessionFactory = HandleFactory<MPI_Session, SessionData, MPI_Session>;
-using MapListSessionFactory =
-    HandleFactory<MPI_Session, SessionData,
-                  std::multimap<MPI_Session, SessionData *>>;
 #endif
 
 using GroupFactory = HandleFactory<MPI_Group, GroupData, MPI_Group>;
-using MapListGroupFactory =
-    HandleFactory<MPI_Group, GroupData, std::multimap<MPI_Group, GroupData *>>;
 
 using RequestFactory = RequestFactoryInst<MPI_Request>;
-using MapListRequestFactory =
-    RequestFactoryInst<std::multimap<MPI_Request, RequestData *>>;
 
 #ifdef HANDLE_OP
 template <> void AbstractHandleFactory<MPI_Op, OpData>::initPredefined() {
@@ -760,11 +508,9 @@ template <> void AbstractHandleFactory<MPI_Op, OpData>::initPredefined() {
                        "implemented, but requested");
 }
 extern OpFactory of;
-extern MapListOpFactory mof;
 #endif
 #ifdef HANDLE_WIN
 extern WinFactory wf;
-extern MapListWinFactory mwf;
 #endif
 #ifdef HANDLE_TYPE
 template <>
@@ -773,11 +519,9 @@ void AbstractHandleFactory<MPI_Datatype, TypeData>::initPredefined() {
                        "not yet implemented, but requested");
 }
 extern TypeFactory tf;
-extern MapListTypeFactory mtf;
 #endif
 #ifdef HANDLE_FILE
 extern FileFactory ff;
-extern MapListFileFactory mff;
 #endif
 #ifdef HANDLE_COMM
 template <>
@@ -786,7 +530,6 @@ bool AbstractHandleFactory<MPI_Comm, CommData>::isPredefined(MPI_Comm handle);
 template <> void AbstractHandleFactory<MPI_Comm, CommData>::initPredefined();
 
 extern CommFactory cf;
-extern MapListCommFactory mcf;
 #endif
 #ifdef HANDLE_GROUP
 template <>
@@ -796,15 +539,12 @@ bool AbstractHandleFactory<MPI_Group, GroupData>::isPredefined(
 template <> void AbstractHandleFactory<MPI_Group, GroupData>::initPredefined();
 
 extern GroupFactory gf;
-extern MapListGroupFactory mgf;
 #endif
 #ifdef HANDLE_REQUEST
 extern RequestFactory rf;
-extern MapListRequestFactory mrf;
 #endif
 #if defined(HAVE_SESSION) && defined(HANDLE_SESSION)
 extern SessionFactory sf;
-extern MapListSessionFactory msf;
 #elif !defined(HAVE_SESSION)
 typedef int MPI_Session;
 #endif

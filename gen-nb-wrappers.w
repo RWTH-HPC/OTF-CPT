@@ -18,7 +18,7 @@
   thread_local_clock->send++;
 
   {{apply_to_type MPI_Comm 'mpiSendPBMacro'}}
-  {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Datatype preType}} 
+  {{apply_to_type MPI_Comm preComm}}
    
   {{ret_val}} = P{{fn_name}}({{args}});
 {{endfn}}
@@ -28,7 +28,7 @@
   thread_local_clock->isend++;
 
   {{apply_to_type {{list 'MPI_Comm' 'MPI_Request*'}} 'mpiIsendPBMacro'}}
-  {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Datatype preType}} 
+  {{apply_to_type MPI_Comm preComm}}
    
   {{ret_val}} = P{{fn_name}}({{args}});
 {{endfn}}
@@ -38,7 +38,7 @@
   thread_local_clock->isend++;
 
   {{apply_to_type {{list 'MPI_Comm' 'MPI_Request*'}} 'mpiSendInitPBMacro'}}
-  {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Datatype preType}} 
+  {{apply_to_type MPI_Comm preComm}}
    
   {{ret_val}} = P{{fn_name}}({{args}});
 {{endfn}}
@@ -48,7 +48,7 @@
   thread_local_clock->recv++;
 
   {{apply_to_type {{list 'MPI_Comm' 'MPI_Status*'}} 'mpiRecvPBMacro'}}
-  {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Datatype preType}} 
+  {{apply_to_type MPI_Comm preComm}}
    
   {{ret_val}} = P{{fn_name}}({{args}});
 {{endfn}}
@@ -58,7 +58,7 @@
   thread_local_clock->irecv++;
 
   {{apply_to_type {{list 'MPI_Comm' 'MPI_Request*'}} 'mpiIrecvPBMacro'}}
-  {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Datatype preType}} 
+  {{apply_to_type MPI_Comm preComm}}
    
   {{ret_val}} = P{{fn_name}}({{args}});
 {{endfn}}
@@ -68,7 +68,7 @@
   thread_local_clock->irecv++;
 
   {{apply_to_type {{list 'MPI_Comm' 'MPI_Request*'}} 'mpiRecvInitPBMacro'}}
-  {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Datatype preType}} 
+  {{apply_to_type MPI_Comm preComm}}
    
   {{ret_val}} = P{{fn_name}}({{args}});
 {{endfn}}
@@ -88,9 +88,9 @@
   thread_local_clock->coll++;
 
   {{apply_to_type MPI_Comm 'mpiCollAllreduceMacro'}}
-   {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Datatype preType}} {{apply_to_type MPI_Group preGroup}} {{apply_to_type MPI_File preFile}} {{apply_to_type MPI_Win preWin}} {{apply_to_type MPI_Op preOp}} {{apply_to_type MPI_Session preSession}}
+   {{apply_to_type MPI_Comm preComm}}
    {{ret_val}} = P{{fn_name}}({{args}});
-   {{apply_to_type MPI_Comm* postComm}} {{apply_to_type MPI_Datatype* postType}} {{apply_to_type MPI_Group* postGroup}} {{apply_to_type MPI_Win* postWin}} {{apply_to_type MPI_File* postFile}} {{apply_to_type MPI_Op* postOp}} {{apply_to_type MPI_Session* postSession}}
+   {{apply_to_type MPI_Comm* postComm}}
 {{endfn}}
 
 {{fn fn_name MPI_Ibarrier MPI_Iallgather  MPI_Iallgather_c MPI_Iallgatherv MPI_Iallgatherv_c MPI_Ialltoall MPI_Ialltoall_c MPI_Ialltoallv MPI_Ialltoallv_c MPI_Iallreduce MPI_Iallreduce_c MPI_Ireduce_scatter_block MPI_Ireduce_scatter_block_c MPI_Ireduce_scatter MPI_Ireduce_scatter_c MPI_Iscan MPI_Iscan_c MPI_Iexscan MPI_Iexscan_c MPI_Ineighbor_allgather MPI_Ineighbor_allgather_c MPI_Ineighbor_allgatherv MPI_Ineighbor_allgatherv_c MPI_Ineighbor_alltoall MPI_Ineighbor_alltoall_c MPI_Ineighbor_alltoallv MPI_Ineighbor_alltoallv_c}}
@@ -98,9 +98,9 @@
   thread_local_clock->icoll++;
 
   {{apply_to_type {{list 'MPI_Comm' 'MPI_Request*'}} 'mpiIcollAllreduceMacro'}}
-   {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Datatype preType}} {{apply_to_type MPI_Group preGroup}} {{apply_to_type MPI_File preFile}} {{apply_to_type MPI_Win preWin}} {{apply_to_type MPI_Op preOp}} {{apply_to_type MPI_Session preSession}}
+   {{apply_to_type MPI_Comm preComm}}
    {{ret_val}} = P{{fn_name}}({{args}});
-   {{apply_to_type MPI_Comm* postComm}} {{apply_to_type MPI_Datatype* postType}} {{apply_to_type MPI_Group* postGroup}} {{apply_to_type MPI_Win* postWin}} {{apply_to_type MPI_File* postFile}} {{apply_to_type MPI_Op* postOp}} {{apply_to_type MPI_Session* postSession}}
+   {{apply_to_type MPI_Comm* postComm}}
 {{endfn}}
 
 
@@ -109,9 +109,9 @@
   thread_local_clock->icoll++;
 
   {{apply_to_type {{list 'MPI_Comm' 'MPI_Request*'}} 'mpiCollAllreduceInitMacro'}}
-   {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Datatype preType}} {{apply_to_type MPI_Group preGroup}} {{apply_to_type MPI_File preFile}} {{apply_to_type MPI_Win preWin}} {{apply_to_type MPI_Op preOp}} {{apply_to_type MPI_Session preSession}}
+   {{apply_to_type MPI_Comm preComm}}
    {{ret_val}} = P{{fn_name}}({{args}});
-   {{apply_to_type MPI_Comm* postComm}} {{apply_to_type MPI_Datatype* postType}} {{apply_to_type MPI_Group* postGroup}} {{apply_to_type MPI_Win* postWin}} {{apply_to_type MPI_File* postFile}} {{apply_to_type MPI_Op* postOp}} {{apply_to_type MPI_Session* postSession}}
+   {{apply_to_type MPI_Comm* postComm}}
 {{endfn}}
 
 
@@ -120,9 +120,9 @@
   thread_local_clock->coll++;
 
   {{apply_to_type MPI_Comm 'mpiCollReduceMacro'}}
-   {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Datatype preType}} {{apply_to_type MPI_Group preGroup}} {{apply_to_type MPI_File preFile}} {{apply_to_type MPI_Win preWin}} {{apply_to_type MPI_Op preOp}} {{apply_to_type MPI_Session preSession}}
+   {{apply_to_type MPI_Comm preComm}}
    {{ret_val}} = P{{fn_name}}({{args}});
-   {{apply_to_type MPI_Comm* postComm}} {{apply_to_type MPI_Datatype* postType}} {{apply_to_type MPI_Group* postGroup}} {{apply_to_type MPI_Win* postWin}} {{apply_to_type MPI_File* postFile}} {{apply_to_type MPI_Op* postOp}} {{apply_to_type MPI_Session* postSession}}
+   {{apply_to_type MPI_Comm* postComm}}
 {{endfn}}
 
 {{fn fn_name MPI_Igather MPI_Igather_c MPI_Igatherv MPI_Igatherv_c MPI_Ireduce MPI_Ireduce_c}}
@@ -130,9 +130,9 @@
   thread_local_clock->icoll++;
 
   {{apply_to_type {{list 'MPI_Comm' 'MPI_Request*'}} 'mpiIcollReduceMacro'}}
-   {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Datatype preType}} {{apply_to_type MPI_Group preGroup}} {{apply_to_type MPI_File preFile}} {{apply_to_type MPI_Win preWin}} {{apply_to_type MPI_Op preOp}} {{apply_to_type MPI_Session preSession}}
+   {{apply_to_type MPI_Comm preComm}}
    {{ret_val}} = P{{fn_name}}({{args}});
-   {{apply_to_type MPI_Comm* postComm}} {{apply_to_type MPI_Datatype* postType}} {{apply_to_type MPI_Group* postGroup}} {{apply_to_type MPI_Win* postWin}} {{apply_to_type MPI_File* postFile}} {{apply_to_type MPI_Op* postOp}} {{apply_to_type MPI_Session* postSession}}
+   {{apply_to_type MPI_Comm* postComm}}
 {{endfn}}
 
 {{fn fn_name MPI_Gather_init MPI_Gather_init_c MPI_Gatherv_init MPI_Gatherv_init_c MPI_Reduce_init MPI_Reduce_init_c}}
@@ -140,9 +140,9 @@
   thread_local_clock->icoll++;
 
   {{apply_to_type {{list 'MPI_Comm' 'MPI_Request*'}} 'mpiCollReduceInitMacro'}}
-   {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Datatype preType}} {{apply_to_type MPI_Group preGroup}} {{apply_to_type MPI_File preFile}} {{apply_to_type MPI_Win preWin}} {{apply_to_type MPI_Op preOp}} {{apply_to_type MPI_Session preSession}}
+   {{apply_to_type MPI_Comm preComm}}
    {{ret_val}} = P{{fn_name}}({{args}});
-   {{apply_to_type MPI_Comm* postComm}} {{apply_to_type MPI_Datatype* postType}} {{apply_to_type MPI_Group* postGroup}} {{apply_to_type MPI_Win* postWin}} {{apply_to_type MPI_File* postFile}} {{apply_to_type MPI_Op* postOp}} {{apply_to_type MPI_Session* postSession}}
+   {{apply_to_type MPI_Comm* postComm}}
 {{endfn}}
 
 
@@ -151,9 +151,9 @@
   thread_local_clock->coll++;
 
   {{apply_to_type MPI_Comm 'mpiCollBcastMacro'}}
-   {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Datatype preType}} {{apply_to_type MPI_Group preGroup}} {{apply_to_type MPI_File preFile}} {{apply_to_type MPI_Win preWin}} {{apply_to_type MPI_Op preOp}} {{apply_to_type MPI_Session preSession}}
+   {{apply_to_type MPI_Comm preComm}}
    {{ret_val}} = P{{fn_name}}({{args}});
-   {{apply_to_type MPI_Comm* postComm}} {{apply_to_type MPI_Datatype* postType}} {{apply_to_type MPI_Group* postGroup}} {{apply_to_type MPI_Win* postWin}} {{apply_to_type MPI_File* postFile}} {{apply_to_type MPI_Op* postOp}} {{apply_to_type MPI_Session* postSession}}
+   {{apply_to_type MPI_Comm* postComm}}
 {{endfn}}
 
 {{fn fn_name MPI_Ibcast MPI_Ibcast_c MPI_Iscatter MPI_Iscatter_c MPI_Iscatterv MPI_Iscatterv_c}}
@@ -161,9 +161,9 @@
   thread_local_clock->icoll++;
 
   {{apply_to_type {{list 'MPI_Comm' 'MPI_Request*'}} 'mpiIcollBcastMacro'}}
-   {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Datatype preType}} {{apply_to_type MPI_Group preGroup}} {{apply_to_type MPI_File preFile}} {{apply_to_type MPI_Win preWin}} {{apply_to_type MPI_Op preOp}} {{apply_to_type MPI_Session preSession}}
+   {{apply_to_type MPI_Comm preComm}}
    {{ret_val}} = P{{fn_name}}({{args}});
-   {{apply_to_type MPI_Comm* postComm}} {{apply_to_type MPI_Datatype* postType}} {{apply_to_type MPI_Group* postGroup}} {{apply_to_type MPI_Win* postWin}} {{apply_to_type MPI_File* postFile}} {{apply_to_type MPI_Op* postOp}} {{apply_to_type MPI_Session* postSession}}
+   {{apply_to_type MPI_Comm* postComm}}
 {{endfn}}
 
 {{fn fn_name MPI_Bcast_init MPI_Bcast_init_c MPI_Scatter_init MPI_Scatter_init_c MPI_Scatterv_init MPI_Scatterv_init_c}}
@@ -171,9 +171,9 @@
   thread_local_clock->icoll++;
 
   {{apply_to_type {{list 'MPI_Comm' 'MPI_Request*'}} 'mpiCollBcastInitMacro'}}
-   {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Datatype preType}} {{apply_to_type MPI_Group preGroup}} {{apply_to_type MPI_File preFile}} {{apply_to_type MPI_Win preWin}} {{apply_to_type MPI_Op preOp}} {{apply_to_type MPI_Session preSession}}
+   {{apply_to_type MPI_Comm preComm}}
    {{ret_val}} = P{{fn_name}}({{args}});
-   {{apply_to_type MPI_Comm* postComm}} {{apply_to_type MPI_Datatype* postType}} {{apply_to_type MPI_Group* postGroup}} {{apply_to_type MPI_Win* postWin}} {{apply_to_type MPI_File* postFile}} {{apply_to_type MPI_Op* postOp}} {{apply_to_type MPI_Session* postSession}}
+   {{apply_to_type MPI_Comm* postComm}}
 {{endfn}}
 
 {{fn fn_name MPI_Alltoallw MPI_Alltoallw_c MPI_Neighbor_alltoallw MPI_Neighbor_alltoallw_c}}
@@ -181,9 +181,9 @@
   thread_local_clock->coll++;
 
   {{apply_to_type MPI_Comm 'mpiCollAllreduceMacro'}}
-   {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Group preGroup}} {{apply_to_type MPI_File preFile}} {{apply_to_type MPI_Win preWin}} {{apply_to_type MPI_Op preOp}} {{apply_to_type MPI_Session preSession}}
+   {{apply_to_type MPI_Comm preComm}}
    {{ret_val}} = P{{fn_name}}({{args}});
-   {{apply_to_type MPI_Comm* postComm}} {{apply_to_type MPI_Group* postGroup}} {{apply_to_type MPI_Win* postWin}} {{apply_to_type MPI_File* postFile}} {{apply_to_type MPI_Op* postOp}} {{apply_to_type MPI_Session* postSession}}
+   {{apply_to_type MPI_Comm* postComm}}
 {{endfn}}
 
 {{fn fn_name MPI_Ialltoallw MPI_Ialltoallw_c MPI_Ineighbor_alltoallw MPI_Ineighbor_alltoallw_c}}
@@ -191,9 +191,9 @@
   thread_local_clock->icoll++;
 
   {{apply_to_type {{list 'MPI_Comm' 'MPI_Request*'}} 'mpiIcollAllreduceMacro'}}
-   {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Group preGroup}} {{apply_to_type MPI_File preFile}} {{apply_to_type MPI_Win preWin}} {{apply_to_type MPI_Op preOp}} {{apply_to_type MPI_Session preSession}}
+   {{apply_to_type MPI_Comm preComm}}
    {{ret_val}} = P{{fn_name}}({{args}});
-   {{apply_to_type MPI_Comm* postComm}} {{apply_to_type MPI_Group* postGroup}} {{apply_to_type MPI_Win* postWin}} {{apply_to_type MPI_File* postFile}} {{apply_to_type MPI_Op* postOp}} {{apply_to_type MPI_Session* postSession}}
+   {{apply_to_type MPI_Comm* postComm}}
 {{endfn}}
 
 {{fn fn_name MPI_Alltoallw_init MPI_Alltoallw_init_c MPI_Neighbor_alltoallw_init MPI_Neighbor_alltoallw_init_c}}
@@ -201,7 +201,7 @@
   thread_local_clock->icoll++;
 
   {{apply_to_type {{list 'MPI_Comm' 'MPI_Request*'}} 'mpiCollAllreduceInitMacro'}}
-   {{apply_to_type MPI_Comm preComm}} {{apply_to_type MPI_Group preGroup}} {{apply_to_type MPI_File preFile}} {{apply_to_type MPI_Win preWin}} {{apply_to_type MPI_Op preOp}} {{apply_to_type MPI_Session preSession}}
+   {{apply_to_type MPI_Comm preComm}}
    {{ret_val}} = P{{fn_name}}({{args}});
-   {{apply_to_type MPI_Comm* postComm}} {{apply_to_type MPI_Group* postGroup}} {{apply_to_type MPI_Win* postWin}} {{apply_to_type MPI_File* postFile}} {{apply_to_type MPI_Op* postOp}} {{apply_to_type MPI_Session* postSession}}
+   {{apply_to_type MPI_Comm* postComm}}
 {{endfn}}
