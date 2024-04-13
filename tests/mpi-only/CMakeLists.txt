@@ -6,6 +6,7 @@ set(CMAKE_EXECUTABLE_SUFFIX_CXX .cpp.tmp)
 set(mpiOnlyTests
     mpi-balanced 
     mpi-imbalance
+    mpi-message
     mpi-serialization
     mpi-bcast-balanced
     mpi-bcast-serialization
