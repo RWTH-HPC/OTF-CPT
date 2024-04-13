@@ -21,22 +21,18 @@ void registerErrHandler(MPI_Comm comm){
 #ifdef HANDLE_OP
 template <> MPI_Op OpData::nullHandle{MPI_OP_NULL};
 OpFactory of;
-MapListOpFactory mof;
 #endif
 #ifdef HANDLE_WIN
 template <> MPI_Win WinData::nullHandle{MPI_WIN_NULL};
 WinFactory wf;
-MapListWinFactory mwf;
 #endif
 #ifdef HANDLE_TYPE
 template <> MPI_Datatype TypeData::nullHandle{MPI_DATATYPE_NULL};
 TypeFactory tf{};
-MapListTypeFactory mtf{};
 #endif
 #ifdef HANDLE_FILE
 template <> MPI_File FileData::nullHandle{MPI_FILE_NULL};
 FileFactory ff;
-MapListFileFactory mff;
 #endif
 #ifdef HANDLE_COMM
 template <>
@@ -51,7 +47,6 @@ template <> void AbstractHandleFactory<MPI_Comm, CommData>::initPredefined() {
 }
 MPI_Comm CommData::nullHandle{MPI_COMM_NULL};
 CommFactory cf;
-MapListCommFactory mcf;
 #endif
 #ifdef HANDLE_GROUP
 template <>
@@ -65,17 +60,14 @@ template <> void AbstractHandleFactory<MPI_Group, GroupData>::initPredefined() {
 }
 template <> MPI_Group GroupData::nullHandle{MPI_GROUP_NULL};
 GroupFactory gf;
-MapListGroupFactory mgf;
 #endif
 #ifdef HANDLE_REQUEST
 MPI_Request RequestData::nullHandle{MPI_REQUEST_NULL};
 RequestFactory rf;
-MapListRequestFactory mrf;
 #endif
 #if defined(HAVE_SESSION) && defined(HANDLE_SESSION)
 template <> MPI_Session SessionData::nullHandle{MPI_SESSION_NULL};
 SessionFactory sf;
-MapListSessionFactory msf;
 #endif
 
 int ipcData::num_uc_double{NUM_UC_DOUBLE};
