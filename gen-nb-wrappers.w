@@ -10,6 +10,10 @@
 #define mpiSendInitPBMacro(c,r)  mpiSendInitPB pb{dest, tag, comm, request};
 #define mpiRecvPBMacro(c,s)  mpiRecvPB pb{source, tag, c, &s};
 #define mpiIrecvPBMacro(c,r)  mpiIrecvPB pb{source, tag, c, r};
+#define mpiMprobePBMacro(c,s,m)  mpiMprobePB pb{source, tag, c, &s, m};
+#define mpiImprobePBMacro(c,s,m)  mpiMprobePB pb{source, tag, flag, c, &s, m};
+#define mpiMrecvPBMacro(m,s)  mpiRecvPB pb{m, &s};
+#define mpiImrecvPBMacro(m,r)  mpiIrecvPB pb{m, r};
 #define mpiRecvInitPBMacro(c,r)  mpiRecvInitPB pb{source, tag, c, r};
 
 
@@ -63,12 +67,52 @@
   {{ret_val}} = P{{fn_name}}({{args}});
 {{endfn}}
 
+{{fn fn_name MPI_Mprobe MPI_Mprobe_c }}
+  mpiTimer mt{false, __func__};
+  thread_local_clock->recv++;
+
+  {{apply_to_type {{list 'MPI_Comm' 'MPI_Status*' 'MPI_Message*'}} 'mpiMprobePBMacro'}}
+  {{apply_to_type MPI_Comm preComm}}
+   
+  {{ret_val}} = P{{fn_name}}({{args}});
+{{endfn}}
+
+{{fn fn_name MPI_Improbe MPI_Improbe_c }}
+  mpiTimer mt{false, __func__};
+  thread_local_clock->recv++;
+
+  {{apply_to_type {{list 'MPI_Comm' 'MPI_Status*' 'MPI_Message*'}} 'mpiImprobePBMacro'}}
+  {{apply_to_type MPI_Comm preComm}}
+   
+  {{ret_val}} = P{{fn_name}}({{args}});
+{{endfn}}
+
 {{fn fn_name MPI_Recv_init MPI_Recv_init_c}}
   mpiTimer mt{false, __func__};
   thread_local_clock->irecv++;
 
   {{apply_to_type {{list 'MPI_Comm' 'MPI_Request*'}} 'mpiRecvInitPBMacro'}}
   {{apply_to_type MPI_Comm preComm}}
+   
+  {{ret_val}} = P{{fn_name}}({{args}});
+{{endfn}}
+
+{{fn fn_name MPI_Mrecv MPI_Mrecv_c }}
+  mpiTimer mt{false, __func__};
+  thread_local_clock->recv++;
+
+  {{apply_to_type {{list 'MPI_Message*' 'MPI_Status*'}} 'mpiMrecvPBMacro'}}
+  {{apply_to_type MPI_Message preMessage}}
+   
+  {{ret_val}} = P{{fn_name}}({{args}});
+{{endfn}}
+
+{{fn fn_name MPI_Imrecv MPI_Imrecv_c}}
+  mpiTimer mt{false, __func__};
+  thread_local_clock->irecv++;
+
+  {{apply_to_type {{list 'MPI_Message*' 'MPI_Request*'}} 'mpiImrecvPBMacro'}}
+  {{apply_to_type MPI_Message preMessage}}
    
   {{ret_val}} = P{{fn_name}}({{args}});
 {{endfn}}

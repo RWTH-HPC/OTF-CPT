@@ -125,6 +125,8 @@ public:
 typedef enum {
   ISEND = 0,
   IRECV,
+  IMRECV,
+  MPROBE,
   ICOLL,
   IREDUCE,
   IALLREDUCE,
@@ -252,10 +254,10 @@ public:
     freed = false;
   }
 
-  void init(MPI_Request request, const void *rData = nullptr,
-            bool _persistent = false) {
+  template <typename M>
+  void init(M request, const void *rData = nullptr, bool _persistent = false) {
     persistent = _persistent;
-    handle = request;
+    handle = (MPI_Request)request;
     freed = false;
   }
 

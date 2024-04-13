@@ -44,6 +44,20 @@ if(NOT FileCheck_FOUND)
 set(OTFCPT_Test_avail FALSE)
 endif()
 
+add_custom_target(build-tests)
+add_custom_target(build-mpi-only-tests)
+add_custom_target(build-omp-only-tests)
+add_custom_target(build-hybrid-tests)
+add_dependencies(build-tests build-mpi-only-tests build-omp-only-tests build-hybrid-tests OTFCPT OTFCPT_omp)
+
+add_subdirectory(datastructures)
+add_subdirectory(mpi-only)
+
+if(OpenMP_C_FOUND)
+    add_subdirectory(hybrid)
+    add_subdirectory(omp-only)
+endif()
+
 if(NOT OTFCPT_Test_avail)
 set(OTFCPT_Test_avail FALSE)
     message(STATUS "No tests available with missing lit/FileCheck")
@@ -67,12 +81,6 @@ file(GENERATE
      INPUT "${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.configured"
 )
 
-add_custom_target(build-tests)
-add_custom_target(build-mpi-only-tests)
-add_custom_target(build-omp-only-tests)
-add_custom_target(build-hybrid-tests)
-add_dependencies(build-tests build-mpi-only-tests build-omp-only-tests build-hybrid-tests OTFCPT OTFCPT_omp)
-
 if (TARGET FileCheck_Standalone AND MUST_BUILD_FILECHECK)
     add_dependencies(build-test FileCheck_Standalone)
 endif()
@@ -80,10 +88,3 @@ endif()
 
 add_check_target(NAME check SUITES . COMMENT "Run all OTF-CPT tests" DEPENDS build-tests)
 
-add_subdirectory(datastructures)
-add_subdirectory(mpi-only)
-
-if(OpenMP_C_FOUND)
-    add_subdirectory(hybrid)
-    add_subdirectory(omp-only)
-endif()

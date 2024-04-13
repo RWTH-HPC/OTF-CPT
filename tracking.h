@@ -20,6 +20,7 @@
 // critical path tool only needs comm and request tracking
 #define HANDLE_COMM 1
 #define HANDLE_REQUEST 1
+#define HANDLE_MESSAGE 1
 // use memory management for tool data
 #define REAL_DATAPOOL 1
 #define USE_ERRHANDLER 1
@@ -93,6 +94,14 @@ void registerErrHandler(MPI_Comm comm);
 #define postSession(s) (void)s
 #endif
 
+#ifdef HANDLE_MESSAGE
+#define preMessage(m) m = mf.getHandle(m)
+#define postMessage(m) *m = mf.newHandle(*m)
+#else
+#define preOp(m) (void)m
+#define postOp(m) (void)m
+#endif
+
 #ifdef HANDLE_REQUEST
 #define postRequest(r) *r = rf.newRequest(*r)
 #define postRequestInit(r) *r = rf.newRequest(*r, true)
@@ -109,6 +118,7 @@ enum toolDataEnum {
   toolCommData,
   toolGroupData,
   toolSessionData,
+  toolMessageData,
   toolRequestData
 };
 
@@ -130,6 +140,7 @@ public:
   virtual M newHandle(M &handle) = 0;
   virtual M newHandle(M &handle, T *data) = 0;
   virtual M freeHandle(M handle) = 0;
+  virtual T *detachHandle(M handle) = 0;
   virtual T *findData(M handle) = 0;
   virtual T *newData() = 0;
   virtual M &getHandle(M &handle) = 0;
@@ -237,10 +248,14 @@ public:
   }
   M freeHandle(M handle) {
     if (this->isPredefined(handle))
-      return T::nullHandle;
+      return (M)T::nullHandle;
     ((T *)(uintptr_t)(handle))->fini();
     this->returnData((T *)(uintptr_t)(handle));
-    return T::nullHandle;
+    return (M)T::nullHandle;
+  }
+  T *detachHandle(M handle) {
+    assert (!this->isPredefined(handle));
+    return (T *)(uintptr_t)(handle);
   }
   T *findData(M handle) {
     T *ret = this->findPredefinedData(handle);
@@ -251,12 +266,12 @@ public:
   M &getHandle(M &handle) {
     if (this->isPredefined(handle))
       return handle;
-    return ((T *)(uintptr_t)(handle))->handle;
+    return (M &)(((T *)(uintptr_t)(handle))->handle);
   }
   M &getHandleLocked(M &handle) {
     if (this->isPredefined(handle))
       return handle;
-    return ((T *)(uintptr_t)(handle))->handle;
+    return (M &)(((T *)(uintptr_t)(handle))->handle);
   }
   std::shared_lock<std::shared_mutex> getSharedLock() {
     return std::shared_lock<std::shared_mutex>{DummyMutex, std::defer_lock};
@@ -372,6 +387,16 @@ public:
     this->returnData(ret);
     return T::nullHandle;
   }
+  T *detachHandle(M handle) {
+    assert (!this->isPredefined(handle));
+    T *ret;
+    {
+      std::unique_lock<std::shared_mutex> lock(AHMutex);
+      ret = dataTable[(size_t)(handle)];
+      availableHandles.emplace_back(handle);
+    }
+    return ret;
+  }
   T *findData(M handle) {
     T *ret = this->findPredefinedData(handle);
     if (ret != nullptr)
@@ -480,6 +505,7 @@ using TypeData = HandleData<MPI_Datatype, toolTypeData>;
 using FileData = HandleData<MPI_File, toolFileData>;
 // using CommData = HandleData<MPI_Comm, toolCommData>;
 using GroupData = HandleData<MPI_Group, toolGroupData>;
+using MessageData = RequestData;
 #ifdef HAVE_SESSION
 using SessionData = HandleData<MPI_Session, toolSessionData>;
 #endif
@@ -499,6 +525,8 @@ using SessionFactory = HandleFactory<MPI_Session, SessionData, MPI_Session>;
 #endif
 
 using GroupFactory = HandleFactory<MPI_Group, GroupData, MPI_Group>;
+
+using MessageFactory = HandleFactory<MPI_Message, MessageData, MPI_Message>;
 
 using RequestFactory = RequestFactoryInst<MPI_Request>;
 
@@ -530,6 +558,14 @@ bool AbstractHandleFactory<MPI_Comm, CommData>::isPredefined(MPI_Comm handle);
 template <> void AbstractHandleFactory<MPI_Comm, CommData>::initPredefined();
 
 extern CommFactory cf;
+#endif
+#ifdef HANDLE_MESSAGE
+template <>
+bool AbstractHandleFactory<MPI_Message, MessageData>::isPredefined(MPI_Message handle);
+
+template <> void AbstractHandleFactory<MPI_Message, MessageData>::initPredefined();
+
+extern MessageFactory mf;
 #endif
 #ifdef HANDLE_GROUP
 template <>

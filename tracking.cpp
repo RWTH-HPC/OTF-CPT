@@ -61,6 +61,15 @@ template <> void AbstractHandleFactory<MPI_Group, GroupData>::initPredefined() {
 template <> MPI_Group GroupData::nullHandle{MPI_GROUP_NULL};
 GroupFactory gf;
 #endif
+#ifdef HANDLE_MESSAGE
+template <>
+bool AbstractHandleFactory<MPI_Message, MessageData>::isPredefined(
+    MPI_Message handle) {
+  return false;
+}
+template <> void AbstractHandleFactory<MPI_Message, MessageData>::initPredefined() {}
+MessageFactory mf;
+#endif
 #ifdef HANDLE_REQUEST
 MPI_Request RequestData::nullHandle{MPI_REQUEST_NULL};
 RequestFactory rf;

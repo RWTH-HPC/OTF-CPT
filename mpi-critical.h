@@ -419,6 +419,60 @@ struct mpiSendPB {
   }
 };
 
+struct mpiMprobePB {
+  double *uc;
+  MPI_Comm comm;
+  MPI_Message *message;
+  CommData *cData;
+  MPI_Status tStatus;
+  MPI_Status *pStatus;
+  int *flag;
+  int iflag{1};
+  int src{MPI_ANY_SOURCE};
+  int tag{MPI_ANY_TAG};
+  int rank;
+
+  mpiMprobePB(int src, int tag, MPI_Comm comm, MPI_Status **status,
+              MPI_Message *message)
+      : mpiMprobePB(src, tag, &iflag, comm, status, message) {}
+
+  mpiMprobePB(int src, int tag, int *flag, MPI_Comm comm, MPI_Status **status,
+              MPI_Message *message)
+      : comm(comm), message(message), pStatus(*status), flag(flag), src(src),
+        tag(tag) {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    if (src == MPI_PROC_NULL)
+      return;
+    if ((src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) &&
+        (*status == MPI_STATUS_IGNORE)) {
+      pStatus = *status = &tStatus;
+    }
+  }
+  ~mpiMprobePB() {
+    if (!*flag)
+      return;
+    auto rData = rf.newData();
+    *message = mf.newHandle(*message, rData);
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    cData = cf.findData(comm);
+    rank = cData->getRank();
+    uc = rData->uc_double;
+    if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
+      src = pStatus->MPI_SOURCE;
+      tag = pStatus->MPI_TAG;
+    }
+    rData->init(rData->handle, MPROBE, src, tag, cData);
+    PMPI_Irecv(uc, 1, ipcData::ipcMpiType, src, tag, cData->getDupComm(),
+               rData->pb_reqs);
+  }
+};
+
 struct mpiRecvPB {
   double *uc;
   RequestData rData;
@@ -428,6 +482,20 @@ struct mpiRecvPB {
   int src;
   int tag;
   int rank;
+
+  mpiRecvPB(MPI_Message *message, MPI_Status **status) : pStatus(*status) {
+    auto *mData = mf.detachHandle(*message);
+#if OnlyActivePB
+    if (analysis_flags->running)
+#endif
+    {
+      rData = *mData;
+    }
+    *message = (MPI_Message)mData->handle;
+    mData->fini();
+    mf.returnData(mData);
+    src = rData.remote;
+  }
 
   mpiRecvPB(int src, int tag, MPI_Comm comm, MPI_Status **status)
       : pStatus(*status), src(src), tag(tag) {
@@ -474,8 +542,16 @@ struct mpiIrecvPB {
   CommData *cData;
   MPI_Request *send_req;
   int rank;
+  KIND kind{IRECV};
   int src;
   int tag;
+
+  mpiIrecvPB(MPI_Message *message, MPI_Request *request)
+      : send_req(request), kind(IMRECV) {
+    rData = mf.detachHandle(*message);
+    *message = (MPI_Message)rData->handle;
+    src = rData->remote;
+  }
 
   mpiIrecvPB(int src, int tag, MPI_Comm comm, MPI_Request *request)
       : send_req(request), src(src), tag(tag) {
@@ -505,7 +581,8 @@ struct mpiIrecvPB {
           rData->init(*send_req, IRECV, src, tag, cData);
           rData->setCompletionCallback(completePBWC);
         } else {
-          rData->init(*send_req, IRECV, src);
+          if (kind == IRECV)
+            rData->init(*send_req, kind, src);
           rData->setCompletionCallback(completePBHB);
         }
       }
