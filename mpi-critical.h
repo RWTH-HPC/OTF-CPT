@@ -352,7 +352,7 @@ struct mpiIsendPB {
     if (analysis_flags->running)
 #endif
     {
-      if (dest == MPI_PROC_NULL) {
+      if (dest != MPI_PROC_NULL) {
         rData->init(*send_req, ISEND, dest);
         rData->setCompletionCallback(completePBnoHB);
       }
@@ -382,7 +382,7 @@ struct mpiSendInitPB {
                    rData->pb_reqs);
   }
   ~mpiSendInitPB() {
-    if (dest == MPI_PROC_NULL) {
+    if (dest != MPI_PROC_NULL) {
       rData->init(*send_req, PSEND, dest);
     }
     *send_req = rf.newHandle(*send_req, rData);
@@ -413,7 +413,7 @@ struct mpiSendPB {
     if (!analysis_flags->running)
       return;
 #endif
-    if (dest == MPI_PROC_NULL)
+    if (dest != MPI_PROC_NULL)
       return;
     PMPI_Waitall(2, rData.pb_reqs, MPI_STATUSES_IGNORE);
   }
@@ -500,7 +500,7 @@ struct mpiIrecvPB {
     if (analysis_flags->running)
 #endif
     {
-      if (src == MPI_PROC_NULL) {
+      if (src != MPI_PROC_NULL) {
         if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
           rData->init(*send_req, IRECV, src, tag, cData);
           rData->setCompletionCallback(completePBWC);
@@ -544,7 +544,7 @@ struct mpiRecvInitPB {
     }
   }
   ~mpiRecvInitPB() {
-    if (src == MPI_PROC_NULL) {
+    if (src != MPI_PROC_NULL) {
       if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
         rData->init(*send_req, IRECV, src, tag, cData);
       } else {
