@@ -1,5 +1,3 @@
-#ifndef NOTOOL
-
 #include <assert.h>
 #include <mpi.h>
 #include <stdio.h>
@@ -61,8 +59,6 @@
    mpiTimer mt{false, __func__};
    {{apply_to_type MPI_Comm preComm}} 
    {{ret_val}} = P{{fn_name}}({{args}});
-   {{apply_to_type MPI_Comm* postComm}} 
    {{apply_to_type MPI_Comm* errHandlerComm}}
+   {{apply_to_type MPI_Comm* postComm}} 
 {{endfnallntype}}
-
-#endif
