@@ -171,6 +171,25 @@ struct MPI_COUNTS {
   }
 };
 
+struct omptCounts {
+  int taskCreate{0};
+  int taskSchedule{0};
+  int implTaskBegin{0};
+  int implTaskEnd{0};
+  int syncRegionBegin{0};
+  int syncRegionEnd{0};
+  int mutexAcquire{0};
+  void add(const omptCounts& o){
+    taskCreate += o.taskCreate;
+    taskSchedule += o.taskSchedule;
+    implTaskBegin += o.implTaskBegin;
+    implTaskEnd += o.implTaskEnd;
+    syncRegionBegin += o.syncRegionBegin;
+    syncRegionEnd += o.syncRegionEnd;
+    mutexAcquire += o.mutexAcquire;
+  }
+};
+
 struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
   int thread_id{-1};
   bool openmp_thread{false};
@@ -277,6 +296,7 @@ struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
 typedef SYNC_CLOCK ompt_tsan_clockid;
 extern thread_local THREAD_CLOCK *thread_local_clock;
 extern std::vector<THREAD_CLOCK *> *thread_clocks;
+extern std::vector<omptCounts *> *thread_counts;
 extern double startProgrammTime;
 extern double crit_path_useful_time;
 

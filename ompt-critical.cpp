@@ -37,6 +37,8 @@ static ompt_get_thread_data_t critical_ompt_get_thread_data{};
 
 static int hasTaskCreation = 0;
 
+static __thread omptCounts *omptThreadCount;
+
 template <bool always = true> struct ompTimer {
   const char *loc;
   bool stopped{false};
@@ -464,12 +466,14 @@ static void ompt_tsan_thread_begin(ompt_thread_t thread_type,
   TaskDataPool::ThreadDataPool = new TaskDataPool;
   DependencyDataPool::ThreadDataPool = new DependencyDataPool;
 
+  omptThreadCount = new omptCounts();
   if (!thread_local_clock)
     thread_local_clock = new THREAD_CLOCK(my_next_id(), 0, true);
   thread_data->ptr = thread_local_clock;
   {
     const std::lock_guard<std::mutex> lock(tcmutex);
     thread_clocks->push_back(thread_local_clock);
+    thread_counts->push_back(omptThreadCount);
   }
 }
 
@@ -519,6 +523,8 @@ static void ompt_tsan_implicit_task(ompt_scope_endpoint_t endpoint,
                                     unsigned int thread_num, int type) {
   switch (endpoint) {
   case ompt_scope_begin:
+    if (analysis_flags->running)
+      omptThreadCount->implTaskBegin++;
     if (type & ompt_task_initial) {
       parallel_data->ptr = ParallelData::New(nullptr);
     } else {
@@ -540,6 +546,8 @@ static void ompt_tsan_implicit_task(ompt_scope_endpoint_t endpoint,
     // start of the task, useful computation start
     break;
   case ompt_scope_end: {
+    if (analysis_flags->running)
+      omptThreadCount->implTaskEnd++;
     // end of the task, useful computation stop
     TaskData *Data = ToTaskData(task_data);
 #ifdef DEBUG
@@ -582,6 +590,8 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
   switch (endpoint) {
   case ompt_scope_begin:
   case ompt_scope_beginend:
+    if (analysis_flags->running)
+      omptThreadCount->syncRegionBegin++;
     // runtime overhead, stop useful
     Data->InBarrier = true;
     thread_local_clock->Stop(CLOCK_OMP, "SyncRegionBegin");
@@ -615,6 +625,8 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
       break;
     KMP_FALLTHROUGH();
   case ompt_scope_end:
+    if (analysis_flags->running)
+      omptThreadCount->syncRegionEnd++;
     switch (kind) {
     case ompt_sync_region_barrier_implementation:
     case ompt_sync_region_barrier_implicit:
@@ -692,6 +704,8 @@ static void ompt_tsan_task_create(
     int type, int has_dependences,
     const void *codeptr_ra) /* pointer to outlined function */
 {
+    if (analysis_flags->running)
+      omptThreadCount->taskCreate++;
   TaskData *Data;
   assert(new_task_data->ptr == NULL &&
          "Task data should be initialized to NULL");
@@ -765,6 +779,8 @@ static void ompt_tsan_task_schedule(ompt_data_t *first_task_data,
                                     ompt_task_status_t prior_task_status,
                                     ompt_data_t *second_task_data) {
 
+    if (analysis_flags->running)
+      omptThreadCount->taskSchedule++;
   //
   //  The necessary action depends on prior_task_status:
   //
@@ -893,6 +909,8 @@ static void ompt_tsan_dependences(ompt_data_t *task_data,
 static void ompt_tsan_mutex_acquire(ompt_mutex_t kind, unsigned int hint,
                                     unsigned int impl, ompt_wait_id_t wait_id,
                                     const void *codeptr_ra) {
+    if (analysis_flags->running)
+      omptThreadCount->mutexAcquire++;
   thread_local_clock->Stop(CLOCK_OMP, "MutexAcquire");
 }
 
@@ -1027,6 +1045,8 @@ ompt_start_tool(unsigned int omp_version, const char *runtime_version) {
       &ompt_tsan_initialize, &ompt_tsan_finalize, {0}};
   if (!thread_clocks)
     thread_clocks = new std::vector<THREAD_CLOCK *>{};
+  if (!thread_counts)
+    thread_counts = new std::vector<omptCounts *>{};
 
   // The OMPT start-up code uses dlopen with RTLD_LAZY. Therefore, we cannot
   // rely on dlopen to fail if TSan is missing, but would get a runtime error
