@@ -46,6 +46,7 @@ double startProgrammTime = getTime(), endProgrammTime;
 double crit_path_useful_time = 0;
 
 std::vector<THREAD_CLOCK *> *thread_clocks = nullptr;
+std::vector<omptCounts *> *thread_counts = nullptr;
 thread_local THREAD_CLOCK *thread_local_clock = nullptr;
 
 void resetMpiClock(THREAD_CLOCK *thread_clock) {
@@ -134,6 +135,9 @@ void finishMeasurement() {
     uc_avg[0] = uc_avg[0];
 
     uc_avg[2] = uc_avg[2];
+    if (thread_counts)
+      for(int i=1; i<thread_counts->size(); i++)
+        (*thread_counts)[0]->add(*(*thread_counts)[i]);
   } else {
     num_threads = 1;
     uc_max[0] = uc_avg[0] =
@@ -247,6 +251,25 @@ void finishMeasurement() {
       if (total_counts.wait)
         std::cout << "MPI_Wait*: " << total_counts.wait << std::endl
                   << std::endl;
+
+      if(thread_counts){
+        std::cout << "\n\n--------OMPT stats:--------\n";
+        auto* tCounts = thread_counts->at(0);
+        if(tCounts->taskCreate)
+          std::cout << "taskCreate: " << tCounts->taskCreate << std::endl;
+        if(tCounts->taskSchedule)
+          std::cout << "taskSchedule: " << tCounts->taskSchedule << std::endl;
+        if(tCounts->implTaskBegin)
+          std::cout << "implTaskBegin: " << tCounts->implTaskBegin << std::endl;
+        if(tCounts->implTaskEnd)
+          std::cout << "implTaskEnd: " << tCounts->implTaskEnd << std::endl;
+        if(tCounts->syncRegionBegin)
+          std::cout << "syncRegionBegin: " << tCounts->syncRegionBegin << std::endl;
+        if(tCounts->syncRegionEnd)
+          std::cout << "syncRegionEnd: " << tCounts->syncRegionEnd << std::endl;
+        if(tCounts->mutexAcquire)
+          std::cout << "mutexAcquire: " << tCounts->mutexAcquire << std::endl;
+      }
 
       std::cout << "\n\n--------CritPath Analysis Tool results:--------\n";
       std::cout << "=> Number of processes:          " +
