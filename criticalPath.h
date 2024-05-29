@@ -156,8 +156,8 @@ enum ClockContext {
 
 struct MPI_COUNTS {
   int send{0}, recv{0}, isend{0}, irecv{0}, coll{0}, icoll{0}, test{0}, wait{0},
-      pers{0};
-  void add(MPI_COUNTS o) {
+      pers{0}, probe{0};
+  void add(const MPI_COUNTS& o) {
     send += o.send;
     recv += o.recv;
     isend += o.isend;
@@ -167,6 +167,7 @@ struct MPI_COUNTS {
     test += o.test;
     wait += o.wait;
     pers += o.pers;
+    probe += o.probe;
   }
 };
 
