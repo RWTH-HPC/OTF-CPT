@@ -9,14 +9,16 @@
 
 int MPI_Start(MPI_Request *request) {
   mpiTimer mt{false, __func__};
-  thread_local_clock->pers++;
+  if (analysis_flags->running)
+    thread_local_clock->pers++;
   MPI_Request myReq = rf.startRequest(*request);
   return PMPI_Start(&myReq);
 }
 
 int MPI_Startall(int count, MPI_Request array_of_requests[]) {
   mpiTimer mt{false, __func__};
-  thread_local_clock->pers++;
+  if (analysis_flags->running)
+    thread_local_clock->pers++;
   MPI_Request myReqs[count];
   {
     for (int i = 0; i < count; i++) {
@@ -28,7 +30,8 @@ int MPI_Startall(int count, MPI_Request array_of_requests[]) {
 
 int MPI_Request_free(MPI_Request *request) {
   mpiTimer mt{false, __func__};
-  thread_local_clock->pers++;
+  if (analysis_flags->running)
+    thread_local_clock->pers++;
   MPI_Request myReq = rf.getHandle(*request);
   int ret = PMPI_Request_free(&myReq);
   *request = rf.freeHandle(*request);
@@ -37,7 +40,8 @@ int MPI_Request_free(MPI_Request *request) {
 
 int MPI_Wait(MPI_Request *request, MPI_Status *status) {
   mpiTimer mt{false, __func__};
-  thread_local_clock->wait++;
+  if (analysis_flags->running)
+    thread_local_clock->wait++;
   MPI_Request myReq = rf.getHandle(*request);
   MPI_Status tmpstatus;
   if (status == MPI_STATUS_IGNORE)
@@ -50,7 +54,8 @@ int MPI_Wait(MPI_Request *request, MPI_Status *status) {
 int MPI_Waitall(int count, MPI_Request array_of_requests[],
                 MPI_Status array_of_statuses[]) {
   mpiTimer mt{false, __func__};
-  thread_local_clock->wait++;
+  if (analysis_flags->running)
+    thread_local_clock->wait++;
   MPI_Request myReqs[count];
   MPI_Status tmpstatuses[count];
   if (array_of_statuses == MPI_STATUSES_IGNORE)
@@ -74,7 +79,8 @@ int MPI_Waitall(int count, MPI_Request array_of_requests[],
 int MPI_Waitany(int count, MPI_Request array_of_requests[], int *indx,
                 MPI_Status *status) {
   mpiTimer mt{false, __func__};
-  thread_local_clock->wait++;
+  if (analysis_flags->running)
+    thread_local_clock->wait++;
   MPI_Request myReqs[count];
   MPI_Status tmpstatus;
   if (status == MPI_STATUS_IGNORE)
@@ -96,7 +102,8 @@ int MPI_Waitany(int count, MPI_Request array_of_requests[], int *indx,
 int MPI_Waitsome(int incount, MPI_Request array_of_requests[], int *outcount,
                  int array_of_indices[], MPI_Status array_of_statuses[]) {
   mpiTimer mt{false, __func__};
-  thread_local_clock->wait++;
+  if (analysis_flags->running)
+    thread_local_clock->wait++;
   MPI_Request myReqs[incount];
   MPI_Status tmpstatuses[incount];
   if (array_of_statuses == MPI_STATUSES_IGNORE)
@@ -120,7 +127,8 @@ int MPI_Waitsome(int incount, MPI_Request array_of_requests[], int *outcount,
 
 int MPI_Test(MPI_Request *request, int *flag, MPI_Status *status) {
   mpiTimer mt{false, __func__};
-  thread_local_clock->test++;
+  if (analysis_flags->running)
+    thread_local_clock->test++;
   MPI_Request myReq = rf.getHandle(*request);
   int ret = PMPI_Test(&myReq, flag, status);
   if (*flag) {
@@ -132,7 +140,8 @@ int MPI_Test(MPI_Request *request, int *flag, MPI_Status *status) {
 int MPI_Testall(int count, MPI_Request array_of_requests[], int *flag,
                 MPI_Status array_of_statuses[]) {
   mpiTimer mt{false, __func__};
-  thread_local_clock->test++;
+  if (analysis_flags->running)
+    thread_local_clock->test++;
   MPI_Request myReqs[count];
   MPI_Status tmpstatuses[count];
   if (array_of_statuses == MPI_STATUSES_IGNORE)
@@ -156,7 +165,8 @@ int MPI_Testall(int count, MPI_Request array_of_requests[], int *flag,
 int MPI_Testany(int count, MPI_Request array_of_requests[], int *indx,
                 int *flag, MPI_Status *status) {
   mpiTimer mt{false, __func__};
-  thread_local_clock->test++;
+  if (analysis_flags->running)
+    thread_local_clock->test++;
   MPI_Request myReqs[count];
   MPI_Status tmpstatus;
   if (status == MPI_STATUS_IGNORE)
@@ -178,7 +188,8 @@ int MPI_Testany(int count, MPI_Request array_of_requests[], int *indx,
 int MPI_Testsome(int incount, MPI_Request array_of_requests[], int *outcount,
                  int array_of_indices[], MPI_Status array_of_statuses[]) {
   mpiTimer mt{false, __func__};
-  thread_local_clock->test++;
+  if (analysis_flags->running)
+    thread_local_clock->test++;
   MPI_Request myReqs[incount];
   MPI_Status tmpstatuses[incount];
   if (array_of_statuses == MPI_STATUSES_IGNORE)

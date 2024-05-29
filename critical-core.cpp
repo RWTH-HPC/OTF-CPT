@@ -232,6 +232,8 @@ void finishMeasurement() {
         std::cout << "MPI_*send: " << total_counts.send << std::endl;
       if (total_counts.isend)
         std::cout << "MPI_I*send: " << total_counts.isend << std::endl;
+      if (total_counts.probe)
+        std::cout << "MPI_*mprobe: " << total_counts.probe << std::endl;
       if (total_counts.recv)
         std::cout << "MPI_Recv: " << total_counts.recv << std::endl;
       if (total_counts.irecv)
