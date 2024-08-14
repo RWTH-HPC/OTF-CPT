@@ -17,6 +17,8 @@ void completePBHB(RequestData *uc, MPI_Status *status);
 void completePersPBHB(RequestData *uc, MPI_Status *status);
 void startPersPBHB(RequestData *uc);
 
+void cancelPB(RequestData *uc);
+
 void completePBnoHB(RequestData *uc, MPI_Status *status);
 void completePersPBnoHB(RequestData *uc, MPI_Status *status);
 void startPersPBnoHB(RequestData *uc);
@@ -76,7 +78,7 @@ struct mpiIcollBcastPBImpl {
       rData->init(*send_req, IBCAST, REF_RANK);
       rData->setCompletionCallback(completePBHB);
     }
-    *send_req = rf.newHandle(*send_req, rData);
+    *send_req = rf.newRequest(*send_req, rData, false);
   }
 };
 
@@ -101,7 +103,7 @@ struct mpiCollBcastInitPBImpl {
   }
   ~mpiCollBcastInitPBImpl() {
     rData->init(*send_req, PBCAST, REF_RANK);
-    *send_req = rf.newHandle(*send_req, rData);
+    *send_req = rf.newRequest(*send_req, rData, true);
   }
 };
 #endif
@@ -156,7 +158,7 @@ struct mpiIcollAllreducePBImpl {
       rData->init(*send_req, IALLREDUCE, REF_RANK);
       rData->setCompletionCallback(completePBHB);
     }
-    *send_req = rf.newHandle(*send_req, rData);
+    *send_req = rf.newRequest(*send_req, rData, false);
   }
 };
 
@@ -178,7 +180,7 @@ struct mpiCollAllreduceInitPBImpl {
   }
   ~mpiCollAllreduceInitPBImpl() {
     rData->init(*send_req, PALLREDUCE, REF_RANK);
-    *send_req = rf.newHandle(*send_req, rData);
+    *send_req = rf.newRequest(*send_req, rData, true);
   }
 };
 #endif
@@ -238,7 +240,7 @@ struct mpiIcollReducePBImpl {
     {
       rData->init(*send_req, IREDUCE, REF_RANK, rank, nullptr, root);
     }
-    *send_req = rf.newHandle(*send_req, rData);
+    *send_req = rf.newRequest(*send_req, rData, false);
   }
 };
 
@@ -265,7 +267,7 @@ struct mpiCollReduceInitPBImpl {
   }
   ~mpiCollReduceInitPBImpl() {
     rData->init(*send_req, PREDUCE, REF_RANK, rank, nullptr, root);
-    *send_req = rf.newHandle(*send_req, rData);
+    *send_req = rf.newRequest(*send_req, rData, true);
   }
 };
 #endif
@@ -325,7 +327,7 @@ typedef mpiCollBcastInitPBImpl mpiCollBcastInitPB;
 #endif
 
 struct mpiIsendPB {
-  double *uc;
+  double *uc{nullptr};
   RequestData *rData;
   MPI_Request *send_req;
   int dest;
@@ -357,12 +359,13 @@ struct mpiIsendPB {
         rData->setCompletionCallback(completePBnoHB);
       }
     }
-    *send_req = rf.newHandle(*send_req, rData);
+    *send_req = rf.newRequest(*send_req, rData, false);
+    assert(!rData->isPersistent());
   }
 };
 
 struct mpiSendInitPB {
-  double *uc;
+  double *uc{nullptr};
   RequestData *rData;
   MPI_Request *send_req;
   int dest;
@@ -375,6 +378,7 @@ struct mpiSendInitPB {
     if (dest == MPI_PROC_NULL)
       return;
     auto cData = cf.findData(comm);
+    uc = rData->uc_double;
     rank = cData->getRank();
     rData->setStartCallback(startPersPBHB);
     rData->setCompletionCallback(completePersPBnoHB);
@@ -385,12 +389,13 @@ struct mpiSendInitPB {
     if (dest != MPI_PROC_NULL) {
       rData->init(*send_req, PSEND, dest);
     }
-    *send_req = rf.newHandle(*send_req, rData);
+    *send_req = rf.newRequest(*send_req, rData, true);
+    assert(rData->isPersistent());
   }
 };
 
 struct mpiSendPB {
-  double *uc;
+  double *uc{nullptr};
   RequestData rData{};
   int dest;
   int rank;
@@ -420,7 +425,7 @@ struct mpiSendPB {
 };
 
 struct mpiMprobePB {
-  double *uc;
+  double *uc{nullptr};
   MPI_Comm comm;
   MPI_Message *message;
   CommData *cData;
@@ -474,7 +479,7 @@ struct mpiMprobePB {
 };
 
 struct mpiRecvPB {
-  double *uc;
+  double *uc{nullptr};
   RequestData rData;
   CommData *cData;
   MPI_Status tStatus;
@@ -537,7 +542,7 @@ struct mpiRecvPB {
 };
 
 struct mpiIrecvPB {
-  double *uc;
+  double *uc{nullptr};
   RequestData *rData;
   CommData *cData;
   MPI_Request *send_req;
@@ -584,15 +589,17 @@ struct mpiIrecvPB {
           if (kind == IRECV)
             rData->init(*send_req, kind, src);
           rData->setCompletionCallback(completePBHB);
+          rData->setCancelCallback(cancelPB);
         }
       }
     }
-    *send_req = rf.newHandle(*send_req, rData);
+    *send_req = rf.newRequest(*send_req, rData, false);
+    assert(!rData->isPersistent());
   }
 };
 
 struct mpiRecvInitPB {
-  double *uc;
+  double *uc{nullptr};
   RequestData *rData;
   CommData *cData;
   MPI_Request *send_req;
@@ -614,6 +621,7 @@ struct mpiRecvInitPB {
     } else {
       rData->setStartCallback(startPersPBnoHB);
       rData->setCompletionCallback(completePersPBHB);
+      rData->setCancelCallback(cancelPB);
       PMPI_Recv_init(uc, 1, ipcData::ipcMpiType, src, tag, cData->getDupComm(),
                      rData->pb_reqs);
     }
@@ -628,7 +636,8 @@ struct mpiRecvInitPB {
         rData->init(*send_req, IRECV, src);
       }
     }
-    *send_req = rf.newHandle(*send_req, rData);
+    *send_req = rf.newRequest(*send_req, rData, true);
+    assert(rData->isPersistent());
   }
 };
 

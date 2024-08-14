@@ -51,6 +51,8 @@ double *loadThreadTimers(ipcData *uc, int remote) {
 
 // completion callback function for wild-card recv
 void completePBWC(RequestData *uc, MPI_Status *status) {
+  if (uc->isCancelled())
+    return;
   assert(status->MPI_SOURCE >= 0);
   assert(status->MPI_TAG == uc->tag || MPI_ANY_TAG == uc->tag);
   assert(status->MPI_SOURCE == uc->remote || MPI_ANY_SOURCE == uc->remote);
@@ -68,15 +70,25 @@ void completePBHB(RequestData *uc, MPI_Status *status) {
     PMPI_Wait(uc->pb_reqs, MPI_STATUS_IGNORE);
   else
     PMPI_Waitall(2, uc->pb_reqs, MPI_STATUSES_IGNORE);
-  MpiHappensAfter(uc, uc->remote);
+  if (!uc->isCancelled())
+    MpiHappensAfter(uc, uc->remote);
 }
 
 // completion callback function without clock update
 void completePBnoHB(RequestData *uc, MPI_Status *status) {
+  uc->isCancelled();
   if (uc->pb_reqs[1] == MPI_REQUEST_NULL)
     PMPI_Wait(uc->pb_reqs, MPI_STATUS_IGNORE);
   else
     PMPI_Waitall(2, uc->pb_reqs, MPI_STATUSES_IGNORE);
+}
+
+// cancel callback function
+void cancelPB(RequestData *uc) {
+  if (uc->pb_reqs[0] != MPI_REQUEST_NULL)
+    PMPI_Cancel(uc->pb_reqs);
+  if (uc->pb_reqs[1] != MPI_REQUEST_NULL)
+    PMPI_Cancel(uc->pb_reqs + 1);
 }
 
 // completion callback function for persistent request with clock update
@@ -89,11 +101,13 @@ void completePersPBHB(RequestData *uc, MPI_Status *status) {
     PMPI_Wait(uc->pb_reqs, MPI_STATUS_IGNORE);
   else
     PMPI_Waitall(2, uc->pb_reqs, MPI_STATUSES_IGNORE);
-  MpiHappensAfter(uc, uc->remote);
+  if (!uc->isCancelled())
+    MpiHappensAfter(uc, uc->remote);
 }
 
 // completion callback function for persistent request without clock update
 void completePersPBnoHB(RequestData *uc, MPI_Status *status) {
+  uc->isCancelled();
 #if OnlyActivePB
   if (!analysis_flags->running)
     return;
@@ -111,7 +125,10 @@ void startPersPBHB(RequestData *uc) {
     return;
 #endif
   loadThreadTimers(uc);
-  PMPI_Startall(2, uc->pb_reqs);
+  if (uc->pb_reqs[1] == MPI_REQUEST_NULL)
+    PMPI_Start(uc->pb_reqs);
+  else
+    PMPI_Startall(2, uc->pb_reqs);
 }
 
 // start callback function for persistent request without clock update
@@ -120,7 +137,10 @@ void startPersPBnoHB(RequestData *uc) {
   if (!analysis_flags->running)
     return;
 #endif
-  PMPI_Startall(2, uc->pb_reqs);
+  if (uc->pb_reqs[1] == MPI_REQUEST_NULL)
+    PMPI_Start(uc->pb_reqs);
+  else
+    PMPI_Startall(2, uc->pb_reqs);
 }
 
 void init_timer_offsets() {
@@ -163,15 +183,14 @@ void init_timer_offsets() {
   }
   PMPI_Bcast(timeOffsets.data(), size, MPI_DOUBLE, 0, cw_dup);
   localTimeOffset = localTime = timeOffsets[rank];
-  if (rank == 0 && analysis_flags->verbose)
+  if (rank == 0 && analysis_flags->verbose) {
     printf("Timer Offsets:");
-  for (auto &v : timeOffsets) {
-    v -= localTime;
-    if (rank == 0 && analysis_flags->verbose)
+    for (auto &v : timeOffsets) {
+      v -= localTime;
       printf("%lf, ", v);
-  }
-  if (rank == 0 && analysis_flags->verbose)
+    }
     printf("\n");
+  }
 }
 
 void init_processes(mpiTimer &mt) {

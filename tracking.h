@@ -95,7 +95,7 @@ enum toolDataEnum {
 #include "handle-data.h"
 
 // Abstract interface of the HandleFactor
-template <typename M, typename T> class AbstractHandleFactory {
+template <typename M, typename T, auto E> class AbstractHandleFactory {
 protected:
   std::unordered_map<M, T> predefHandles{};
   virtual bool isPredefined(M handle) { return handle == T::nullHandle; }
@@ -116,7 +116,7 @@ public:
   virtual M &getHandle(M &handle) = 0;
   virtual M &getHandleLocked(M &handle) = 0;
   virtual std::shared_lock<std::shared_mutex> getSharedLock() = 0;
-  virtual ~AbstractHandleFactory<M, T>(){};
+  virtual ~AbstractHandleFactory<M, T, E>(){};
   virtual void initPredefined() {
     predefHandles[T::nullHandle].init(T::nullHandle);
   }
@@ -124,11 +124,17 @@ public:
 
 // Abstract interface of the RequestFactor
 class AbstractRequestFactory
-    : public virtual AbstractHandleFactory<MPI_Request, RequestData> {
+    : public virtual AbstractHandleFactory<MPI_Request, RequestData,
+                                           toolRequestData> {
 public:
   virtual MPI_Request newRequest(MPI_Request req, bool persistent = false) = 0;
+  virtual MPI_Request newRequest(MPI_Request req, RequestData *data,
+                                 bool persistent = false) = 0;
   virtual MPI_Request completeRequest(MPI_Request req, MPI_Status *status) = 0;
+  virtual MPI_Request completeRequest(MPI_Request req, MPI_Request mpi_req,
+                                      MPI_Status *status) = 0;
   virtual MPI_Request startRequest(MPI_Request req) = 0;
+  virtual MPI_Request cancelRequest(MPI_Request req) = 0;
   virtual ~AbstractRequestFactory(){};
 };
 
@@ -182,8 +188,8 @@ public:
 
 // General template for HandleFactory / RequestFactory
 // should not be instanciated
-template <typename M, typename T, typename D>
-class HandleFactory : public virtual AbstractHandleFactory<M, T> {
+template <typename M, typename T, typename D, auto E>
+class HandleFactory : public virtual AbstractHandleFactory<M, T, E> {
   // Instanciating the primary class should fail because of the private default
   // constructor
   HandleFactory() { /*static_assert(false, "primary template of HandleFactory
@@ -199,9 +205,9 @@ template <typename D> class RequestFactoryInst {
 };
 
 // Specialized template of HandleFactory for pointer-type handles
-template <typename M, typename T, typename MI>
-class HandleFactory<M, T, MI *> : public virtual AbstractHandleFactory<M, T>,
-                                  public DataPool<M, T> {
+template <typename M, typename T, typename MI, auto E>
+class HandleFactory<M, T, MI *, E>
+    : public virtual AbstractHandleFactory<M, T, E>, public DataPool<M, T> {
 protected:
   mutable std::shared_mutex DummyMutex{};
 
@@ -247,30 +253,38 @@ public:
   std::shared_lock<std::shared_mutex> getSharedLock() {
     return std::shared_lock<std::shared_mutex>{DummyMutex, std::defer_lock};
   }
-  virtual ~HandleFactory<M, T, MI *>() {}
+  virtual ~HandleFactory<M, T, MI *, E>() {}
 };
 
 // Specialized template of RequestFactory for pointer-type handles
 template <typename MI>
 class RequestFactoryInst<MI *>
-    : public HandleFactory<MPI_Request, RequestData, MI *>,
+    : public HandleFactory<MPI_Request, RequestData, MI *, toolRequestData>,
       public AbstractRequestFactory {
-  template <typename D>
-  MPI_Request _newRequest(MPI_Request req, D &reqData, bool persistent) {
+  MPI_Request _newRequest(MPI_Request req, bool persistent) {
     if (req == MPI_REQUEST_NULL)
       return MPI_REQUEST_NULL;
     RequestData *ret = this->getData();
-    ret->init(req, reqData, persistent);
+    ret->init(req, persistent);
     return (MPI_Request)(uintptr_t)ret;
   }
 
 public:
   // get data from the pool
   MPI_Request newRequest(MPI_Request req, bool persistent) {
-    const void *reqData = nullptr;
-    return _newRequest(req, reqData, persistent);
+    return _newRequest(req, persistent);
   }
 
+  MPI_Request newRequest(MPI_Request req, RequestData *data, bool persistent) {
+    data->init(req, persistent);
+    return (MPI_Request)(uintptr_t)data;
+  }
+
+  MPI_Request completeRequest(MPI_Request req, MPI_Request mpi_req,
+                              MPI_Status *status) {
+    ((RequestData *)(uintptr_t)(req))->handle = mpi_req;
+    return completeRequest(req, status);
+  }
   MPI_Request completeRequest(MPI_Request req, MPI_Status *status) {
     if (req == MPI_REQUEST_NULL)
       return MPI_REQUEST_NULL;
@@ -290,12 +304,19 @@ public:
     ret->start();
     return ret->handle;
   }
+  MPI_Request cancelRequest(MPI_Request req) {
+    if (req == MPI_REQUEST_NULL)
+      return MPI_REQUEST_NULL;
+    RequestData *ret = ((RequestData *)(uintptr_t)(req));
+    ret->cancel();
+    return req;
+  }
 };
 
 // Specialized template of HandleFactory for int-type handles
-template <typename M, typename T>
-class HandleFactory<M, T, int> : public virtual AbstractHandleFactory<M, T>,
-                                 public DataPool<M, T> {
+template <typename M, typename T, auto E>
+class HandleFactory<M, T, int, E>
+    : public virtual AbstractHandleFactory<M, T, E>, public DataPool<M, T> {
 protected:
   mutable std::shared_mutex DTMutex{};
   mutable std::shared_mutex AHMutex{};
@@ -389,16 +410,15 @@ public:
   std::shared_lock<std::shared_mutex> getSharedLock() {
     return std::shared_lock<std::shared_mutex>{DTMutex};
   }
-  virtual ~HandleFactory<M, T, int>() {}
+  virtual ~HandleFactory<M, T, int, E>() {}
 };
 
 // Specialized template of RequestFactory for int-type handles
 template <>
 class RequestFactoryInst<int>
-    : public HandleFactory<MPI_Request, RequestData, int>,
+    : public HandleFactory<MPI_Request, RequestData, int, toolRequestData>,
       public AbstractRequestFactory {
-  template <typename D>
-  MPI_Request _newRequest(MPI_Request req, D &reqData, bool persistent) {
+  MPI_Request _newRequest(MPI_Request req, bool persistent) {
     if (req == MPI_REQUEST_NULL)
       return MPI_REQUEST_NULL;
     MPI_Request ret;
@@ -411,15 +431,16 @@ class RequestFactoryInst<int>
       availableHandles.pop_back();
       dataTable[(size_t)(ret)] = dp;
     }
-    dp->init(req, reqData, persistent);
+    dp->init(req, persistent);
     return ret;
   }
 
 public:
   // get data from the pool
-  MPI_Request newRequest(MPI_Request req, bool persistent, RequestData *data) {
+  MPI_Request newRequest(MPI_Request req, RequestData *data, bool persistent) {
     if (req == MPI_REQUEST_NULL)
       return MPI_REQUEST_NULL;
+    data->init(req, persistent);
     MPI_Request ret;
     std::unique_lock<std::shared_mutex> lock(AHMutex);
     if (availableHandles.empty())
@@ -430,8 +451,7 @@ public:
     return ret;
   }
   MPI_Request newRequest(MPI_Request req, bool persistent) {
-    const void *reqData = nullptr;
-    return _newRequest(req, reqData, persistent);
+    return _newRequest(req, persistent);
   }
 
   // returning to the datapool using lock
@@ -456,6 +476,29 @@ public:
     this->returnData(ret);
     return MPI_REQUEST_NULL;
   }
+  MPI_Request completeRequest(MPI_Request req, MPI_Request mpi_req,
+                              MPI_Status *status) {
+    if (req == MPI_REQUEST_NULL)
+      return MPI_REQUEST_NULL;
+    RequestData *ret;
+    bool persistent{false};
+    {
+      std::unique_lock<std::shared_mutex> lock(AHMutex);
+      ret = dataTable[(size_t)(req)];
+      persistent = ret->isPersistent();
+      if (!persistent) {
+        availableHandles.emplace_back(req);
+      }
+    }
+    ret->handle = mpi_req;
+    if (persistent) {
+      ret->complete(status);
+      return req;
+    }
+    ret->fini(status);
+    this->returnData(ret);
+    return MPI_REQUEST_NULL;
+  }
   MPI_Request startRequest(MPI_Request req) {
     if (req == MPI_REQUEST_NULL)
       return MPI_REQUEST_NULL;
@@ -468,6 +511,17 @@ public:
     ret->start();
     return ret->handle;
   }
+  MPI_Request cancelRequest(MPI_Request req) {
+    if (req == MPI_REQUEST_NULL)
+      return MPI_REQUEST_NULL;
+    RequestData *ret;
+    {
+      std::shared_lock<std::shared_mutex> lock(DTMutex);
+      ret = dataTable[(size_t)(req)];
+    }
+    ret->cancel();
+    return req;
+  }
 };
 
 using WinData = HandleData<MPI_Win, toolWinData>;
@@ -477,17 +531,19 @@ using MessageData = RequestData;
 using SessionData = HandleData<MPI_Session, toolSessionData>;
 #endif
 
-using WinFactory = HandleFactory<MPI_Win, WinData, MPI_Win>;
+using WinFactory = HandleFactory<MPI_Win, WinData, MPI_Win, toolWinData>;
 
-using FileFactory = HandleFactory<MPI_File, FileData, MPI_File>;
+using FileFactory = HandleFactory<MPI_File, FileData, MPI_File, toolFileData>;
 
-using CommFactory = HandleFactory<MPI_Comm, CommData, MPI_Comm>;
+using CommFactory = HandleFactory<MPI_Comm, CommData, MPI_Comm, toolCommData>;
 
 #ifdef HAVE_SESSION
-using SessionFactory = HandleFactory<MPI_Session, SessionData, MPI_Session>;
+using SessionFactory =
+    HandleFactory<MPI_Session, SessionData, MPI_Session, toolSessionData>;
 #endif
 
-using MessageFactory = HandleFactory<MPI_Message, MessageData, MPI_Message>;
+using MessageFactory =
+    HandleFactory<MPI_Message, MessageData, MPI_Message, toolMessageData>;
 
 using RequestFactory = RequestFactoryInst<MPI_Request>;
 
@@ -499,17 +555,22 @@ extern FileFactory ff;
 #endif
 #ifdef HANDLE_COMM
 template <>
-bool AbstractHandleFactory<MPI_Comm, CommData>::isPredefined(MPI_Comm handle);
+bool AbstractHandleFactory<MPI_Comm, CommData, toolCommData>::isPredefined(
+    MPI_Comm handle);
 
-template <> void AbstractHandleFactory<MPI_Comm, CommData>::initPredefined();
+template <>
+void AbstractHandleFactory<MPI_Comm, CommData, toolCommData>::initPredefined();
 
 extern CommFactory cf;
 #endif
 #ifdef HANDLE_MESSAGE
 template <>
-bool AbstractHandleFactory<MPI_Message, MessageData>::isPredefined(MPI_Message handle);
+bool AbstractHandleFactory<MPI_Message, MessageData,
+                           toolMessageData>::isPredefined(MPI_Message handle);
 
-template <> void AbstractHandleFactory<MPI_Message, MessageData>::initPredefined();
+template <>
+void AbstractHandleFactory<MPI_Message, MessageData,
+                           toolMessageData>::initPredefined();
 
 extern MessageFactory mf;
 #endif

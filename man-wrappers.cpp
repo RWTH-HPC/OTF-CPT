@@ -10,8 +10,8 @@
 ////////////////////
 
 /* ================== C Wrappers for MPI_Win_free ================== */
-int PMPI_Win_free(MPI_Win *win);
-int MPI_Win_free(MPI_Win *win) {
+_EXTERN_C_ int PMPI_Win_free(MPI_Win *win);
+_EXTERN_C_ int MPI_Win_free(MPI_Win *win) {
   mpiTimer mt{false, __func__};
   int _wrap_py_return_val = 0;
 
@@ -28,8 +28,8 @@ int MPI_Win_free(MPI_Win *win) {
 }
 
 /* ================== C Wrappers for MPI_Comm_free ================== */
-int PMPI_Comm_free(MPI_Comm *comm);
-int MPI_Comm_free(MPI_Comm *comm) {
+_EXTERN_C_ int PMPI_Comm_free(MPI_Comm *comm);
+_EXTERN_C_ int MPI_Comm_free(MPI_Comm *comm) {
   mpiTimer mt{false, __func__};
   int _wrap_py_return_val = 0;
 
@@ -46,8 +46,8 @@ int MPI_Comm_free(MPI_Comm *comm) {
 }
 
 /* ================== C Wrappers for MPI_Comm_disconnect ================== */
-int PMPI_Comm_disconnect(MPI_Comm *comm);
-int MPI_Comm_disconnect(MPI_Comm *comm) {
+_EXTERN_C_ int PMPI_Comm_disconnect(MPI_Comm *comm);
+_EXTERN_C_ int MPI_Comm_disconnect(MPI_Comm *comm) {
   mpiTimer mt{false, __func__};
   int _wrap_py_return_val = 0;
 
@@ -65,8 +65,8 @@ int MPI_Comm_disconnect(MPI_Comm *comm) {
 
 #ifdef HAVE_SESSION
 /* ================== C Wrappers for MPI_Session_finalize ================== */
-int PMPI_Session_finalize(MPI_Session *session);
-int MPI_Session_finalize(MPI_Session *session) {
+_EXTERN_C_ int PMPI_Session_finalize(MPI_Session *session);
+_EXTERN_C_ int MPI_Session_finalize(MPI_Session *session) {
   mpiTimer mt{false, __func__};
   int _wrap_py_return_val = 0;
 

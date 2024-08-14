@@ -29,11 +29,13 @@ FileFactory ff;
 #endif
 #ifdef HANDLE_COMM
 template <>
-bool AbstractHandleFactory<MPI_Comm, CommData>::isPredefined(MPI_Comm handle) {
+bool AbstractHandleFactory<MPI_Comm, CommData, toolCommData>::isPredefined(
+    MPI_Comm handle) {
   return handle == MPI_COMM_NULL || handle == MPI_COMM_WORLD ||
          handle == MPI_COMM_SELF;
 }
-template <> void AbstractHandleFactory<MPI_Comm, CommData>::initPredefined() {
+template <>
+void AbstractHandleFactory<MPI_Comm, CommData, toolCommData>::initPredefined() {
   predefHandles[MPI_COMM_NULL].init(MPI_COMM_NULL);
   predefHandles[MPI_COMM_WORLD].init(MPI_COMM_WORLD);
   predefHandles[MPI_COMM_SELF].init(MPI_COMM_SELF);
@@ -43,11 +45,13 @@ CommFactory cf;
 #endif
 #ifdef HANDLE_MESSAGE
 template <>
-bool AbstractHandleFactory<MPI_Message, MessageData>::isPredefined(
-    MPI_Message handle) {
+bool AbstractHandleFactory<MPI_Message, MessageData,
+                           toolMessageData>::isPredefined(MPI_Message handle) {
   return handle == MPI_MESSAGE_NULL || handle == MPI_MESSAGE_NO_PROC;
 }
-template <> void AbstractHandleFactory<MPI_Message, MessageData>::initPredefined() {}
+template <>
+void AbstractHandleFactory<MPI_Message, MessageData,
+                           toolMessageData>::initPredefined() {}
 MessageFactory mf;
 #endif
 #ifdef HANDLE_REQUEST
