@@ -228,8 +228,10 @@ public:
 class alignas(64) RequestData : public ipcData {
   bool persistent{false};
   std::function<void(RequestData *)> startCallback{};
+  std::function<void(RequestData *)> cancelCallback{};
   std::function<void(RequestData *, MPI_Status *)> completionCallback{};
   bool freed{true};
+  bool cancelled{false};
 
 protected:
 public:
@@ -256,19 +258,28 @@ public:
     root = _root;
     persistent = _persistent;
     freed = false;
+    cancelled = false;
   }
 
-  template <typename M>
-  void init(M request, const void *rData = nullptr, bool _persistent = false) {
+  template <typename M> void init(M request, bool _persistent = false) {
     persistent = _persistent;
     handle = (MPI_Request)request;
     freed = false;
+    cancelled = false;
   }
 
   void start() {
     assert(!freed);
     if (startCallback) {
       startCallback(this);
+    }
+  }
+  void cancel() {
+    assert(!freed);
+    assert(!cancelled);
+    cancelled = true;
+    if (cancelCallback) {
+      cancelCallback(this);
     }
   }
   void complete(MPI_Status *status) {
@@ -283,21 +294,34 @@ public:
   }
   void fini() {
     handle = MPI_REQUEST_NULL;
+    pb_reqs[0] = MPI_REQUEST_NULL;
+    pb_reqs[1] = MPI_REQUEST_NULL;
     completionCallback = nullptr;
     startCallback = nullptr;
+    cancelCallback = nullptr;
     remote = -42;
     tag = -42;
     root = -42;
     kind = ISEND;
     freed = true;
+    cancelled = false;
   }
   bool isFreed() { return freed; }
   bool isPersistent() {
     assert(!freed);
     return persistent;
   }
+  bool isCancelled() {
+    bool ret = cancelled;
+    cancelled = false;
+    return ret;
+  }
   void setStartCallback(std::function<void(RequestData *)> sc) {
+    persistent = true;
     startCallback = sc;
+  }
+  void setCancelCallback(std::function<void(RequestData *)> cc) {
+    cancelCallback = cc;
   }
   void
   setCompletionCallback(std::function<void(RequestData *, MPI_Status *)> cc) {

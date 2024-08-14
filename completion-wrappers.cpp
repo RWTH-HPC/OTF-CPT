@@ -38,11 +38,21 @@ int MPI_Request_free(MPI_Request *request) {
   return ret;
 }
 
+int MPI_Cancel(MPI_Request *request) {
+  mpiTimer mt{false, __func__};
+  if (analysis_flags->running)
+    thread_local_clock->pers++;
+  MPI_Request &myReq = rf.getHandle(*request);
+  int ret = PMPI_Cancel(&myReq);
+  rf.cancelRequest(*request);
+  return ret;
+}
+
 int MPI_Wait(MPI_Request *request, MPI_Status *status) {
   mpiTimer mt{false, __func__};
   if (analysis_flags->running)
     thread_local_clock->wait++;
-  MPI_Request myReq = rf.getHandle(*request);
+  MPI_Request &myReq = rf.getHandle(*request);
   MPI_Status tmpstatus;
   if (status == MPI_STATUS_IGNORE)
     status = &tmpstatus;
@@ -69,8 +79,8 @@ int MPI_Waitall(int count, MPI_Request array_of_requests[],
   int ret = PMPI_Waitall(count, myReqs, array_of_statuses);
   {
     for (int i = 0; i < count; i++) {
-      array_of_requests[i] =
-          rf.completeRequest(array_of_requests[i], array_of_statuses + i);
+      array_of_requests[i] = rf.completeRequest(array_of_requests[i], myReqs[i],
+                                                array_of_statuses + i);
     }
   }
   return ret;
@@ -94,7 +104,7 @@ int MPI_Waitany(int count, MPI_Request array_of_requests[], int *indx,
   int ret = PMPI_Waitany(count, myReqs, indx, status);
   {
     array_of_requests[*indx] =
-        rf.completeRequest(array_of_requests[*indx], status);
+        rf.completeRequest(array_of_requests[*indx], myReqs[*indx], status);
   }
   return ret;
 }
@@ -119,7 +129,8 @@ int MPI_Waitsome(int incount, MPI_Request array_of_requests[], int *outcount,
   {
     for (int i = 0; i < *outcount; i++) {
       array_of_requests[array_of_indices[i]] = rf.completeRequest(
-          array_of_requests[array_of_indices[i]], array_of_statuses + i);
+          array_of_requests[array_of_indices[i]], myReqs[array_of_indices[i]],
+          array_of_statuses + i);
     }
   }
   return ret;
@@ -129,7 +140,7 @@ int MPI_Test(MPI_Request *request, int *flag, MPI_Status *status) {
   mpiTimer mt{false, __func__};
   if (analysis_flags->running)
     thread_local_clock->test++;
-  MPI_Request myReq = rf.getHandle(*request);
+  MPI_Request &myReq = rf.getHandle(*request);
   int ret = PMPI_Test(&myReq, flag, status);
   if (*flag) {
     *request = rf.completeRequest(*request, status);
@@ -155,8 +166,8 @@ int MPI_Testall(int count, MPI_Request array_of_requests[], int *flag,
   int ret = PMPI_Testall(count, myReqs, flag, array_of_statuses);
   if (*flag) {
     for (int i = 0; i < count; i++) {
-      array_of_requests[i] =
-          rf.completeRequest(array_of_requests[i], array_of_statuses + i);
+      array_of_requests[i] = rf.completeRequest(array_of_requests[i], myReqs[i],
+                                                array_of_statuses + i);
     }
   }
   return ret;
@@ -180,7 +191,7 @@ int MPI_Testany(int count, MPI_Request array_of_requests[], int *indx,
   int ret = PMPI_Testany(count, myReqs, indx, flag, status);
   if (*flag) {
     array_of_requests[*indx] =
-        rf.completeRequest(array_of_requests[*indx], status);
+        rf.completeRequest(array_of_requests[*indx], myReqs[*indx], status);
   }
   return ret;
 }
@@ -205,7 +216,8 @@ int MPI_Testsome(int incount, MPI_Request array_of_requests[], int *outcount,
   {
     for (int i = 0; i < *outcount; i++) {
       array_of_requests[array_of_indices[i]] = rf.completeRequest(
-          array_of_requests[array_of_indices[i]], array_of_statuses + i);
+          array_of_requests[array_of_indices[i]], myReqs[array_of_indices[i]],
+          array_of_statuses + i);
     }
   }
   return ret;

@@ -6,8 +6,8 @@
 #include "mpi-critical.h"
 
 #define mpiSendPBMacro(c)   mpiSendPB pb{dest, tag, c};
-#define mpiIsendPBMacro(c,r)  mpiIsendPB pb{dest, tag, comm, request};
-#define mpiSendInitPBMacro(c,r)  mpiSendInitPB pb{dest, tag, comm, request};
+#define mpiIsendPBMacro(c,r)  mpiIsendPB pb{dest, tag, c, r};
+#define mpiSendInitPBMacro(c,r)  mpiSendInitPB pb{dest, tag, c, r};
 #define mpiRecvPBMacro(c,s)  mpiRecvPB pb{source, tag, c, &s};
 #define mpiIrecvPBMacro(c,r)  mpiIrecvPB pb{source, tag, c, r};
 #define mpiMprobePBMacro(c,s,m)  mpiMprobePB pb{source, tag, c, &s, m};
