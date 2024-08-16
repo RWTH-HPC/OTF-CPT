@@ -1,4 +1,5 @@
 #include "tracking.h"
+#include "mpi.h"
 
 #ifdef USE_ERRHANDLER
 #include <sys/types.h>
@@ -18,17 +19,9 @@ void registerErrHandler(MPI_Comm comm){
 }
 #endif
 
-#ifdef HANDLE_OP
-template <> MPI_Op OpData::nullHandle{MPI_OP_NULL};
-OpFactory of;
-#endif
 #ifdef HANDLE_WIN
 template <> MPI_Win WinData::nullHandle{MPI_WIN_NULL};
 WinFactory wf;
-#endif
-#ifdef HANDLE_TYPE
-template <> MPI_Datatype TypeData::nullHandle{MPI_DATATYPE_NULL};
-TypeFactory tf{};
 #endif
 #ifdef HANDLE_FILE
 template <> MPI_File FileData::nullHandle{MPI_FILE_NULL};
@@ -48,24 +41,11 @@ template <> void AbstractHandleFactory<MPI_Comm, CommData>::initPredefined() {
 MPI_Comm CommData::nullHandle{MPI_COMM_NULL};
 CommFactory cf;
 #endif
-#ifdef HANDLE_GROUP
-template <>
-bool AbstractHandleFactory<MPI_Group, GroupData>::isPredefined(
-    MPI_Group handle) {
-  return handle == MPI_GROUP_NULL || handle == MPI_GROUP_EMPTY;
-}
-template <> void AbstractHandleFactory<MPI_Group, GroupData>::initPredefined() {
-  predefHandles[MPI_GROUP_NULL].init(MPI_GROUP_NULL);
-  predefHandles[MPI_GROUP_EMPTY].init(MPI_GROUP_EMPTY);
-}
-template <> MPI_Group GroupData::nullHandle{MPI_GROUP_NULL};
-GroupFactory gf;
-#endif
 #ifdef HANDLE_MESSAGE
 template <>
 bool AbstractHandleFactory<MPI_Message, MessageData>::isPredefined(
     MPI_Message handle) {
-  return false;
+  return handle == MPI_MESSAGE_NULL || handle == MPI_MESSAGE_NO_PROC;
 }
 template <> void AbstractHandleFactory<MPI_Message, MessageData>::initPredefined() {}
 MessageFactory mf;
