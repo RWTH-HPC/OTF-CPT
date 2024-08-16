@@ -1,3 +1,7 @@
+#include <cassert>
+#include <functional>
+#include <mpi.h>
+
 enum nbFunction {
   nbf_unknown = -1,
   nbf_MPI_Isend,

@@ -1,5 +1,3 @@
-#ifndef NOTOOL
-
 #ifndef TRACKING_H
 #define TRACKING_H
 
@@ -37,29 +35,12 @@ void registerErrHandler(MPI_Comm comm);
 #define errHandlerComm(c) (void)c
 #endif
 
-
-#ifdef HANDLE_OP
-#define preOp(o) o = of.getHandle(o)
-#define postOp(o) *o = of.newHandle(*o)
-#else
-#define preOp(o) (void)o
-#define postOp(o) (void)o
-#endif
-
 #ifdef HANDLE_WIN
 #define preWin(w) w = wf.getHandle(w)
 #define postWin(w) *w = wf.newHandle(*w)
 #else
 #define preWin(w) (void)w
 #define postWin(w) (void)w
-#endif
-
-#ifdef HANDLE_TYPE
-#define preType(t) t = tf.getHandle(t)
-#define postType(t) *(t) = tf.newHandle(*(t))
-#else
-#define preType(t) (void)t
-#define postType(t) (void)t
 #endif
 
 #ifdef HANDLE_FILE
@@ -78,14 +59,6 @@ void registerErrHandler(MPI_Comm comm);
 #define postComm(c) (void)c
 #endif
 
-#ifdef HANDLE_GROUP
-#define preGroup(g) g = gf.getHandle(g)
-#define postGroup(g) *g = gf.newHandle(*g)
-#else
-#define preGroup(g) (void)g
-#define postGroup(g) (void)g
-#endif
-
 #if defined(HAVE_SESSION) && defined(HANDLE_SESSION)
 #define preSession(s) s = sf.getHandle(s)
 #define postSession(s) *s = sf.newHandle(*s)
@@ -98,8 +71,8 @@ void registerErrHandler(MPI_Comm comm);
 #define preMessage(m) m = mf.getHandle(m)
 #define postMessage(m) *m = mf.newHandle(*m)
 #else
-#define preOp(m) (void)m
-#define postOp(m) (void)m
+#define preMessage(m) (void)m
+#define postMessage(m) (void)m
 #endif
 
 #ifdef HANDLE_REQUEST
@@ -111,12 +84,9 @@ void registerErrHandler(MPI_Comm comm);
 #endif
 
 enum toolDataEnum {
-  toolOpData,
   toolWinData,
-  toolTypeData,
   toolFileData,
   toolCommData,
-  toolGroupData,
   toolSessionData,
   toolMessageData,
   toolRequestData
@@ -212,7 +182,8 @@ public:
 
 // General template for HandleFactory / RequestFactory
 // should not be instanciated
-template <typename M, typename T, typename D> class HandleFactory {
+template <typename M, typename T, typename D>
+class HandleFactory : public virtual AbstractHandleFactory<M, T> {
   // Instanciating the primary class should fail because of the private default
   // constructor
   HandleFactory() { /*static_assert(false, "primary template of HandleFactory
@@ -499,22 +470,14 @@ public:
   }
 };
 
-using OpData = HandleData<MPI_Op, toolOpData>;
 using WinData = HandleData<MPI_Win, toolWinData>;
-using TypeData = HandleData<MPI_Datatype, toolTypeData>;
 using FileData = HandleData<MPI_File, toolFileData>;
-// using CommData = HandleData<MPI_Comm, toolCommData>;
-using GroupData = HandleData<MPI_Group, toolGroupData>;
 using MessageData = RequestData;
 #ifdef HAVE_SESSION
 using SessionData = HandleData<MPI_Session, toolSessionData>;
 #endif
 
-using OpFactory = HandleFactory<MPI_Op, OpData, MPI_Op>;
-
 using WinFactory = HandleFactory<MPI_Win, WinData, MPI_Win>;
-
-using TypeFactory = HandleFactory<MPI_Datatype, TypeData, MPI_Datatype>;
 
 using FileFactory = HandleFactory<MPI_File, FileData, MPI_File>;
 
@@ -524,29 +487,12 @@ using CommFactory = HandleFactory<MPI_Comm, CommData, MPI_Comm>;
 using SessionFactory = HandleFactory<MPI_Session, SessionData, MPI_Session>;
 #endif
 
-using GroupFactory = HandleFactory<MPI_Group, GroupData, MPI_Group>;
-
 using MessageFactory = HandleFactory<MPI_Message, MessageData, MPI_Message>;
 
 using RequestFactory = RequestFactoryInst<MPI_Request>;
 
-#ifdef HANDLE_OP
-template <> void AbstractHandleFactory<MPI_Op, OpData>::initPredefined() {
-  static_assert(false, "HandleFactory<MPI_Op, OpData>::initPredefined not yet "
-                       "implemented, but requested");
-}
-extern OpFactory of;
-#endif
 #ifdef HANDLE_WIN
 extern WinFactory wf;
-#endif
-#ifdef HANDLE_TYPE
-template <>
-void AbstractHandleFactory<MPI_Datatype, TypeData>::initPredefined() {
-  static_assert(false, "HandleFactory<MPI_Datatype, TypeData>::initPredefined "
-                       "not yet implemented, but requested");
-}
-extern TypeFactory tf;
 #endif
 #ifdef HANDLE_FILE
 extern FileFactory ff;
@@ -567,15 +513,6 @@ template <> void AbstractHandleFactory<MPI_Message, MessageData>::initPredefined
 
 extern MessageFactory mf;
 #endif
-#ifdef HANDLE_GROUP
-template <>
-bool AbstractHandleFactory<MPI_Group, GroupData>::isPredefined(
-    MPI_Group handle);
-
-template <> void AbstractHandleFactory<MPI_Group, GroupData>::initPredefined();
-
-extern GroupFactory gf;
-#endif
 #ifdef HANDLE_REQUEST
 extern RequestFactory rf;
 #endif
@@ -585,5 +522,4 @@ extern SessionFactory sf;
 typedef int MPI_Session;
 #endif
 
-#endif
 #endif
