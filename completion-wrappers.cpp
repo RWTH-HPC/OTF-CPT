@@ -7,7 +7,10 @@
 
 /* Start & Completion */
 
-int MPI_Start(MPI_Request *request) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wvla-cxx-extension"
+
+_EXTERN_C_ int MPI_Start(MPI_Request *request) {
   mpiTimer mt{false, __func__};
   if (analysis_flags->running)
     thread_local_clock->pers++;
@@ -15,7 +18,7 @@ int MPI_Start(MPI_Request *request) {
   return PMPI_Start(&myReq);
 }
 
-int MPI_Startall(int count, MPI_Request array_of_requests[]) {
+_EXTERN_C_ int MPI_Startall(int count, MPI_Request array_of_requests[]) {
   mpiTimer mt{false, __func__};
   if (analysis_flags->running)
     thread_local_clock->pers++;
@@ -28,7 +31,7 @@ int MPI_Startall(int count, MPI_Request array_of_requests[]) {
   return PMPI_Startall(count, myReqs);
 }
 
-int MPI_Request_free(MPI_Request *request) {
+_EXTERN_C_ int MPI_Request_free(MPI_Request *request) {
   mpiTimer mt{false, __func__};
   if (analysis_flags->running)
     thread_local_clock->pers++;
@@ -38,7 +41,7 @@ int MPI_Request_free(MPI_Request *request) {
   return ret;
 }
 
-int MPI_Cancel(MPI_Request *request) {
+_EXTERN_C_ int MPI_Cancel(MPI_Request *request) {
   mpiTimer mt{false, __func__};
   if (analysis_flags->running)
     thread_local_clock->pers++;
@@ -48,7 +51,7 @@ int MPI_Cancel(MPI_Request *request) {
   return ret;
 }
 
-int MPI_Wait(MPI_Request *request, MPI_Status *status) {
+_EXTERN_C_ int MPI_Wait(MPI_Request *request, MPI_Status *status) {
   mpiTimer mt{false, __func__};
   if (analysis_flags->running)
     thread_local_clock->wait++;
@@ -61,8 +64,8 @@ int MPI_Wait(MPI_Request *request, MPI_Status *status) {
   return ret;
 }
 
-int MPI_Waitall(int count, MPI_Request array_of_requests[],
-                MPI_Status array_of_statuses[]) {
+_EXTERN_C_ int MPI_Waitall(int count, MPI_Request array_of_requests[],
+                           MPI_Status array_of_statuses[]) {
   mpiTimer mt{false, __func__};
   if (analysis_flags->running)
     thread_local_clock->wait++;
@@ -86,8 +89,8 @@ int MPI_Waitall(int count, MPI_Request array_of_requests[],
   return ret;
 }
 
-int MPI_Waitany(int count, MPI_Request array_of_requests[], int *indx,
-                MPI_Status *status) {
+_EXTERN_C_ int MPI_Waitany(int count, MPI_Request array_of_requests[],
+                           int *indx, MPI_Status *status) {
   mpiTimer mt{false, __func__};
   if (analysis_flags->running)
     thread_local_clock->wait++;
@@ -109,8 +112,9 @@ int MPI_Waitany(int count, MPI_Request array_of_requests[], int *indx,
   return ret;
 }
 
-int MPI_Waitsome(int incount, MPI_Request array_of_requests[], int *outcount,
-                 int array_of_indices[], MPI_Status array_of_statuses[]) {
+_EXTERN_C_ int MPI_Waitsome(int incount, MPI_Request array_of_requests[],
+                            int *outcount, int array_of_indices[],
+                            MPI_Status array_of_statuses[]) {
   mpiTimer mt{false, __func__};
   if (analysis_flags->running)
     thread_local_clock->wait++;
@@ -136,7 +140,7 @@ int MPI_Waitsome(int incount, MPI_Request array_of_requests[], int *outcount,
   return ret;
 }
 
-int MPI_Test(MPI_Request *request, int *flag, MPI_Status *status) {
+_EXTERN_C_ int MPI_Test(MPI_Request *request, int *flag, MPI_Status *status) {
   mpiTimer mt{false, __func__};
   if (analysis_flags->running)
     thread_local_clock->test++;
@@ -148,8 +152,8 @@ int MPI_Test(MPI_Request *request, int *flag, MPI_Status *status) {
   return ret;
 }
 
-int MPI_Testall(int count, MPI_Request array_of_requests[], int *flag,
-                MPI_Status array_of_statuses[]) {
+_EXTERN_C_ int MPI_Testall(int count, MPI_Request array_of_requests[],
+                           int *flag, MPI_Status array_of_statuses[]) {
   mpiTimer mt{false, __func__};
   if (analysis_flags->running)
     thread_local_clock->test++;
@@ -173,8 +177,8 @@ int MPI_Testall(int count, MPI_Request array_of_requests[], int *flag,
   return ret;
 }
 
-int MPI_Testany(int count, MPI_Request array_of_requests[], int *indx,
-                int *flag, MPI_Status *status) {
+_EXTERN_C_ int MPI_Testany(int count, MPI_Request array_of_requests[],
+                           int *indx, int *flag, MPI_Status *status) {
   mpiTimer mt{false, __func__};
   if (analysis_flags->running)
     thread_local_clock->test++;
@@ -196,8 +200,9 @@ int MPI_Testany(int count, MPI_Request array_of_requests[], int *indx,
   return ret;
 }
 
-int MPI_Testsome(int incount, MPI_Request array_of_requests[], int *outcount,
-                 int array_of_indices[], MPI_Status array_of_statuses[]) {
+_EXTERN_C_ int MPI_Testsome(int incount, MPI_Request array_of_requests[],
+                            int *outcount, int array_of_indices[],
+                            MPI_Status array_of_statuses[]) {
   mpiTimer mt{false, __func__};
   if (analysis_flags->running)
     thread_local_clock->test++;
@@ -222,3 +227,4 @@ int MPI_Testsome(int incount, MPI_Request array_of_requests[], int *outcount,
   }
   return ret;
 }
+#pragma clang diagnostic pop
