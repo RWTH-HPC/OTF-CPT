@@ -1,6 +1,7 @@
 #ifndef TRACKING_H
 #define TRACKING_H
 
+#include "errorhandler.h"
 #include <assert.h>
 #include <mpi.h>
 #include <stdio.h>
