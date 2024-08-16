@@ -43,8 +43,6 @@ check_mpi_type_exists_pp(MPI_Session)
 check_mpi_type_exists_pp(MPI_Count)
 check_mpi_function_exists_pp(MPI_Barrier_init)
 
-add_definitions(-DUSE_MPI)
-
 if(HAVE_MPI_SESSION)
     add_definitions(-DHAVE_SESSION)
 endif()
@@ -81,11 +79,13 @@ add_wrapped_file(gen-wrappers.cpp gen-wrappers.w)
 
 add_library(OTFCPT SHARED ${OTFCPT_SOURCES})
 target_link_libraries(OTFCPT ${MPI_C_LIBRARIES})
+target_compile_definitions(OTFCPT PUBLIC -DUSE_MPI=1)
 
 add_library(OTFCPT_omp SHARED ${OTFCPT_OMP_SOURCES})
 
 add_library(OTFCPT_static STATIC ${OTFCPT_SOURCES})
 target_link_libraries(OTFCPT_static ${MPI_C_LIBRARIES})
+target_compile_definitions(OTFCPT_static PUBLIC -DUSE_MPI=1)
 
 add_subdirectory(tests)
 
