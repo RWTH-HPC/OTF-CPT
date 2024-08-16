@@ -14,8 +14,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "criticalPath.h"
-#include "omp-tools.h"
-#include "omp.h"
+#include "errorhandler.h"
+#include <omp-tools.h>
+#include <omp.h>
 
 // Define attribute that indicates that the fall through from the previous
 // case label is intentional and should not be diagnosed by a compiler
@@ -1020,8 +1021,10 @@ static void ompt_tsan_finalize(ompt_data_t *tool_data) {
     printf("MAX RSS[KBytes] during execution: %ld\n", end.ru_maxrss);
   }
 
-  if (!useMpi && analysis_flags)
+  if (!useMpi && analysis_flags) {
     delete analysis_flags;
+    analysis_flags = nullptr;
+  }
 }
 extern "C" ompt_start_tool_result_t *__attribute__((visibility("default")))
 ompt_start_tool(unsigned int omp_version, const char *runtime_version) {
@@ -1038,6 +1041,10 @@ ompt_start_tool(unsigned int omp_version, const char *runtime_version) {
   }
   if (analysis_flags->verbose)
     std::cout << "Starting critPathAnalysis OMPT tool" << std::endl;
+
+#ifdef USE_ERRHANDLER
+  init_signalhandlers();
+#endif
 
   pagesize = getpagesize();
 
