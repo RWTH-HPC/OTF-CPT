@@ -6,7 +6,7 @@
 # See the file LICENSE in the package base directory for details.
 
 # Set the minimum required CMake version.
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.13.4...3.27.4)
 
 
 include(CheckSymbolExists)
@@ -28,23 +28,13 @@ function(CHECK_MPI_SYMBOL_EXISTS symbol variable)
 	# called functions implement such a check.
 
 	# search for MPI environment
-	IF (POLICY CMP0074)
-		CMAKE_POLICY(PUSH)
-		#if MPI_ROOT is set, use it for finding MPI
-		CMAKE_POLICY(SET CMP0074 NEW)
-	ENDIF ()
-
 	find_package(MPI)
-
-	IF (POLICY CMP0074)
-		CMAKE_POLICY(POP)
-	ENDIF ()
 
 	if (MPI_C_FOUND)
 		# set environment
-		set(CMAKE_REQUIRED_FLAGS "${MPI_C_COMPILE_FLAGS}")
-		set(CMAKE_REQUIRED_DEFINITIONS "")
-		set(CMAKE_REQUIRED_INCLUDES "${MPI_C_INCLUDE_PATH}")
+		set(CMAKE_REQUIRED_FLAGS "${MPI_C_COMPILE_OPTIONS}")
+		set(CMAKE_REQUIRED_DEFINITIONS "${MPI_C_COMPILE_DEFINITIONS}")
+		set(CMAKE_REQUIRED_INCLUDES "${MPI_C_INCLUDE_DIRS}")
 		set(CMAKE_REQUIRED_LIBRARIES "${MPI_C_LIBRARIES}")
 
 		# check for symbol

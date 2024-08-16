@@ -27,30 +27,22 @@ if (NOT Wrap_CONFIG_LOADED)
     set(file_path    ${CMAKE_CURRENT_BINARY_DIR}/${file_name})
     set(wrapper_path ${CMAKE_CURRENT_SOURCE_DIR}/${wrapper_name})
 
-    # Play nice with FindPythonInterp -- use the interpreter if it was found,
+    # Play nice with FindPython3 -- use the interpreter if it was found,
     # otherwise use the script directly.
-    find_package(PythonInterp 2.6)
-    if (PYTHON_EXECUTABLE)
-      set(command ${PYTHON_EXECUTABLE})
+    find_package(Python3 COMPONENTS Interpreter)
+    if (Python3_Interpreter_FOUND)
+      set(command Python3::Interpreter)
       set(script_arg ${Wrap_EXECUTABLE})
     else()
       set(command ${Wrap_EXECUTABLE})
       set(script_arg "")
     endif()
 
-    # Backward compatibility for old FindMPIs that did not have MPI_C_INCLUDE_PATH
-    if (NOT MPI_C_INCLUDE_PATH)
-      set(MPI_C_INCLUDE_PATH ${MPI_INCLUDE_PATH})
-    endif()
-    if (NOT MPI_C_COMPILER)
-      set(MPI_C_COMPILER ${MPI_COMPILER})
-    endif()
-
     # Play nice with FindMPI.  This will deduce the appropriate MPI compiler to use
     # for generating wrappers
-    if (MPI_C_INCLUDE_PATH)
+    if (MPI_C_INCLUDE_DIRS)
       set(wrap_includes "")
-      foreach(include ${MPI_C_INCLUDE_PATH})
+      foreach(include ${MPI_C_INCLUDE_DIRS})
         set(wrap_includes ${wrap_includes} -I ${include})
       endforeach()
     endif()
@@ -79,9 +71,12 @@ if (NOT Wrap_CONFIG_LOADED)
       set(wrap_compiler -c ${MPI_${wrap_lang}_COMPILER})
     endif()
 
-    include(CheckSymbolExists)
     set(CMAKE_REQUIRED_LIBRARIES MPI::MPI_C)
-    check_symbol_exists(MPI_F_STATUS_SIZE "mpi.h" HAVE_MPI_F_STATUS_SIZE)
+    check_c_source_compiles("
+        #include <mpi.h>
+        int main(int argc, char** argv)
+        { return MPI_F_STATUS_SIZE; }"
+        HAVE_MPI_F_STATUS_SIZE)
     if(NOT HAVE_MPI_F_STATUS_SIZE)
       set(wrap_f_status_flag --fstatus)
     endif()
