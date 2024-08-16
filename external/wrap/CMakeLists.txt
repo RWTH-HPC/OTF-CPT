@@ -2,8 +2,8 @@
 # Written by Martin Schulz, schulzm@llnl.gov, LLNL-CODE-402774,
 # All rights reserved - please read information in "LICENCSE"
 
+cmake_minimum_required(VERSION 3.13.4...3.27.4)
 project(wrap)
-cmake_minimum_required(VERSION 2.8.12)
 
 # @authors Todd Gamblin, Tobias Hilbrich, Martin Schulz
 # @date 2011-05-01

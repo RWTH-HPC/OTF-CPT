@@ -6,7 +6,7 @@
 # See the file LICENSE in the package base directory for details.
 
 # Set the minimum required CMake version.
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.13.4...3.27.4)
 
 
 include(CheckTypeSize)

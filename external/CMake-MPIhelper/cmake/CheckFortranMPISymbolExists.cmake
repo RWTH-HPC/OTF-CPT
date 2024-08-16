@@ -11,7 +11,7 @@
 #       module shipps these files, too, so this module may be used with earlier
 #       versions of CMake.
 #
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.13.4...3.27.4)
 
 
 include(CheckFortranSourceCompiles)
@@ -35,23 +35,13 @@ function(CHECK_FORTRAN_MPI_SYMBOL_EXISTS symbol variable)
 	# called functions implement such a check.
 
 	# search for MPI environment
-	IF (POLICY CMP0074)
-		CMAKE_POLICY(PUSH)
-		#if MPI_ROOT is set, use it for finding MPI
-		CMAKE_POLICY(SET CMP0074 NEW)
-	ENDIF ()
-
 	find_package(MPI)
-
-	IF (POLICY CMP0074)
-		CMAKE_POLICY(POP)
-	ENDIF ()
 
 	if (MPI_Fortran_FOUND)
 		# set environment
-		set(CMAKE_REQUIRED_FLAGS "${MPI_Fortran_COMPILE_FLAGS}")
-		set(CMAKE_REQUIRED_DEFINITIONS "")
-		set(CMAKE_REQUIRED_INCLUDES "${MPI_Fortran_INCLUDE_PATH}")
+		set(CMAKE_REQUIRED_FLAGS "${MPI_Fortran_COMPILE_OPTIONS}")
+		set(CMAKE_REQUIRED_DEFINITIONS "${MPI_Fortran_COMPILE_DEFINITIONS}")
+		set(CMAKE_REQUIRED_INCLUDES "${MPI_Fortran_INCLUDE_DIRS}")
 		set(CMAKE_REQUIRED_LIBRARIES "${MPI_Fortran_LIBRARIES}")
 
 		# generate test source
