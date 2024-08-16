@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.13.4...3.27.4)
 
 project(OTFCPT C CXX)
 
