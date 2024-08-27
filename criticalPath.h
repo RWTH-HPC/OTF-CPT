@@ -5,26 +5,23 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
-#include <algorithm>
 #include <atomic>
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <inttypes.h>
-#include <iostream>
-#include <list>
-#include <map>
 #include <mutex>
-#include <sstream>
-#include <string>
 #include <sys/resource.h>
 #include <unistd.h>
-#include <unordered_map>
-#include <vector>
+
+#include "containers.h"
+#include "parse_flags.h"
 
 #if (defined __APPLE__ && defined __MACH__)
 #include <dlfcn.h>
 #endif
+
+using namespace __otfcpt;
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,8 +29,6 @@
 #include <omp-tools.h>
 
 //#define DEBUG_CLOCKS 1
-
-#define ANALYSIS_FLAGS "OTFCPT_OPTIONS"
 
 extern int myProcId;
 extern bool useMpi;
@@ -47,51 +42,7 @@ struct THREAD_CLOCK;
 extern thread_local THREAD_CLOCK *thread_local_clock;
 extern ompt_finalize_tool_t critical_ompt_finalize_tool;
 
-class AnalysisFlags {
-public:
-  int print_max_rss{0};
-  int verbose{0};
-  int enabled{1};
-  int stopped{0};
-  bool running{false};
-  int report_data_leak{0};
-  int ignore_serial{0};
-  int analyze_pattern{1};
-  int colorize{1};
-
-  AnalysisFlags(const char *env) {
-    if (env) {
-      std::vector<std::string> tokens;
-      std::string token;
-      std::string str(env);
-      std::istringstream iss(str);
-      while (std::getline(iss, token, ' '))
-        tokens.push_back(token);
-
-      for (std::vector<std::string>::iterator it = tokens.begin();
-           it != tokens.end(); ++it) {
-        if (sscanf(it->c_str(), "print_max_rss=%d", &print_max_rss))
-          continue;
-        if (sscanf(it->c_str(), "verbose=%d", &verbose))
-          continue;
-        if (sscanf(it->c_str(), "start_stopped=%d", &stopped))
-          continue;
-        if (sscanf(it->c_str(), "report_data_leak=%d", &report_data_leak))
-          continue;
-        if (sscanf(it->c_str(), "enable=%d", &enabled))
-          continue;
-        if (sscanf(it->c_str(), "colorize=%d", &colorize))
-          continue;
-        if (sscanf(it->c_str(), "ignore_serial=%d", &ignore_serial))
-          continue;
-        std::cerr << "Illegal values for " ANALYSIS_FLAGS " variable: " << token
-                  << std::endl;
-      }
-    }
-  }
-};
-
-extern AnalysisFlags *analysis_flags;
+#define analysis_flags get_otfcpt_flags()
 
 template <typename T>
 static void update_maximum(std::atomic<T> &maximum_value,
@@ -144,6 +95,10 @@ struct SYNC_CLOCK {
            outsideomp_thread.load(), outsideomp_critical.load(),
            outsideomp_critical_nooffset.load());
   }
+
+  void *operator new(size_t size) { return malloc(size); }
+
+  void operator delete(void *p) { free(p); }
 };
 
 enum ClockContext {
@@ -169,6 +124,10 @@ struct MPI_COUNTS {
     pers += o.pers;
     probe += o.probe;
   }
+
+  void *operator new(size_t size) { return malloc(size); }
+
+  void operator delete(void *p) { free(p); }
 };
 
 struct omptCounts {
@@ -188,6 +147,10 @@ struct omptCounts {
     syncRegionEnd += o.syncRegionEnd;
     mutexAcquire += o.mutexAcquire;
   }
+
+  void *operator new(size_t size) { return malloc(size); }
+
+  void operator delete(void *p) { free(p); }
 };
 
 struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
@@ -291,12 +254,16 @@ struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
     Print("Started at ", loc);
 #endif
   }
+
+  void *operator new(size_t size) { return malloc(size); }
+
+  void operator delete(void *p) { free(p); }
 };
 
 typedef SYNC_CLOCK ompt_tsan_clockid;
 extern thread_local THREAD_CLOCK *thread_local_clock;
-extern std::vector<THREAD_CLOCK *> *thread_clocks;
-extern std::vector<omptCounts *> *thread_counts;
+extern Vector<THREAD_CLOCK *> *thread_clocks;
+extern Vector<omptCounts *> *thread_counts;
 extern double startProgrammTime;
 extern double crit_path_useful_time;
 

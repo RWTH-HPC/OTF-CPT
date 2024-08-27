@@ -10,7 +10,7 @@
 
 #include "mpi-critical.h"
 
-std::vector<double> timeOffsets;
+Vector<double> timeOffsets;
 
 void MpiHappensAfter(ipcData &uc, int remote) { MpiHappensAfter(&uc, remote); }
 void MpiHappensAfter(ipcData *uc, int remote) {
@@ -150,12 +150,12 @@ void init_timer_offsets() {
 
 // build offset table
 #define NTIMES 19
-  std::vector<double> localTimes, allTimes{NTIMES, 0};
+  Vector<double> localTimes, allTimes;
   double localTime, endTime, remoteTime;
 
-  timeOffsets.resize(size);
-  localTimes.resize(NTIMES);
-  allTimes.resize(size * NTIMES);
+  timeOffsets.Resize(size);
+  localTimes.Resize(NTIMES);
+  allTimes.Resize(size * NTIMES);
 
   for (int i = 0; i < NTIMES; i++) {
     if (rank == 0) {
@@ -181,7 +181,7 @@ void init_timer_offsets() {
       timeOffsets[i] = allTimes[i * NTIMES + NTIMES / 2];
     }
   }
-  PMPI_Bcast(timeOffsets.data(), size, MPI_DOUBLE, 0, cw_dup);
+  PMPI_Bcast(timeOffsets.begin(), size, MPI_DOUBLE, 0, cw_dup);
   localTimeOffset = localTime = timeOffsets[rank];
   if (rank == 0 && analysis_flags->verbose) {
     printf("Timer Offsets:");

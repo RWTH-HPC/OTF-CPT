@@ -1,6 +1,7 @@
 #include <cassert>
 #include <functional>
 #include <mpi.h>
+#include <stdlib.h>
 
 enum nbFunction {
   nbf_unknown = -1,
@@ -102,6 +103,18 @@ public:
   HandleData(HandleData &&o) noexcept { this->init(o.handle); }
   virtual void init(M group) { handle = group; }
   virtual void fini() {}
+
+  // define new/delete operator to avoid dependency to libstdc++
+  void *operator new(size_t size, void *ptr) { return ptr; }
+
+private:
+  void *operator new(size_t size) {
+    static_assert(false, "operator new must never be called directly");
+    return malloc(size);
+  }
+  void operator delete(void *p) {
+    static_assert(false, "operator delete must never be called directly");
+  }
 };
 
 class alignas(64) CommData {
@@ -124,6 +137,20 @@ public:
   int getSize() { return size; }
   int getRank() { return rank; }
   MPI_Comm &getDupComm() { return dupComm; }
+
+  // define new/delete operator to avoid dependency to libstdc++
+  void *operator new(size_t size, void *ptr) { return ptr; }
+
+private:
+  void *operator new(size_t size) { // static_assert(false, "operator new must
+                                    // never be called directly");
+    assert(false && "operator new must never be called directly");
+    return malloc(size);
+  }
+  void operator delete(void *p) { // static_assert(false, "operator delete must
+                                  // never be called directly");
+    assert(false && "operator delete must never be called directly");
+  }
 };
 
 typedef enum {

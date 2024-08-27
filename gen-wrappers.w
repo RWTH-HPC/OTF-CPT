@@ -1,25 +1,21 @@
 #include <assert.h>
 #include <mpi.h>
 #include <stdio.h>
-#include <iostream>
 
 #include "tracking.h"
 #include "criticalPath.h"
 #include "mpi-critical.h"
 
 {{fn fn_name MPI_Init MPI_Init_thread}}
-  if (!analysis_flags) {
-    const char *options = getenv(ANALYSIS_FLAGS);
-    analysis_flags = new AnalysisFlags(options);
-  }
+  InitializeOtfcptFlags();
   if (analysis_flags->verbose)
-     std::cout << "Starting critPathAnalysis tool" << std::endl;
+     printf("Starting critPathAnalysis tool\n");
   useMpi = true;
 
   mpiTimer mt{true, __func__};
 
   if (analysis_flags->verbose)
-     std::cout << "MPI Init" << std::endl;
+     printf("MPI Init\n");
 
    {{ret_val}} = P{{fn_name}}({{args}});
 

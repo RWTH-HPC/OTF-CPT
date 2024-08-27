@@ -64,12 +64,14 @@ set(OTFCPT_SOURCES
     tracking.cpp
     gen-nb-wrappers.cpp
     gen-wrappers.cpp
+    parse_flags.cpp
 )
 
 set(OTFCPT_OMP_SOURCES
     critical-core.cpp
     ompt-critical.cpp
     tracking.cpp
+    parse_flags.cpp
 )
 
 
@@ -80,12 +82,18 @@ add_wrapped_file(gen-wrappers.cpp gen-wrappers.w)
 add_library(OTFCPT SHARED ${OTFCPT_SOURCES})
 target_link_libraries(OTFCPT ${MPI_C_LIBRARIES})
 target_compile_definitions(OTFCPT PUBLIC -DUSE_MPI=1)
+target_link_options(OTFCPT PUBLIC -fno-rtti -fno-exceptions -nostdlib++ -Wl,--gc-sections)
+target_compile_options(OTFCPT PUBLIC -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections)
 
 add_library(OTFCPT_omp SHARED ${OTFCPT_OMP_SOURCES})
+target_link_options(OTFCPT_omp PUBLIC -fno-rtti -fno-exceptions -nostdlib++ -Wl,--gc-sections)
+target_compile_options(OTFCPT_omp PUBLIC -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections)
 
 add_library(OTFCPT_static STATIC ${OTFCPT_SOURCES})
 target_link_libraries(OTFCPT_static ${MPI_C_LIBRARIES})
 target_compile_definitions(OTFCPT_static PUBLIC -DUSE_MPI=1)
+target_link_options(OTFCPT_static PUBLIC -fno-rtti -fno-exceptions -nostdlib++ -Wl,--gc-sections)
+target_compile_options(OTFCPT_static PUBLIC -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections)
 
 add_subdirectory(tests)
 

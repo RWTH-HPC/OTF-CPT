@@ -68,11 +68,11 @@ template <typename T> struct DataPool final {
   std::mutex DPMutex{};
 
   // store unused objects
-  std::vector<T *> DataPointer{};
-  std::vector<T *> RemoteDataPointer{};
+  Vector<T *> DataPointer{};
+  Vector<T *> RemoteDataPointer{};
 
   // store all allocated memory to finally release
-  std::list<void *> memory;
+  Vector<void *> memory;
 
   // count remotely returned data (RemoteDataPointer.size())
   std::atomic<int> remote{0};
@@ -88,7 +88,7 @@ template <typename T> struct DataPool final {
 #endif
   int getTotal() { return total; }
   int getMissing() {
-    return total - DataPointer.size() - RemoteDataPointer.size();
+    return total - DataPointer.Size() - RemoteDataPointer.Size();
   }
 
   // fill the pool by allocating a page of memory
@@ -96,7 +96,7 @@ template <typename T> struct DataPool final {
     if (remote > 0) {
       const std::lock_guard<std::mutex> lock(DPMutex);
       // DataPointer is empty, so just swap the vectors
-      DataPointer.swap(RemoteDataPointer);
+      DataPointer.Swap(RemoteDataPointer);
       remote = 0;
       return;
     }
@@ -106,9 +106,9 @@ template <typename T> struct DataPool final {
     // number of padded elements to allocate
     int ndatas = pagesize / paddedSize;
     char *datas = (char *)malloc(ndatas * paddedSize);
-    memory.push_back(datas);
+    memory.PushBack(datas);
     for (int i = 0; i < ndatas; i++) {
-      DataPointer.push_back(new (datas + i * paddedSize) T(this));
+      DataPointer.PushBack(new (datas + i * paddedSize) T(this));
     }
     total += ndatas;
   }
@@ -116,16 +116,16 @@ template <typename T> struct DataPool final {
   // get data from the pool
   T *getData() {
     T *ret;
-    if (DataPointer.empty())
+    if (DataPointer.Empty())
       newDatas();
-    ret = DataPointer.back();
-    DataPointer.pop_back();
+    ret = DataPointer.Back();
+    DataPointer.PopBack();
     return ret;
   }
 
   // accesses to the thread-local datapool don't need locks
   void returnOwnData(T *data) {
-    DataPointer.emplace_back(data);
+    DataPointer.PushBack(data);
 #ifdef DEBUG_DATA
     localReturn++;
 #endif
@@ -134,7 +134,7 @@ template <typename T> struct DataPool final {
   // returning to a remote datapool using lock
   void returnData(T *data) {
     const std::lock_guard<std::mutex> lock(DPMutex);
-    RemoteDataPointer.emplace_back(data);
+    RemoteDataPointer.PushBack(data);
     remote++;
 #ifdef DEBUG_DATA
     remoteReturn++;
@@ -145,9 +145,10 @@ template <typename T> struct DataPool final {
     // we assume all memory is returned when the thread finished / destructor is
     // called
     if (analysis_flags->report_data_leak && getMissing() != 0) {
-      printf("ERROR: While freeing DataPool (%s) we are missing %i data "
-             "objects.\n",
-             __PRETTY_FUNCTION__, getMissing());
+      fprintf(stderr,
+              "ERROR: While freeing DataPool (%s) we are missing %i data "
+              "objects.\n",
+              __PRETTY_FUNCTION__, getMissing());
       exit(-3);
     }
     for (auto i : DataPointer)
@@ -160,6 +161,9 @@ template <typename T> struct DataPool final {
       if (i)
         free(i);
   }
+  void *operator new(size_t size) { return malloc(size); }
+
+  void operator delete(void *p) { free(p); }
 };
 
 template <typename T> struct DataPoolEntry {
@@ -354,7 +358,7 @@ struct TaskData final : DataPoolEntry<TaskData> {
   // the dependency variables used on the sibling tasks created from
   // this task
   // We expect a rare need for the dependency-map, so alloc on demand
-  std::unordered_map<void *, DependencyData *> *DependencyMap{nullptr};
+  CompactHashMap<void *, DependencyData *> *DependencyMap{nullptr};
 
 #ifdef DEBUG
   int freed{0};
@@ -455,8 +459,7 @@ static inline TaskData *ToTaskData(ompt_data_t *task_data) {
  */
 
 /// Store a mutex for each wait_id to resolve race condition with callbacks.
-std::unordered_map<ompt_wait_id_t, std::pair<std::mutex, ompt_tsan_clockid>>
-    Locks;
+CompactHashMap<ompt_wait_id_t, std::pair<std::mutex, ompt_tsan_clockid>> Locks;
 std::mutex LocksMutex;
 std::mutex tcmutex;
 
@@ -473,8 +476,8 @@ static void ompt_tsan_thread_begin(ompt_thread_t thread_type,
   thread_data->ptr = thread_local_clock;
   {
     const std::lock_guard<std::mutex> lock(tcmutex);
-    thread_clocks->push_back(thread_local_clock);
-    thread_counts->push_back(omptThreadCount);
+    thread_clocks->PushBack(thread_local_clock);
+    thread_counts->PushBack(omptThreadCount);
   }
 }
 
@@ -923,13 +926,13 @@ static void ompt_tsan_dependences(ompt_data_t *task_data,
     TaskData *Data = ToTaskData(task_data);
     if (!Data->Parent->DependencyMap)
       Data->Parent->DependencyMap =
-          new std::unordered_map<void *, DependencyData *>();
+          new CompactHashMap<void *, DependencyData *>();
     Data->Dependencies =
         (TaskDependency *)malloc(sizeof(TaskDependency) * ndeps);
     Data->DependencyCount = ndeps;
     for (int i = 0; i < ndeps; i++) {
-      auto ret = Data->Parent->DependencyMap->insert(
-          std::make_pair(deps[i].variable.ptr, nullptr));
+      auto ret = Data->Parent->DependencyMap->Insert(
+          Pair<void *, DependencyData *>({deps[i].variable.ptr, nullptr}));
       if (ret.second) {
         ret.first->second = DependencyData::New();
       }
@@ -1004,7 +1007,7 @@ static int ompt_tsan_initialize(ompt_function_lookup_t lookup, int device_num,
   ompt_set_callback_t ompt_set_callback =
       (ompt_set_callback_t)lookup("ompt_set_callback");
   if (ompt_set_callback == NULL) {
-    std::cerr << "Could not set callback, exiting..." << std::endl;
+    fprintf(stderr, "Could not set callback, exiting...\n");
     std::exit(1);
   }
   critical_ompt_get_parallel_info =
@@ -1047,36 +1050,27 @@ static int ompt_tsan_initialize(ompt_function_lookup_t lookup, int device_num,
 static void ompt_tsan_finalize(ompt_data_t *tool_data) {
   if (!useMpi) {
     if (analysis_flags->verbose)
-      std::cout << "Max Useful Computation -- " << crit_path_useful_time
-                << std::endl;
+      fprintf(analysis_flags->output, "Max Useful Computation -- %2.5lf\n",
+              crit_path_useful_time);
     finishMeasurement();
   }
   if (analysis_flags->print_max_rss) {
     struct rusage end;
     getrusage(RUSAGE_SELF, &end);
-    printf("MAX RSS[KBytes] during execution: %ld\n", end.ru_maxrss);
-  }
-
-  if (!useMpi && analysis_flags) {
-    delete analysis_flags;
-    analysis_flags = nullptr;
+    fprintf(analysis_flags->output, "MAX RSS[KBytes] during execution: %ld\n",
+            end.ru_maxrss);
   }
 }
 extern "C" ompt_start_tool_result_t *__attribute__((visibility("default")))
 ompt_start_tool(unsigned int omp_version, const char *runtime_version) {
-  if (!analysis_flags) {
-    const char *options = getenv(ANALYSIS_FLAGS);
-    analysis_flags = new AnalysisFlags(options);
-  }
+  InitializeOtfcptFlags();
   if (!analysis_flags->enabled) {
     if (analysis_flags->verbose)
-      std::cout << "Tool disabled, stopping operation" << std::endl;
-
-    delete analysis_flags;
+      fprintf(stderr, "Tool disabled, stopping operation\n");
     return NULL;
   }
   if (analysis_flags->verbose)
-    std::cout << "Starting critPathAnalysis OMPT tool" << std::endl;
+    fprintf(analysis_flags->output, "Starting critPathAnalysis OMPT tool\n");
 
 #ifdef USE_ERRHANDLER
   init_signalhandlers();
@@ -1087,9 +1081,9 @@ ompt_start_tool(unsigned int omp_version, const char *runtime_version) {
   static ompt_start_tool_result_t ompt_start_tool_result = {
       &ompt_tsan_initialize, &ompt_tsan_finalize, {0}};
   if (!thread_clocks)
-    thread_clocks = new std::vector<THREAD_CLOCK *>{};
+    thread_clocks = new Vector<THREAD_CLOCK *>{};
   if (!thread_counts)
-    thread_counts = new std::vector<omptCounts *>{};
+    thread_counts = new Vector<omptCounts *>{};
 
   // The OMPT start-up code uses dlopen with RTLD_LAZY. Therefore, we cannot
   // rely on dlopen to fail if TSan is missing, but would get a runtime error
@@ -1098,8 +1092,9 @@ ompt_start_tool(unsigned int omp_version, const char *runtime_version) {
   // execution or disable the tool (by returning NULL).
 
   if (analysis_flags->verbose && analysis_flags->stopped)
-    std::cout << "Tool enabled, collecting critical path." << std::endl;
+    fprintf(analysis_flags->output,
+            "Tool enabled, collecting critical path.\n");
   if (analysis_flags->verbose && !analysis_flags->stopped)
-    std::cout << "Tool enabled, waiting to get started." << std::endl;
+    fprintf(analysis_flags->output, "Tool enabled, waiting to get started.\n");
   return &ompt_start_tool_result;
 }
