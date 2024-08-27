@@ -14,9 +14,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "criticalPath.h"
+#include "parse_flags.h"
+#include <time.h>
 #ifdef USE_MPI
 #include <mpi.h>
 #endif
+
+extern "C" void __cxa_pure_virtual() {
+  assert(false && "Pure virtual function must not be called");
+  abort();
+}
 
 double localTimeOffset{0};
 double getTime() {
@@ -31,8 +38,6 @@ double getStartTimeNoOffset(double time) { return time - localTimeOffset; }
 int myProcId = 0;
 bool useMpi = false;
 
-AnalysisFlags *analysis_flags = nullptr;
-
 ompt_finalize_tool_t critical_ompt_finalize_tool{nullptr};
 
 uint64_t my_next_id() {
@@ -45,8 +50,8 @@ double totalProgrammTime = 0;
 double startProgrammTime = getTime(), endProgrammTime;
 double crit_path_useful_time = 0;
 
-std::vector<THREAD_CLOCK *> *thread_clocks = nullptr;
-std::vector<omptCounts *> *thread_counts = nullptr;
+Vector<THREAD_CLOCK *> *thread_clocks = nullptr;
+Vector<omptCounts *> *thread_counts = nullptr;
 thread_local THREAD_CLOCK *thread_local_clock = nullptr;
 
 void resetMpiClock(THREAD_CLOCK *thread_clock) {
@@ -81,25 +86,20 @@ void startMeasurement(double time) {
   auto initialStart = startProgrammTime;
   startProgrammTime = time;
   if (analysis_flags->verbose)
-    printf("Initialize after %lf s\n", startProgrammTime - initialStart);
+    fprintf(analysis_flags->output, "Initialize after %lf s\n",
+            startProgrammTime - initialStart);
 }
 
 void stopMeasurement(double time) { endProgrammTime = time; }
 
 #define NUM_SHARED_METRICS 7
 
-std::string colorize(std::string text) {
-  if (!analysis_flags->colorize)
-    return text;
-  return "\033[1;35m" + text + "\033[0m";
-}
-
 void finishMeasurement() {
   int number_of_procs = 1;
   int total_threads = 0;
   int num_threads = 0;
   if (thread_clocks)
-    total_threads = num_threads = thread_clocks->size();
+    total_threads = num_threads = thread_clocks->Size();
 
   double avgComputation[NUM_SHARED_METRICS] = {0};
   double maxComputation[NUM_SHARED_METRICS] = {0};
@@ -136,7 +136,7 @@ void finishMeasurement() {
 
     uc_avg[2] = uc_avg[2];
     if (thread_counts)
-      for(int i=1; i<thread_counts->size(); i++)
+      for (int i = 1; i < thread_counts->Size(); i++)
         (*thread_counts)[0]->add(*(*thread_counts)[i]);
   } else {
     num_threads = 1;
@@ -221,153 +221,109 @@ void finishMeasurement() {
     double ompPE = ompLB * ompCommE;
     double mpiPE = mpiLB * mpiCommE;
 
+    auto of = get_otfcpt_flags()->output;
+
     if (analysis_flags->verbose) {
-      std::string pop_string_total =
-          "\n[pop] sere:" + std::to_string(SerE) + ":te:" + std::to_string(TE) +
-          ":comme:" + std::to_string(CommE) + ":lb:" + std::to_string(LB) +
-          ":pe:" + std::to_string(PE) +
-          ":crittime:" + std::to_string(totalRuntimeIdeal) +
-          ":totaltime:" + std::to_string(totalRuntimeReal) +
-          ":avgcomputation:" + std::to_string(avgComputation[0]) +
-          ":maxcomputation:" + std::to_string(maxComputation[0]) + "\n";
-      std::cout << pop_string_total;
-      std::cout << "\n\n--------MPI stats:--------\n";
+      fprintf(
+          of,
+          "\n[pop] "
+          "sere:%6.3lf:te:%6.3lf:comme:%6.3lf:lb:%6.3lf:pe:%6.3lf:crittime:%2."
+          "5lf:totaltime:%6.3lf:avgcomputation:%6.3lf:maxcomputation:%6.3lf\n",
+          SerE, TE, CommE, LB, PE, totalRuntimeIdeal, totalRuntimeReal,
+          avgComputation[0], maxComputation[0]);
+      fprintf(of, "\n\n--------MPI stats:--------\n");
       if (total_counts.send)
-        std::cout << "MPI_*send: " << total_counts.send << std::endl;
+        fprintf(of, "MPI_*send: %i\n", total_counts.send);
       if (total_counts.isend)
-        std::cout << "MPI_I*send: " << total_counts.isend << std::endl;
+        fprintf(of, "MPI_I*send: %i\n", total_counts.isend);
       if (total_counts.probe)
-        std::cout << "MPI_*mprobe: " << total_counts.probe << std::endl;
+        fprintf(of, "MPI_*mprobe: %i\n", total_counts.probe);
       if (total_counts.recv)
-        std::cout << "MPI_Recv: " << total_counts.recv << std::endl;
+        fprintf(of, "MPI_Recv: %i\n", total_counts.recv);
       if (total_counts.irecv)
-        std::cout << "MPI_Irecv: " << total_counts.irecv << std::endl;
+        fprintf(of, "MPI_Irecv: %i\n", total_counts.irecv);
       if (total_counts.coll)
-        std::cout << "MPI_*coll: " << total_counts.coll << std::endl;
+        fprintf(of, "MPI_*coll: %i\n", total_counts.coll);
       if (total_counts.coll)
-        std::cout << "MPI_I*coll: " << total_counts.coll << std::endl;
+        fprintf(of, "MPI_I*coll: %i\n", total_counts.coll);
       if (total_counts.test)
-        std::cout << "MPI_Test*: " << total_counts.test << std::endl;
+        fprintf(of, "MPI_Test*: %i\n", total_counts.test);
       if (total_counts.wait)
-        std::cout << "MPI_Wait*: " << total_counts.wait << std::endl
-                  << std::endl;
+        fprintf(of, "MPI_Wait*: %i\n", total_counts.wait);
 
       if(thread_counts){
-        std::cout << "\n\n--------OMPT stats:--------\n";
-        auto* tCounts = thread_counts->at(0);
+        fprintf(of, "\n\n--------OMPT stats:--------\n");
+        auto *tCounts = (*thread_counts)[0];
         if(tCounts->taskCreate)
-          std::cout << "taskCreate: " << tCounts->taskCreate << std::endl;
+          fprintf(of, "taskCreate: %i\n", tCounts->taskCreate);
         if(tCounts->taskSchedule)
-          std::cout << "taskSchedule: " << tCounts->taskSchedule << std::endl;
+          fprintf(of, "taskSchedule: %i\n", tCounts->taskSchedule);
         if(tCounts->implTaskBegin)
-          std::cout << "implTaskBegin: " << tCounts->implTaskBegin << std::endl;
+          fprintf(of, "implTaskBegin: %i\n", tCounts->implTaskBegin);
         if(tCounts->implTaskEnd)
-          std::cout << "implTaskEnd: " << tCounts->implTaskEnd << std::endl;
+          fprintf(of, "implTaskEnd: %i\n", tCounts->implTaskEnd);
         if(tCounts->syncRegionBegin)
-          std::cout << "syncRegionBegin: " << tCounts->syncRegionBegin << std::endl;
+          fprintf(of, "syncRegionBegin: %i\n", tCounts->syncRegionBegin);
         if(tCounts->syncRegionEnd)
-          std::cout << "syncRegionEnd: " << tCounts->syncRegionEnd << std::endl;
+          fprintf(of, "syncRegionEnd: %i\n", tCounts->syncRegionEnd);
         if(tCounts->mutexAcquire)
-          std::cout << "mutexAcquire: " << tCounts->mutexAcquire << std::endl;
+          fprintf(of, "mutexAcquire: %i\n", tCounts->mutexAcquire);
       }
 
-      std::cout << "\n\n--------CritPath Analysis Tool results:--------\n";
-      std::cout << "=> Number of processes:          " +
-                       std::to_string(number_of_procs) + "\n";
-      std::cout << "=> Number of threads:            " +
-                       std::to_string(total_threads) + "\n";
-      std::cout << "=> Average Computation (in s):   " +
-                       std::to_string(avgComputation[0]) + "\n";
-      std::cout << "=> Maximum Computation (in s):   " +
-                       std::to_string(maxComputation[0]) + "\n";
-      std::cout << "=> Max crit. computation (in s): " +
-                       std::to_string(totalRuntimeIdeal) + "\n";
-      std::cout << "=> Average crit. proc-local computation (in s):   " +
-                       std::to_string(avgComputation[3]) + "\n";
-      std::cout << "=> Maximum crit. proc-local computation (in s):   " +
-                       std::to_string(maxComputation[3]) + "\n";
-      std::cout << "=> Average crit. proc-local Outside OpenMP (in s):   " +
-                       std::to_string(avgComputation[4]) + "\n";
-      std::cout << "=> Maximum crit. proc-local Outside OpenMP (in s):   " +
-                       std::to_string(maxComputation[4]) + "\n";
-      std::cout << "=> Average proc-local rumtime (in s):   " +
-                       std::to_string(avgComputation[5]) + "\n";
-      std::cout << "=> Maximum proc-local runtime (in s):   " +
-                       std::to_string(maxComputation[5]) + "\n";
-      std::cout << "=> Average PL-max Computation (in s):   " +
-                       std::to_string(avgComputation[6]) + "\n";
-      std::cout << "=> Maximum PL-max Computation (in s):   " +
-                       std::to_string(maxComputation[6]) + "\n";
-      /*    std::cout << "=> Average Outside MPI (in s):   " +
-                          std::to_string(avgComputation[1]) + "\n";
-          std::cout << "=> Maximum Outside MPI (in s):   " +
-                          std::to_string(maxComputation[1]) + "\n";
-          std::cout << "=> Max crit. Outside MPI (in s): " +
-                          std::to_string(totalOutsideMPIIdeal) + "\n";*/
-      std::cout << "=> Average Outside OpenMP (in s):   " +
-                       std::to_string(avgComputation[2]) + "\n";
-      std::cout << "=> Maximum Outside OpenMP (in s):   " +
-                       std::to_string(maxComputation[2]) + "\n";
-      std::cout << "=> Max crit. Outside OpenMP (in s): " +
-                       std::to_string(totalOutsideOMPIdeal) + "\n";
-      std::cout << "=> Max crit. Outside OpenMP w/o offset (in s): " +
-                       std::to_string(totalOutsideOMPIdealNoOffset) + "\n";
-      std::cout << "=> Total runtime (in s):         " +
-                       std::to_string(totalRuntimeReal) + "\n\n";
+      fprintf(of, "\n\n--------CritPath Analysis Tool results:--------\n");
+      fprintf(of, "=> Number of processes:          %i\n", number_of_procs);
+      fprintf(of, "=> Number of threads:            %i\n", total_threads);
+      fprintf(of, "=> Average Computation (in s):   %6.3lf\n",
+              avgComputation[0]);
+      fprintf(of, "=> Maximum Computation (in s):   %6.3lf\n",
+              maxComputation[0]);
+      fprintf(of, "=> Max crit. computation (in s): %6.3lf\n",
+              totalRuntimeIdeal);
+      fprintf(of, "=> Average crit. proc-local computation (in s):    %6.3lf\n",
+              avgComputation[3]);
+      fprintf(of, "=> Maximum crit. proc-local computation (in s):    %6.3lf\n",
+              maxComputation[3]);
+      fprintf(of, "=> Average crit. proc-local Outside OpenMP (in s): %6.3lf\n",
+              avgComputation[4]);
+      fprintf(of, "=> Maximum crit. proc-local Outside OpenMP (in s): %6.3lf\n",
+              maxComputation[4]);
+      fprintf(of, "=> Average proc-local rumtime (in s):   %6.3lf\n",
+              avgComputation[5]);
+      fprintf(of, "=> Maximum proc-local runtime (in s):   %6.3lf\n",
+              maxComputation[5]);
+      fprintf(of, "=> Average PL-max Computation (in s):   %6.3lf\n",
+              avgComputation[6]);
+      fprintf(of, "=> Maximum PL-max Computation (in s):   %6.3lf\n",
+              maxComputation[6]);
+      fprintf(of, "=> Average Outside OpenMP (in s):   %6.3lf\n",
+              avgComputation[2]);
+      fprintf(of, "=> Maximum Outside OpenMP (in s):   %6.3lf\n",
+              maxComputation[2]);
+      fprintf(of, "=> Max crit. Outside OpenMP (in s): %6.3lf\n",
+              totalOutsideOMPIdeal);
+      fprintf(of, "=> Max crit. Outside OpenMP w/o o,%6.3lf\n",
+              totalOutsideOMPIdealNoOffset);
+      fprintf(of, "=> Total runtime (in s):         %6.3lf\n",
+              totalRuntimeReal);
     }
 
-    std::string pop_string =
-        colorize("\n----------------POP metrics----------------\n");
-    pop_string +=
-        "Parallel Efficiency:                " + std::to_string(PE) + "\n";
-    pop_string +=
-        "  Load Balance:                     " + std::to_string(LB) + "\n";
-    pop_string +=
-        "  Communication Efficiency:         " + std::to_string(CommE) + "\n";
-    pop_string +=
-        "    Serialisation Efficiency:       " + std::to_string(SerE) + "\n";
-    pop_string +=
-        "    Transfer Efficiency:            " + std::to_string(TE) + "\n";
-    pop_string +=
-        "  MPI Parallel Efficiency:          " + std::to_string(mpiPE) + "\n";
-    pop_string +=
-        "    MPI Load Balance:               " + std::to_string(mpiLB) + "\n";
-    pop_string +=
-        "    MPI Communication Efficiency:   " + std::to_string(mpiCommE) +
-        "\n";
-    pop_string +=
-        "      MPI Serialisation Efficiency: " + std::to_string(mpiSerE) + "\n";
-    /*    pop_string +=
-            "  MPI Parallel Efficiency2:          " + std::to_string(mpiPE2) +
-       "\n"; pop_string += "    MPI Communication Efficiency2:   " +
-       std::to_string(mpiCommE2) +
-            "\n";
-        pop_string +=
-            "      MPI Serialisation Efficiency2: " + std::to_string(mpiSerE2) +
-       "\n";*/
-    pop_string +=
-        "      MPI Transfer Efficiency:      " + std::to_string(mpiTE) + "\n";
-    pop_string +=
-        "  OMP Parallel Efficiency:          " + std::to_string(ompPE) + "\n";
-    pop_string +=
-        "    OMP Load Balance:               " + std::to_string(ompLB) + "\n";
-    pop_string +=
-        "    OMP Communication Efficiency:   " + std::to_string(ompCommE) +
-        "\n";
-    pop_string +=
-        "      OMP Serialisation Efficiency: " + std::to_string(ompSerE) + "\n";
-    /*    pop_string +=
-            "  OMP Parallel Efficiency2:          " + std::to_string(ompPE2) +
-       "\n"; pop_string += "    OMP Communication Efficiency2:   " +
-       std::to_string(ompCommE2) +
-            "\n";
-        pop_string +=
-            "      OMP Serialisation Efficiency2: " + std::to_string(ompSerE2) +
-       "\n";*/
-    pop_string +=
-        "      OMP Transfer Efficiency:      " + std::to_string(ompTE) + "\n";
-    pop_string += colorize("-------------------------------------------\n");
-    std::cout << pop_string;
+    fprintf(of, "\n----------------POP metrics----------------\n");
+    fprintf(of, "Parallel Efficiency:                %6.3lf\n", PE);
+    fprintf(of, "  Load Balance:                     %6.3lf\n", LB);
+    fprintf(of, "  Communication Efficiency:         %6.3lf\n", CommE);
+    fprintf(of, "    Serialisation Efficiency:       %6.3lf\n", SerE);
+    fprintf(of, "    Transfer Efficiency:            %6.3lf\n", TE);
+    fprintf(of, "  MPI Parallel Efficiency:          %6.3lf\n", mpiPE);
+    fprintf(of, "    MPI Load Balance:               %6.3lf\n", mpiLB);
+    fprintf(of, "    MPI Communication Efficiency:   %6.3lf\n", mpiCommE);
+    fprintf(of, "      MPI Serialisation Efficiency: %6.3lf\n", mpiSerE);
+    fprintf(of, "      MPI Transfer Efficiency:      %6.3lf\n", mpiTE);
+    fprintf(of, "  OMP Parallel Efficiency:          %6.3lf\n", ompPE);
+    fprintf(of, "    OMP Load Balance:               %6.3lf\n", ompLB);
+    fprintf(of, "    OMP Communication Efficiency:   %6.3lf\n", ompCommE);
+    fprintf(of, "      OMP Serialisation Efficiency: %6.3lf\n", ompSerE);
+    fprintf(of, "      OMP Transfer Efficiency:      %6.3lf\n", ompTE);
+    fprintf(of, "-------------------------------------------\n");
   }
 }
 
@@ -422,7 +378,7 @@ void OmpClockReset(SYNC_CLOCK *cv) {
   if (!analysis_flags->running)
     return;
   if (cv == nullptr)
-    std::cout << "NULL" << std::endl;
+    fprintf(stderr, "%s: unexpected NULL arg\n", __PRETTY_FUNCTION__);
   else {
     cv->useful_computation_thread = -1e50;
     cv->useful_computation_proc = -1e50;
@@ -457,7 +413,7 @@ void startTool(bool toolControl, ClockContext cc) {
     assert(thread_local_clock->outsideomp_proc == 0);
 
     if (analysis_flags->verbose)
-      printf("starting tool\n");
+      fprintf(analysis_flags->output, "starting tool\n");
     double time = getTime();
     analysis_flags->running = true;
     startMeasurement(time);
@@ -468,7 +424,7 @@ void startTool(bool toolControl, ClockContext cc) {
 void stopTool() {
   if (analysis_flags->running) {
     if (analysis_flags->verbose)
-      printf("ending tool\n");
+      fprintf(analysis_flags->output, "ending tool\n");
     double time = getTime();
     thread_local_clock->Stop(time, CLOCK_ALL, __func__);
     analysis_flags->running = false;

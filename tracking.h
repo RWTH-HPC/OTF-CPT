@@ -8,13 +8,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include <functional>
-#include <list>
-#include <map>
+#include "containers.h"
 #include <mutex>
 #include <shared_mutex>
-#include <unordered_map>
-#include <vector>
 
 // critical path tool only needs comm and request tracking
 #define HANDLE_COMM 1
@@ -94,14 +90,15 @@ enum toolDataEnum {
 };
 
 #include "handle-data.h"
+using namespace __otfcpt;
 
 // Abstract interface of the HandleFactor
 template <typename M, typename T, auto E> class AbstractHandleFactory {
 protected:
-  std::unordered_map<M, T> predefHandles{};
+  CompactHashMap<M, T> predefHandles{};
   virtual bool isPredefined(M handle) { return handle == T::nullHandle; }
   virtual T *findPredefinedData(M handle) {
-    auto iter = predefHandles.find(handle);
+    auto iter = predefHandles.Find(handle);
     if (iter == predefHandles.end())
       return nullptr;
     return &(iter->second);
@@ -144,30 +141,30 @@ public:
 template <typename M, typename T> class DataPool {
 private:
   mutable std::shared_mutex DPMutex{};
-  std::vector<T *> dataPointer{};
-  std::list<void *> memory;
+  Vector<T *> dataPointer{};
+  Vector<void *> memory;
   virtual void newDatas() {
     assert(sizeof(T) % 64 == 0);
     int ndatas = 4096 / sizeof(T);
     char *datas = (char *)malloc(ndatas * sizeof(T));
-    memory.push_back(datas);
+    memory.PushBack(datas);
     for (int i = 0; i < ndatas; i++) {
-      dataPointer.push_back(new (datas + i * sizeof(T)) T());
+      dataPointer.PushBack(new (datas + i * sizeof(T)) T());
     }
   }
 
 public:
   virtual T *getData() {
     std::unique_lock<std::shared_mutex> lock(DPMutex);
-    if (dataPointer.empty())
+    if (dataPointer.Empty())
       newDatas();
-    T *ret = dataPointer.back();
-    dataPointer.pop_back();
+    T *ret = dataPointer.Back();
+    dataPointer.PopBack();
     return ret;
   }
   virtual void returnData(T *data) {
     std::unique_lock<std::shared_mutex> lock(DPMutex);
-    dataPointer.emplace_back(data);
+    dataPointer.PushBack(data);
   }
   virtual ~DataPool() {
     for (auto i : this->dataPointer)
@@ -321,24 +318,24 @@ class HandleFactory<M, T, int, E>
 protected:
   mutable std::shared_mutex DTMutex{};
   mutable std::shared_mutex AHMutex{};
-  std::vector<T *> dataTable{};
-  std::vector<M> availableHandles{};
+  Vector<T *> dataTable{};
+  Vector<M> availableHandles{};
 
   void newAH() {
     int ndatas = 4096 / 64;
-    size_t oldSize = dataTable.size(), newSize = oldSize + ndatas;
+    size_t oldSize = dataTable.Size(), newSize = oldSize + ndatas;
     {
       // Only the resize actually modifies the vector and
       // can lead to a reallocation of the elements
       std::unique_lock<std::shared_mutex> lock(DTMutex);
-      dataTable.resize(newSize);
+      dataTable.Resize(newSize);
     }
     // Getting the lock here is not necessary:
     // unique_lock can only be taken while having unique AHMutex
     // std::shared_lock<std::shared_mutex> lock(DTMutex);
     for (size_t i = oldSize, j = 0; i < newSize; i++, j++) {
       dataTable[i] = nullptr;
-      availableHandles.emplace_back((M)(i));
+      availableHandles.PushBack((M)(i));
     }
   }
 
@@ -354,10 +351,10 @@ public:
     M ret;
     {
       std::unique_lock<std::shared_mutex> lock(AHMutex);
-      if (availableHandles.empty())
+      if (availableHandles.Empty())
         newAH();
-      ret = availableHandles.back();
-      availableHandles.pop_back();
+      ret = availableHandles.Back();
+      availableHandles.PopBack();
       // Getting the lock here is not necessary:
       // unique_lock can only be taken while having unique AHMutex
       // std::shared_lock<std::shared_mutex> lock(DTMutex);
@@ -374,7 +371,7 @@ public:
     {
       std::unique_lock<std::shared_mutex> lock(AHMutex);
       ret = dataTable[(size_t)(handle)];
-      availableHandles.emplace_back(handle);
+      availableHandles.PushBack(handle);
     }
     ret->fini();
     this->returnData(ret);
@@ -386,7 +383,7 @@ public:
     {
       std::unique_lock<std::shared_mutex> lock(AHMutex);
       ret = dataTable[(size_t)(handle)];
-      availableHandles.emplace_back(handle);
+      availableHandles.PushBack(handle);
     }
     return ret;
   }
@@ -426,10 +423,10 @@ class RequestFactoryInst<int>
     RequestData *dp = this->getData();
     {
       std::unique_lock<std::shared_mutex> lock(AHMutex);
-      if (availableHandles.empty())
+      if (availableHandles.Empty())
         newAH();
-      ret = availableHandles.back();
-      availableHandles.pop_back();
+      ret = availableHandles.Back();
+      availableHandles.PopBack();
       dataTable[(size_t)(ret)] = dp;
     }
     dp->init(req, persistent);
@@ -444,10 +441,10 @@ public:
     data->init(req, persistent);
     MPI_Request ret;
     std::unique_lock<std::shared_mutex> lock(AHMutex);
-    if (availableHandles.empty())
+    if (availableHandles.Empty())
       newAH();
-    ret = availableHandles.back();
-    availableHandles.pop_back();
+    ret = availableHandles.Back();
+    availableHandles.PopBack();
     dataTable[(size_t)(ret)] = data;
     return ret;
   }
@@ -466,7 +463,7 @@ public:
       ret = dataTable[(size_t)(req)];
       persistent = ret->isPersistent();
       if (!persistent) {
-        availableHandles.emplace_back(req);
+        availableHandles.PushBack(req);
       }
     }
     if (persistent) {
@@ -488,7 +485,7 @@ public:
       ret = dataTable[(size_t)(req)];
       persistent = ret->isPersistent();
       if (!persistent) {
-        availableHandles.emplace_back(req);
+        availableHandles.PushBack(req);
       }
     }
     ret->handle = mpi_req;
