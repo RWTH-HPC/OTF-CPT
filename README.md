@@ -43,17 +43,6 @@ CC=mpicc.openmpi CXX=mpicxx.openmpi cmake ../
 make -j8
 ```
 
-## Build using the Makefile
-The Makefile accepts several configuration variables to be overwritten:
-- MPI defaults to `openmpi`. This will be used as infix in most generated files
-- MPICC defaults to `mpicc.$(MPI)`. In combination with the MPI variable this allows easy switching of MPI on Ubuntu
-- MPICXX defaults to `mpicxx.$(MPI)`. In combination with the MPI variable this allows easy switching of MPI on Ubuntu
-- MPIRUN defaults to `mpirun.$(MPI)`. In combination with the MPI variable this allows easy switching of MPI on Ubuntu
-
-### Run targets in the Makefile
-- `run-test` - runs 4 tests loading the shared library tool implementation
-- `run-test-static` - runs 4 tests that have the tool implementation statically built into the test
-
 ## Using the tool with an application
 Depending on the system and how libomp.so is built, LD_PRELOAD and OMP_TOOL_LIBRARIES might both be necessary. Assuming a cmake build as described above, an application with OTF-CPT is executed like:
 ```
@@ -79,11 +68,11 @@ In both cases the runtime option `start_stopped=1` should be used, see below.
 ### Runtime options
 The behavior of OTF-CPT can be changed with different runtime options. All
 runtime options are exported as a space separated string assigned to
-`OTFCPT_OPTIONS`.
+`OTFCPT_OPTIONS`. For a full list of runtime options refer to the `help` option.
 
 E.g.:
 ```
-export OTFCPT_OPTIONS="verbose=1 start_stopped=1"
+export OTFCPT_OPTIONS="verbose=1 start_stopped=1 help=1"
 ```
 
 <table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
@@ -129,6 +118,27 @@ encountered.</td>
 </tr>
 </tbody>
 </table>
+
+## Plotting results of a scaling experiment
+
+The script `CPT-plot.py` expects all OTF-CPT output files for a scaling experiment in a single directory.
+The script expects the relative or absolute path of this directory as an argument. The directory name 
+will be used as experiment name when generating the output.
+The individual output files should follow the naming convention `<prefix>-<nprocs>x<nthreads>.<suffix>`.
+Prefix and suffix can be chosen freely, the script will only open and parse files with names containing 
+`-<nprocs>x<nthreads>.`.
+
+In the following example we have five output files, execute the script which renders four graphic files 
+with color codes metric table and scaling plots:
+```
+$ ls example
+example-128x12.txt  example-16x12.txt  example-32x12.txt  example-64x12.txt  example-8x12.txt
+$ python3 script/CPT-plot.py example
+$ ls example_*
+example_graph.pdf  example_graph.png  example_metrics.pdf  example_metrics.png
+```
+
+
 
 ## Files
 ### MPI Function Wrappers
