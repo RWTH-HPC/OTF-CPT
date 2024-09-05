@@ -587,6 +587,7 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
                                   ompt_data_t *parallel_data,
                                   ompt_data_t *task_data,
                                   const void *codeptr_ra) {
+  printf("ompt_tsan_sync_region(%i, %i)\n", kind, endpoint);
   TaskData *Data = ToTaskData(task_data);
   switch (endpoint) {
   case ompt_scope_begin:
@@ -594,8 +595,6 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
     if (analysis_flags->running)
       omptThreadCount->syncRegionBegin++;
     // runtime overhead, stop useful
-    Data->InBarrier = true;
-    thread_local_clock->Stop(CLOCK_OMP, "SyncRegionBegin");
     switch (kind) {
     case ompt_sync_region_barrier_implementation:
     case ompt_sync_region_barrier_implicit:
@@ -604,6 +603,8 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
     case ompt_sync_region_barrier_implicit_workshare:
     case ompt_sync_region_barrier_teams:
     case ompt_sync_region_barrier: {
+      Data->InBarrier = true;
+      thread_local_clock->Stop(CLOCK_OMP, "SyncRegionBegin");
       char BarrierIndex = Data->BarrierIndex;
       if (Data->ThreadNum == 0)
         OmpClockReset(Data->Team->GetBarrierPtr((BarrierIndex + 1) % 3));
@@ -611,8 +612,11 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
       break;
     }
 
-    case ompt_sync_region_taskwait:
+    case ompt_sync_region_taskwait: {
+      Data->InBarrier = true;
+      thread_local_clock->Stop(CLOCK_OMP, "SyncRegionBegin");
       break;
+    }
 
     case ompt_sync_region_taskgroup:
       Data->TaskGroup = Taskgroup::New(Data->TaskGroup);
@@ -647,18 +651,24 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
       // by the time we exit the next one. So we can then reuse the first
       // address.
       Data->BarrierIndex = (BarrierIndex + 1) % 3;
+      Data->InBarrier = false;
+      if (parallel_data && kind != ompt_sync_region_barrier_implicit_parallel)
+        thread_local_clock->Start(CLOCK_OMP, "SyncRegionEnd");
       break;
     }
 
     case ompt_sync_region_taskwait: {
       if (Data->execution > 1)
         OmpHappensAfter(Data->GetTaskwaitPtr());
+      Data->InBarrier = false;
+      thread_local_clock->Start(CLOCK_OMP, "SyncRegionEnd");
       break;
     }
 
     case ompt_sync_region_taskgroup: {
       assert(Data->TaskGroup != nullptr &&
              "Should have at least one taskgroup!");
+      ompTimer<> ot{"TaskGroup"};
 
       OmpHappensAfter(Data->TaskGroup->GetPtr());
 
@@ -675,9 +685,6 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
       // Tested in OMPT tests
       break;
     }
-    Data->InBarrier = false;
-    if (parallel_data && kind != ompt_sync_region_barrier_implicit_parallel)
-      thread_local_clock->Start(CLOCK_OMP, "SyncRegionEnd");
     break;
   }
 }
