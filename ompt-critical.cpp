@@ -587,7 +587,6 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
                                   ompt_data_t *parallel_data,
                                   ompt_data_t *task_data,
                                   const void *codeptr_ra) {
-  printf("ompt_tsan_sync_region(%i, %i)\n", kind, endpoint);
   TaskData *Data = ToTaskData(task_data);
   switch (endpoint) {
   case ompt_scope_begin:
@@ -689,6 +688,35 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
   }
 }
 
+static void ompt_tsan_sync_region_wait(ompt_sync_region_t kind,
+                                       ompt_scope_endpoint_t endpoint,
+                                       ompt_data_t *parallel_data,
+                                       ompt_data_t *task_data,
+                                       const void *codeptr_ra) {
+  TaskData *Data = ToTaskData(task_data);
+  if (kind == ompt_sync_region_taskgroup) {
+    switch (endpoint) {
+    case ompt_scope_begin:
+    case ompt_scope_beginend:
+      if (analysis_flags->running)
+        omptThreadCount->syncRegionBegin++;
+
+      Data->InBarrier = true;
+      thread_local_clock->Stop(CLOCK_OMP, "SyncRegionBegin");
+      if (endpoint == ompt_scope_begin)
+        break;
+      KMP_FALLTHROUGH();
+    case ompt_scope_end:
+      if (analysis_flags->running)
+        omptThreadCount->syncRegionEnd++;
+
+      Data->InBarrier = false;
+      thread_local_clock->Start(CLOCK_OMP, "SyncRegionEnd");
+      break;
+    }
+  }
+}
+
 static int ompt_tsan_control_tool(uint64_t command, uint64_t modifier,
                                   void *arg, const void *codeptr_ra) {
   if (command == omp_control_tool_start) {
@@ -712,8 +740,8 @@ static void ompt_tsan_task_create(
     int type, int has_dependences,
     const void *codeptr_ra) /* pointer to outlined function */
 {
-    if (analysis_flags->running)
-      omptThreadCount->taskCreate++;
+  if (analysis_flags->running)
+    omptThreadCount->taskCreate++;
   TaskData *Data;
   assert(new_task_data->ptr == NULL &&
          "Task data should be initialized to NULL");
@@ -997,6 +1025,7 @@ static int ompt_tsan_initialize(ompt_function_lookup_t lookup, int device_num,
   SET_CALLBACK(parallel_begin);
   SET_CALLBACK(implicit_task);
   SET_CALLBACK(sync_region);
+  SET_CALLBACK_T(sync_region_wait, sync_region);
   SET_CALLBACK(parallel_end);
   SET_CALLBACK(control_tool);
 
