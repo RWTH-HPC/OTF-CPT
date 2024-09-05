@@ -365,7 +365,7 @@ struct OtfcptFlags {
 #undef PARSE_FLAG
 
   bool running{false};
-  FILE *output{stdout};
+  FILE *output{stderr};
 
   void SetDefaults();
   void CopyFrom(const OtfcptFlags &other);

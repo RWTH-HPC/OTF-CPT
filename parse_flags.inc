@@ -30,3 +30,7 @@ PARSE_FLAG(int, exitcode, 23, "Exit code for errors.")
 PARSE_FLAG(const char *, log_path, "stdout",
            "Write logs to \"log_path.pid\". The special values are \"stdout\" "
            "and \"stderr\".")
+
+PARSE_FLAG(const char *, data_path, "stdout",
+           "Write metric data to \"data_path-{#t}x{#p}.txt\". The special "
+           "values are \"stdout\" and \"stderr\".")

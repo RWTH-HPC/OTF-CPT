@@ -198,7 +198,7 @@ void __otfcpt::InitializeOtfcptFlags() {
   if (f->help)
     parser.PrintFlagDescriptions();
 
-  if (f->log_path) {
+  if (f->log_path && f->verbose) {
     if (strcmp("stdout", f->log_path) == 0) {
       f->output = stdout;
     } else if (strcmp("stderr", f->log_path) == 0) {
