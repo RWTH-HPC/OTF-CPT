@@ -221,7 +221,28 @@ void finishMeasurement() {
     double ompPE = ompLB * ompCommE;
     double mpiPE = mpiLB * mpiCommE;
 
-    auto of = get_otfcpt_flags()->output;
+    FILE *of = stdout;
+    bool openedFile{false};
+
+    if (analysis_flags->data_path) {
+      if (strcmp("stdout", analysis_flags->data_path) == 0) {
+        of = stdout;
+      } else if (strcmp("stderr", analysis_flags->data_path) == 0) {
+        of = stderr;
+      } else {
+        auto len = strlen(analysis_flags->data_path);
+        char *tempath = (char *)malloc(len + 15);
+        sprintf(tempath, "%s-%ix%i.txt", analysis_flags->data_path,
+                number_of_procs, num_threads);
+        of = fopen(tempath, "w");
+        if (analysis_flags->verbose) {
+          fprintf(analysis_flags->output, "Opened file %s for output\n",
+                  tempath);
+        }
+        free(tempath);
+        openedFile = true;
+      }
+    }
 
     if (analysis_flags->verbose) {
       fprintf(
@@ -324,6 +345,9 @@ void finishMeasurement() {
     fprintf(of, "      OMP Serialisation Efficiency: %6.3lf\n", ompSerE);
     fprintf(of, "      OMP Transfer Efficiency:      %6.3lf\n", ompTE);
     fprintf(of, "-------------------------------------------\n");
+    if (openedFile) {
+      fclose(of);
+    }
   }
 }
 
