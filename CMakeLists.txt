@@ -70,7 +70,6 @@ set(OTFCPT_SOURCES
 set(OTFCPT_OMP_SOURCES
     critical-core.cpp
     ompt-critical.cpp
-    tracking.cpp
     parse_flags.cpp
 )
 

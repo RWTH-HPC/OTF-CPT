@@ -10,6 +10,7 @@ void registerErrHandler(MPI_Comm comm);
 #endif
 
 void init_signalhandlers();
+void disable_signalhandlers();
 #else
 #define errHandlerComm(c) (void)c
 #endif
