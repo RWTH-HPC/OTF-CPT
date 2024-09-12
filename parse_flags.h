@@ -3,6 +3,7 @@
 
 // NOLINTBEGIN
 
+#include "errorhandler.h"
 #include <atomic>
 #include <stdint.h>
 #include <stdio.h>
