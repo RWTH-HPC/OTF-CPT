@@ -24,14 +24,6 @@
 #define _EXTERN_C_ extern "C"
 #endif
 
-#ifdef USE_ERRHANDLER
-#define errHandlerComm(c) registerErrHandler(*c)
-void createErrHandler();
-void registerErrHandler(MPI_Comm comm);
-#else
-#define errHandlerComm(c) (void)c
-#endif
-
 #ifdef HANDLE_WIN
 #define preWin(w) w = wf.getHandle(w)
 #define postWin(w) *w = wf.newHandle(*w)

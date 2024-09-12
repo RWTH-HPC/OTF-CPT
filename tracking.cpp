@@ -1,5 +1,7 @@
 #include "tracking.h"
+#ifdef USE_MPI
 #include "mpi.h"
+#endif
 
 #ifdef USE_ERRHANDLER
 #include <execinfo.h>
@@ -7,55 +9,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define CALLSTACK_SIZE 20
-static void print_stack(void) {
-  int nptrs;
-  void *buf[CALLSTACK_SIZE + 1];
-  nptrs = backtrace(buf, CALLSTACK_SIZE);
-  backtrace_symbols_fd(buf, nptrs, STDOUT_FILENO);
-}
-
-static void set_signalhandlers(sighandler_t handler) {
-  signal(SIGSEGV, handler);
-  signal(SIGINT, handler);
-  signal(SIGHUP, handler);
-  signal(SIGABRT, handler);
-  signal(SIGTERM, handler);
-  signal(SIGUSR2, handler);
-  signal(SIGQUIT, handler);
-  signal(SIGALRM, handler);
-}
-
-static void disable_signalhandlers() { set_signalhandlers(SIG_DFL); }
-
-void mySignalHandler(int signum) {
-  disable_signalhandlers();
-  printf("pid %i caught signal nr %i\n", getpid(), signum);
-  if (signum == SIGINT || signum == SIGKILL) {
-    print_stack();
-    _exit(signum + 128);
-  }
-  if (signum == SIGTERM || signum == SIGUSR2) {
-    print_stack();
-    fflush(stdout);
-    sleep(1);
-    _exit(signum + 128);
-  }
-  print_stack();
-
-  printf("Waiting up to %i seconds to attach with a debugger.\n", 20);
-  sleep(20);
-  _exit(1);
-}
-
-void init_signalhandlers() {
-  if (!analysis_flags->stacktrace)
-    return;
-  if (analysis_flags->verbose)
-    fprintf(analysis_flags->output, "Setting signal handlers\n");
-  set_signalhandlers(mySignalHandler);
-}
-
+#ifdef USE_MPI
 static MPI_Errhandler CommErrHandler{MPI_ERRHANDLER_NULL};
 
 static void myMpiErrHandler(MPI_Comm *comm, int *errCode, ...) {
@@ -150,3 +104,4 @@ void ipcData::finiIpcData() {
   if (ipcMpiType != MPI_DATATYPE_NULL)
     PMPI_Type_free(&ipcMpiType);
 }
+#endif // USE_MPI
