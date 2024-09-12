@@ -19,6 +19,9 @@ PARSE_FLAG(bool, report_data_leak, false, "Report tool internal data leaks.")
 
 PARSE_FLAG(bool, stopped, false, "Delay start of measurement.")
 
+PARSE_FLAG(bool, barrier, false,
+           "Synchronize start of measurement with an MPI_Barrier.")
+
 PARSE_FLAG(bool, colorize, true, "Colorize output.")
 
 PARSE_FLAG(bool, help, false, "Print the flag descriptions.")
