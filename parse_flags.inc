@@ -32,5 +32,5 @@ PARSE_FLAG(const char *, log_path, "stdout",
            "and \"stderr\".")
 
 PARSE_FLAG(const char *, data_path, "stdout",
-           "Write metric data to \"data_path-{#t}x{#p}.txt\". The special "
-           "values are \"stdout\" and \"stderr\".")
+           "Write metric data to \"<data_path>-<#procs>x<#threads>.txt\". "
+           "The special values are \"stdout\" and \"stderr\".")
