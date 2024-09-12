@@ -7,6 +7,7 @@ set(ompOnlyTests
     omp-serialization
     omp-balanced
     omp-imbalance
+    omp-group
 )
 
 FOREACH(tests ${ompOnlyTests})

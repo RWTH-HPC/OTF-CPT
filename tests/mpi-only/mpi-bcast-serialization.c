@@ -1,6 +1,8 @@
-//ALLOW_RETRIES: 5
-//RUN: env %load_otfcpt %mpirunnp 2 %t | %FileCheck --check-prefixes=CHECK %s
-//RUN: env %load_otfcpt %mpirunnp 4 %t | %FileCheck --check-prefixes=CHECK %s
+// ALLOW_RETRIES: 1
+// RUN: %mpirunnp 2 %load_otfcpt %otfcpt_options_stopped %t | %FileCheck \
+// RUN: --check-prefixes=CHECK %s
+// RUN: %mpirunnp 4 %load_otfcpt %otfcpt_options_stopped %t | %FileCheck \
+// RUN: --check-prefixes=CHECK %s
 
 #include <mpi.h>
 #include <stdio.h>
@@ -12,6 +14,7 @@ int main(int argc, char **argv) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+  MPI_Pcontrol(1);
   if (rank == 0)
     usleep(100000);
 
@@ -20,15 +23,16 @@ int main(int argc, char **argv) {
 
   if (rank > 0)
     usleep(100000);
+  MPI_Pcontrol(0);
 
   MPI_Finalize();
 }
 
-// CHECK: Parallel Efficiency:                [[PE:0.49]]{{[0-9]+}}
-// CHECK:   Load Balance:                     [[LB:0.99[0-9]+]]
-// CHECK:   Communication Efficiency:         [[CE:0.49]]{{[0-9]+}}
+// CHECK: Parallel Efficiency:                [[PE:0.(49|50)]]{{[0-9]+}}
+// CHECK:   Load Balance:                     [[LB:(1.0|0.99)[0-9]+]]
+// CHECK:   Communication Efficiency:         [[CE:0.(49|50)]]{{[0-9]+}}
 // CHECK:     Serialisation Efficiency:       [[SE:0.50]]{{[0-9]+}}
-// CHECK:     Transfer Efficiency:            [[TE:0.99]]{{[0-9]+}}
+// CHECK:     Transfer Efficiency:            [[TE:(1.0|0.99)]]{{[0-9]+}}
 // CHECK:   MPI Parallel Efficiency:          [[PE]]
 // CHECK:     MPI Load Balance:               [[LB]]
 // CHECK:     MPI Communication Efficiency:   {{0.(49|50)[0-9]+}}
