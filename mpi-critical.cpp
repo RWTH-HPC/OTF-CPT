@@ -244,6 +244,8 @@ int MPI_Finalize(void) {
 
 int MPI_Pcontrol(const int level, ...) {
   if (level == 1) {
+    if (analysis_flags->barrier)
+      PMPI_Barrier(cf.findData(MPI_COMM_WORLD)->getDupComm());
     startTool();
   } else if (level == 0) {
     stopTool();
