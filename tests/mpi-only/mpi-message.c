@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
 // CHECK:       MPI Serialisation Efficiency: [[SE]]
 // CHECK:       MPI Transfer Efficiency:      [[TE]]
 // CHECK:   OMP Parallel Efficiency:          {{(0.99[0-9]+|1.00[0-9]+)}}
-// CHECK:     OMP Load Balance:               1.000000
+// CHECK:     OMP Load Balance:               1.000
 // CHECK:     OMP Communication Efficiency:   {{(0.99[0-9]+|1.00[0-9]+)}}
-// CHECK:       OMP Serialisation Efficiency: 1.000000
+// CHECK:       OMP Serialisation Efficiency: 1.000
 // CHECK:       OMP Transfer Efficiency:      {{(0.99[0-9]+|1.00[0-9]+)}}
