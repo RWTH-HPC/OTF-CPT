@@ -49,7 +49,10 @@ void mySignalHandler(int signum) {
 }
 
 void init_signalhandlers() {
-  printf("Setting signal handlers\n");
+  if (!analysis_flags->stacktrace)
+    return;
+  if (analysis_flags->verbose)
+    fprintf(analysis_flags->output, "Setting signal handlers\n");
   set_signalhandlers(mySignalHandler);
 }
 
@@ -62,9 +65,13 @@ static void myMpiErrHandler(MPI_Comm *comm, int *errCode, ...) {
   abort();
 }
 void createErrHandler() {
+  if (!analysis_flags->stacktrace)
+    return;
   PMPI_Comm_create_errhandler(myMpiErrHandler, &CommErrHandler);
 }
 void registerErrHandler(MPI_Comm comm) {
+  if (!analysis_flags->stacktrace)
+    return;
   PMPI_Comm_set_errhandler(comm, CommErrHandler);
 }
 #endif

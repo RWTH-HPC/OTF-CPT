@@ -20,8 +20,10 @@
    {{ret_val}} = P{{fn_name}}({{args}});
 
 #ifdef USE_ERRHANDLER
-   createErrHandler();
-   registerErrHandler(MPI_COMM_WORLD);
+  if (analysis_flags->stacktrace) {
+    createErrHandler();
+    registerErrHandler(MPI_COMM_WORLD);
+  }
 #endif
 #ifdef HANDLE_WIN
    wf.initPredefined();

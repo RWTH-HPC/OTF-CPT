@@ -1,6 +1,7 @@
 #ifndef TRACKING_H
 #define TRACKING_H
 
+#include "criticalPath.h"
 #include "errorhandler.h"
 #include <assert.h>
 #include <mpi.h>
@@ -18,7 +19,6 @@
 #define HANDLE_MESSAGE 1
 // use memory management for tool data
 #define REAL_DATAPOOL 1
-#define USE_ERRHANDLER 1
 
 #ifdef __cplusplus
 #define _EXTERN_C_ extern "C"
