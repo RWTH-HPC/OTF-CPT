@@ -67,14 +67,14 @@ MPI_Pcontrol(1); // start
 MPI_Pcontrol(0); // stop
 ```
 
-or alternatively for OpenMP-only:
+or alternatively for OpenMP applications:
 ```
 omp_control_tool(omp_control_tool_start, 0, NULL); // start
 // region of interest
 omp_control_tool(omp_control_tool_stop, 0, NULL); // stop
 ```
 
-In both cases the runtime option `start_stopped=1` should be used, see below.
+In both cases the runtime option `stopped=1` should be used, see below.
 
 ### Runtime options
 The behavior of OTF-CPT can be changed with different runtime options. All
@@ -106,10 +106,26 @@ export OTFCPT_OPTIONS="verbose=1 start_stopped=1"
 
 <tbody>
 <tr>
-<td class="org-left">start_stopped</td>
+<td class="org-left">stopped</td>
 <td class="org-right">0</td>
 <td class="org-left">Delay the start of measurement until a start marker is
 encountered.</td>
+</tr>
+</tbody>
+
+<tbody>
+<tr>
+<td class="org-left">data_path</td>
+<td class="org-right">stdout</td>
+<td class="org-left">Write metric data to "&lt;data_path&gt;-&lt;#procs&gt;x&lt;#threads&gt;.txt". Special values are "stdout" and "stderr". Overwrites the file without checking.</td>
+</tr>
+</tbody>
+
+<tbody>
+<tr>
+<td class="org-left">log_path</td>
+<td class="org-right">stdout</td>
+<td class="org-left">Write logging output to "&lt;log_path&gt;.&lt;pid&gt;". Special values are "stdout" and "stderr". Only relevant with verbose=1</td>
 </tr>
 </tbody>
 
