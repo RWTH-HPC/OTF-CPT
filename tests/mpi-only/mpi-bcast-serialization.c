@@ -24,20 +24,18 @@ int main(int argc, char **argv) {
   MPI_Finalize();
 }
 
-
-//CHECK: Parallel Efficiency:                [[PE:0.49]]{{[0-9]+}}
-//CHECK:   Load Balance:                     [[LB:0.99[0-9]+]]
-//CHECK:   Communication Efficiency:         [[CE:0.49]]{{[0-9]+}}
-//CHECK:     Serialisation Efficiency:       [[SE:0.50]]{{[0-9]+}}
-//CHECK:     Transfer Efficiency:            [[TE:0.99]]{{[0-9]+}}
-//CHECK:   MPI Parallel Efficiency:          [[PE]]
-//CHECK:     MPI Load Balance:               [[LB]]
-//CHECK:     MPI Communication Efficiency:   {{0.(49|50)[0-9]+}}
-//CHECK:       MPI Serialisation Efficiency: [[SE]]
-//CHECK:       MPI Transfer Efficiency:      [[TE]]
-//CHECK:   OMP Parallel Efficiency:          {{(0.99[0-9]+|1.00[0-9]+)}}
-//CHECK:     OMP Load Balance:               1.000000
-//CHECK:     OMP Communication Efficiency:   {{(0.99[0-9]+|1.00[0-9]+)}}
-//CHECK:       OMP Serialisation Efficiency: 1.000000
-//CHECK:       OMP Transfer Efficiency:      {{(0.99[0-9]+|1.00[0-9]+)}}
-
+// CHECK: Parallel Efficiency:                [[PE:0.49]]{{[0-9]+}}
+// CHECK:   Load Balance:                     [[LB:0.99[0-9]+]]
+// CHECK:   Communication Efficiency:         [[CE:0.49]]{{[0-9]+}}
+// CHECK:     Serialisation Efficiency:       [[SE:0.50]]{{[0-9]+}}
+// CHECK:     Transfer Efficiency:            [[TE:0.99]]{{[0-9]+}}
+// CHECK:   MPI Parallel Efficiency:          [[PE]]
+// CHECK:     MPI Load Balance:               [[LB]]
+// CHECK:     MPI Communication Efficiency:   {{0.(49|50)[0-9]+}}
+// CHECK:       MPI Serialisation Efficiency: [[SE]]
+// CHECK:       MPI Transfer Efficiency:      [[TE]]
+// CHECK:   OMP Parallel Efficiency:          {{(0.99[0-9]+|1.00[0-9]+)}}
+// CHECK:     OMP Load Balance:               1.000
+// CHECK:     OMP Communication Efficiency:   {{(0.99[0-9]+|1.00[0-9]+)}}
+// CHECK:       OMP Serialisation Efficiency: 1.000
+// CHECK:       OMP Transfer Efficiency:      {{(0.99[0-9]+|1.00[0-9]+)}}
