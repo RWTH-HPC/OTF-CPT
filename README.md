@@ -129,13 +129,13 @@ Prefix and suffix can be chosen freely, the script will only open and parse file
 `-<nprocs>x<nthreads>.`.
 
 In the following example we have five output files, execute the script which renders four graphic files 
-with color codes metric table and scaling plots:
+with color coded metric table and scaling plots:
 ```
-$ ls example
-example-128x12.txt  example-16x12.txt  example-32x12.txt  example-64x12.txt  example-8x12.txt
-$ python3 script/CPT-plot.py example
-$ ls example_*
-example_graph.pdf  example_graph.png  example_metrics.pdf  example_metrics.png
+$ ls script/data
+data-128x12.txt  data-16x12.txt  data-32x12.txt  data-64x12.txt  data-8x12.txt
+$ python3 script/CPT-plot.py script/data
+$ ls data_*
+data_graph.pdf  data_graph.png  data_metrics.pdf  data_metrics.png
 ```
 
 
