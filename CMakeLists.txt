@@ -94,11 +94,11 @@ target_compile_definitions(OTFCPT_static PUBLIC -DUSE_MPI=1)
 target_link_options(OTFCPT_static PUBLIC -fno-rtti -fno-exceptions -nostdlib++ -Wl,--gc-sections)
 target_compile_options(OTFCPT_static PUBLIC -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections)
 
-add_subdirectory(tests)
-
 if (EXISTS ${CMAKE_CURRENT_LIST_DIR}/external/FileCheck/CMakeLists.txt)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/external/FileCheck EXCLUDE_FROM_ALL)
 endif()
+
+add_subdirectory(tests)
 
 
 install(TARGETS 
