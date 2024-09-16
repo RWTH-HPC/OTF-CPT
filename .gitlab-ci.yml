@@ -1,0 +1,143 @@
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    - if: '$CI_COMMIT_BRANCH'
+
+stages:
+  - build
+  - test
+#  - compliance
+
+
+#TODO: enable when clang format file has been added
+.formatting:
+  stage: compliance
+  needs: []
+  image: ubuntu:24.04
+  before_script:
+    - export DEBIAN_FRONTEND=noninteractive
+    - apt-get update
+    - apt-get install -y --no-install-recommends git clang-format
+  script:
+    - git clang-format --verbose --diff ${CI_MERGE_REQUEST_DIFF_BASE_SHA}
+
+
+.debian-based:
+  parallel:
+    matrix:
+       - MPI: [ mpich, openmpi ]
+  needs: []
+  variables:
+    CMAKE_BUILD_TYPE: Debug
+    OMPI_ALLOW_RUN_AS_ROOT: "1"
+    OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: "1"
+    OMPI_MCA_mpi_yield_when_idle: "1"
+    OMPI_MCA_rmaps_base_oversubscribe: "1"
+  before_script:
+    - export DEBIAN_FRONTEND=noninteractive
+    - apt-get update
+    - >-
+      apt-get install -y --no-install-recommends
+      gcc
+      g++
+      gfortran 
+      cmake 
+      make
+      libopenmpi-dev
+      libmpich-dev
+      git
+      python3
+      libxml2-dev
+      clang
+      libomp-dev
+      llvm-14-tools
+  script:
+    - export PATH=$PATH:/usr/lib/llvm-14/bin
+    - export MPICH_CC=clang MPICH_CXX=clang++
+    - export OMPI_CC=clang OMPI_CXX=clang++
+    - >-
+      cmake -S ./ -B build -DCMAKE_C_COMPILER=mpicc.${MPI} -DCMAKE_CXX_COMPILER=mpicxx.${MPI}
+    - cmake --build build
+    - ldd build/libOTFCPT.so | grep -q "libstdc++" && echo -e "\e[1;31mFound libstdc++ dependency, failure\e[0m" && exit 1
+    - cmake --install build
+    - EXIT_CODE=0
+    - cmake --build build -- check || EXIT_CODE=$?
+    - exit $EXIT_CODE
+  artifacts:
+    reports:
+      junit: build/tests/check.xunit.xml
+
+ubuntu:
+  stage: test
+  image: ubuntu:24.04
+  extends: .debian-based
+  variables:
+    MPIEXEC: mpiexec.openmpi # TODO: Change to ${MPI} when Ubuntu's mpich hydra launcher is fixed
+    LDFLAGS: "-flto=auto"
+
+debian:
+  stage: test
+  image: debian:12
+  extends: .debian-based
+  variables:
+    MPIEXEC: mpiexec.${MPI}
+
+.cluster-template:
+    tags: 
+      - "unstable"
+    variables:
+      SLURM_CPUS_PER_TASK: "4"
+      SRUN_CPUS_PER_TASK: "4"
+      SLURM_ACCOUNT: "rwth1282" 
+      SLURM_PARTITION: "c23ms" 
+      SLURM_TIME: "15" 
+    before_script:
+      - module purge
+      - module load "${TOOLCHAIN}/${VERSION}"
+      - >-
+        if [[ "${COMPILER}" == *"Clang"* ]]; then
+          module load Clang
+          export CC=clang CXX=clang++
+          export OMPI_CC=clang OMPI_CXX=clang++
+          export MPICH_CC=clang MPICH_CXX=clang++
+        fi
+      - >-
+        if [[ "${USE_ONEAPI}" == "1" ]]; then
+          export CC=icx CXX=icpx
+          export I_MPI_CC=icx I_MPI_CXX=icpx
+        fi
+    parallel:
+      matrix:
+        - TOOLCHAIN: ["iimpi"]
+          VERSION: ["2022a", "2022b", "2023a", "2023b", "2024a"]
+          COMPILER: [""]
+          USE_ONEAPI: ["0", "1"]
+        - TOOLCHAIN: ["iimpi"]
+          VERSION: ["2020b", "2021b", "2022a", "2022b", "2023a", "2023b"]
+          COMPILER: ["Clang"]
+        - TOOLCHAIN: ["gompi"]
+          VERSION: ["2020b", "2021b", "2022a", "2022b", "2023a", "2023b"]
+          COMPILER: ["Clang"]
+
+cluster-build:
+    stage: build
+    extends: .cluster-template
+    script:
+      - mkdir build
+      - cmake -S ./ -B build -DCMAKE_INSTALL_PREFIX=$PWD/install -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - cmake --build build
+      - ldd build/libOTFCPT.so | grep -q "libstdc++" && echo -e "\e[1;31mFound libstdc++ dependency, failure\e[0m" && exit 1
+      - cmake --install build
+
+cluster:
+    stage: test
+    extends: .cluster-template
+    script:
+      - !reference [cluster-build, script]
+      - cmake --build build -- check
+    artifacts:
+      reports:
+        junit: build/tests/check.xunit.xml
