@@ -3,7 +3,7 @@
 
 Tool to collect and report model factors (aka. fundamental performance factors) for hybrid MPI + OpenMP applications on-the-fly.
 
-## Build with CMake
+## Building with CMake
 The C/C++ compiler needs to support OMPT (which is provided by icc/clang and others, but not gcc)
 ### Basic Cmake
 ```
@@ -13,7 +13,7 @@ cmake ../
 make -j8
 ```
 
-### Cmake with Clang
+### Building with Clang
 To use clang with IntelMPI/OpenMPI/MPICH, export the following env variables first:
 ```
 export MPICH_CC=clang; export MPICH_CXX=clang++;
@@ -24,7 +24,17 @@ cmake ../
 make -j8
 ```
 
-### Cmake with MPICH + Clang on Ubuntu
+### Using libc++ with Clang-based compilers
+For broad compatibility with applications and libraries built with mixed
+compiler setups (e.g. gfortran + clang++), OTF-CPT tries to avoid dependency 
+to a C++ runtime library. If GNU C++ headers are available, they are 
+preferred for building OTF-CPT (which is also the default). 
+
+If no GNU C++ headers are available, OTF-CPT can be built by explicitly using
+LLVM's C++ runtime library (libc++) by configuring OTF-CPT with the cmake
+flag `-DOTFCPT_USE_LLVM_LIBCPP=ON`.
+
+### Building with MPICH + Clang on Ubuntu
 The MPICH compiler wrapper on Ubuntu bricks MPI detection in cmake, work-around as following:
 ```
 export MPICH_CC=clang; export MPICH_CXX=clang++;
@@ -34,7 +44,7 @@ CC=mpicc.mpich CXX=mpicxx.mpich LDFLAGS=-flto=auto cmake ../
 make -j8
 ```
 
-### Cmake with OpenMPI + Clang on Ubuntu
+### Building with OpenMPI + Clang on Ubuntu
 ```
 export OMPI_CC=clang; export OMPI_CXX=clang++;
 mkdir BUILD
