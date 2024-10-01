@@ -106,3 +106,5 @@ install(TARGETS
         OTFCPT_omp
         OTFCPT_static
         )
+
+install (PROGRAMS script/CPT-plot.py DESTINATION bin)
