@@ -7,7 +7,6 @@ SET(CMAKE_MODULE_PATH
     ${CMAKE_MODULE_PATH}
     )
 
-
 find_package(MPI REQUIRED)
 find_package(OpenMP REQUIRED)
 
@@ -73,21 +72,27 @@ set(OTFCPT_OMP_SOURCES
     parse_flags.cpp
 )
 
+list(APPEND GnuCompatible "Clang" "IntelLLVM" "GNU")
+list(APPEND ClangCompatible "Clang" "IntelLLVM")
+if ("${CMAKE_CXX_COMPILER_ID}" IN_LIST GnuCompatible)
+  set(STDCPLUS_COMPILE_FLAGS -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections)
+  set(STDCPLUS_LINK_FLAGS -fno-rtti -fno-exceptions -fno-rtti -fno-exceptions -nostdlib++ -Wl,--gc-sections)
 
-set(STDCPLUS_COMPILE_FLAGS -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections)
-set(STDCPLUS_LINK_FLAGS -fno-rtti -fno-exceptions -fno-rtti -fno-exceptions -nostdlib++ -Wl,--gc-sections)
-
-if (CMAKE_C_COMPILER_ID STREQUAL "Clang")
-  option(OTFCPT_USE_LLVM_LIBCPP "Use LLVM libc++, which might reduce portability." OFF)
-  if(OTFCPT_USE_LLVM_LIBCPP)
-    message(STATUS "Building with LLVM libc++ was requested, which might limit portability and compatibility with application/library code compiled with gcc.")
-    set(STDCPLUS_COMPILE_FLAGS -stdlib=libc++)
-    set(STDCPLUS_LINK_FLAGS -stdlib=libc++)
-  else()
-    message(STATUS "For portability, OTF-CPT is built without dependency to a C++ runtime library")
-    set(STDCPLUS_COMPILE_FLAGS ${STDCPLUS_COMPILE_FLAGS} -stdlib=libstdc++)
-    set(STDCPLUS_LINK_FLAGS ${STDCPLUS_LINK_FLAGS} -stdlib=libstdc++)
-  endif()
+  if ("${CMAKE_CXX_COMPILER_ID}" IN_LIST ClangCompatible)
+    option(OTFCPT_USE_LLVM_LIBCPP "Use LLVM libc++, which might reduce portability." OFF)
+    if (OTFCPT_USE_LLVM_LIBCPP)
+      message(STATUS "Building with LLVM libc++ was requested, which might limit portability and compatibility with application/library code compiled with gcc.")
+      set(STDCPLUS_COMPILE_FLAGS -stdlib=libc++)
+      set(STDCPLUS_LINK_FLAGS -stdlib=libc++)
+    else ()
+      message(STATUS "For portability, OTF-CPT is built without dependency to a C++ runtime library")
+      set(STDCPLUS_COMPILE_FLAGS ${STDCPLUS_COMPILE_FLAGS} -stdlib=libstdc++)
+      set(STDCPLUS_LINK_FLAGS ${STDCPLUS_LINK_FLAGS} -stdlib=libstdc++)
+    endif ()
+  endif ()
+endif ()
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+  set(STDCPLUS_COMPILE_FLAGS -fno-exceptions)
 endif ()
 
 set(WRAP_FLAGS -s -n)

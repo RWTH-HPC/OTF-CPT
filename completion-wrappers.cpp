@@ -7,8 +7,10 @@
 
 /* Start & Completion */
 
+#if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvla-cxx-extension"
+#endif
 
 _EXTERN_C_ int MPI_Start(MPI_Request *request) {
   mpiTimer mt{false, __func__};
@@ -227,4 +229,6 @@ _EXTERN_C_ int MPI_Testsome(int incount, MPI_Request array_of_requests[],
   }
   return ret;
 }
+#if defined(__clang__)
 #pragma clang diagnostic pop
+#endif
