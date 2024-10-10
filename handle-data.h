@@ -108,13 +108,9 @@ public:
   void *operator new(size_t size, void *ptr) { return ptr; }
 
 private:
-  void *operator new(size_t size) {
-    static_assert(false, "operator new must never be called directly");
-    return malloc(size);
-  }
-  void operator delete(void *p) {
-    static_assert(false, "operator delete must never be called directly");
-  }
+  // operator new/delete must never be called directly
+  void *operator new(size_t size) = delete;
+  void operator delete(void *p) = delete;
 };
 
 class alignas(64) CommData {

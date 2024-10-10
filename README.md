@@ -82,7 +82,7 @@ runtime options are exported as a space separated string assigned to
 
 E.g.:
 ```
-export OTFCPT_OPTIONS="verbose=1 start_stopped=1 help=1"
+export OTFCPT_OPTIONS="verbose=1 stopped=1 help=1"
 ```
 
 <table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
