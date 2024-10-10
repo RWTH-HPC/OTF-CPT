@@ -511,13 +511,6 @@ static void ompt_tsan_parallel_end(ompt_data_t *parallel_data,
   thread_local_clock->Start(CLOCK_OMP, "ParallelEnd");
 
   Data->Delete();
-
-#if (LLVM_VERSION >= 40)
-  if (&__archer_get_omp_status) {
-    if (__archer_get_omp_status() == 0 && analysis_flags->flush_shadow)
-      __tsan_flush_memory();
-  }
-#endif
 }
 
 static void ompt_tsan_implicit_task(ompt_scope_endpoint_t endpoint,
