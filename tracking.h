@@ -106,7 +106,7 @@ public:
   virtual M &getHandle(M &handle) = 0;
   virtual M &getHandleLocked(M &handle) = 0;
   virtual std::shared_lock<std::shared_mutex> getSharedLock() = 0;
-  virtual ~AbstractHandleFactory<M, T, E>(){};
+  virtual ~AbstractHandleFactory(){};
   virtual void initPredefined() {
     predefHandles[T::nullHandle].init(T::nullHandle);
   }
@@ -243,7 +243,7 @@ public:
   std::shared_lock<std::shared_mutex> getSharedLock() {
     return std::shared_lock<std::shared_mutex>{DummyMutex, std::defer_lock};
   }
-  virtual ~HandleFactory<M, T, MI *, E>() {}
+  virtual ~HandleFactory() {}
 };
 
 // Specialized template of RequestFactory for pointer-type handles
@@ -400,7 +400,7 @@ public:
   std::shared_lock<std::shared_mutex> getSharedLock() {
     return std::shared_lock<std::shared_mutex>{DTMutex};
   }
-  virtual ~HandleFactory<M, T, int, E>() {}
+  virtual ~HandleFactory() {}
 };
 
 // Specialized template of RequestFactory for int-type handles
