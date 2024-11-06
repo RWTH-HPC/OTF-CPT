@@ -460,11 +460,6 @@ struct mpiMprobePB {
     if (!*flag)
       return;
     auto rData = rf.newData();
-    *message = mf.newHandle(*message, rData);
-#if OnlyActivePB
-    if (!analysis_flags->running)
-      return;
-#endif
     cData = cf.findData(comm);
     rank = cData->getRank();
     uc = rData->uc_double;
@@ -473,6 +468,11 @@ struct mpiMprobePB {
       tag = pStatus->MPI_TAG;
     }
     rData->init(rData->handle, MPROBE, src, tag, cData);
+    *message = mf.newHandle(*message, rData);
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
     PMPI_Irecv(uc, 1, ipcData::ipcMpiType, src, tag, cData->getDupComm(),
                rData->pb_reqs);
   }

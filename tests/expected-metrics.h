@@ -47,6 +47,11 @@ static void printMetrics(struct metrics m) {
   printM(OTE);
 }
 
+void printmetrics_(int* olb, int* ose, int* ote, int* mlb, int* mse, int* mte){
+  metrics m = {*olb, *ose, *ote, *mlb, *mse, *mte};
+  printMetrics(m);
+}
+
 // These check lines assure that the metric values calculated and reported
 // by the tool are within error boundaries around the expected values.
 // With FileCheck we can only match for exact numbers. So, the approach is:

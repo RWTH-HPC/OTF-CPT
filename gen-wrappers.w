@@ -16,7 +16,6 @@
 
   if (analysis_flags->verbose)
      printf("MPI Init\n");
-
    {{ret_val}} = P{{fn_name}}({{args}});
 
 #ifdef USE_ERRHANDLER
