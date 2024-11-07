@@ -20,7 +20,7 @@ export MPICH_CC=clang; export MPICH_CXX=clang++;
 export OMPI_CC=clang; export OMPI_CXX=clang++;
 mkdir BUILD
 cd BUILD
-cmake ../
+CC=clang CXX=clang++ cmake ../
 make -j8
 ```
 
