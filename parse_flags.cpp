@@ -155,7 +155,7 @@ FlagParser::FlagParser() : n_flags_(0), buf_(nullptr), pos_(0) {
   flags_ = (Flag *)malloc(sizeof(Flag) * kMaxFlags);
 }
 
-OtfcptFlags __otfcpt::otfcpt_flags_dont_use;
+OtfcptFlags *__otfcpt::otfcpt_flags_dont_use{nullptr};
 const char *__otfcpt::SanitizerToolName = "OFTCPT";
 std::atomic<uint32_t> __otfcpt::current_verbosity{0};
 
@@ -181,11 +181,9 @@ SANITIZER_INTERFACE_WEAK_DEF(const char *, __otfcpt_default_options, void) {
 }
 
 void __otfcpt::InitializeOtfcptFlags() {
-  static bool initOnce{false};
-  if (initOnce)
+  if (__otfcpt::otfcpt_flags_dont_use)
     return;
-  initOnce = true;
-  OtfcptFlags *f = get_otfcpt_flags();
+  OtfcptFlags *f = __otfcpt::otfcpt_flags_dont_use = new OtfcptFlags;
   f->SetDefaults();
 
   FlagParser parser;

@@ -374,13 +374,21 @@ struct OtfcptFlags {
 
   void SetDefaults();
   void CopyFrom(const OtfcptFlags &other);
+
+  void *operator new(size_t size) { return malloc(size); }
+
+  void operator delete(void *p) { free(p); }
 };
 
-extern OtfcptFlags otfcpt_flags_dont_use;
-
-inline OtfcptFlags *get_otfcpt_flags() { return &otfcpt_flags_dont_use; }
+extern OtfcptFlags *otfcpt_flags_dont_use;
 
 void InitializeOtfcptFlags();
+
+inline OtfcptFlags *get_otfcpt_flags() {
+  if (!otfcpt_flags_dont_use)
+    InitializeOtfcptFlags();
+  return otfcpt_flags_dont_use;
+}
 
 } // namespace __otfcpt
 
