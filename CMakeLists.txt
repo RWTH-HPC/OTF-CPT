@@ -7,6 +7,7 @@ SET(CMAKE_MODULE_PATH
     ${CMAKE_MODULE_PATH}
     )
 
+set(MPI_CXX_SKIP_MPICXX TRUE)
 find_package(MPI REQUIRED)
 find_package(OpenMP REQUIRED)
 
@@ -76,7 +77,7 @@ list(APPEND GnuCompatible "Clang" "IntelLLVM" "GNU")
 list(APPEND ClangCompatible "Clang" "IntelLLVM")
 if ("${CMAKE_CXX_COMPILER_ID}" IN_LIST GnuCompatible)
   set(STDCPLUS_COMPILE_FLAGS -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections)
-  set(STDCPLUS_LINK_FLAGS -fno-rtti -fno-exceptions -fno-rtti -fno-exceptions -nostdlib++ -Wl,--gc-sections)
+  set(STDCPLUS_LINK_FLAGS -fno-rtti -fno-exceptions -nostdlib++ -Wl,--gc-sections)
 
   if ("${CMAKE_CXX_COMPILER_ID}" IN_LIST ClangCompatible)
     option(OTFCPT_USE_LLVM_LIBCPP "Use LLVM libc++, which might reduce portability." OFF)
@@ -100,7 +101,7 @@ add_wrapped_file(gen-nb-wrappers.cpp gen-nb-wrappers.w)
 add_wrapped_file(gen-wrappers.cpp gen-wrappers.w)
 
 add_library(OTFCPT SHARED ${OTFCPT_SOURCES})
-target_link_libraries(OTFCPT ${MPI_C_LIBRARIES})
+target_link_libraries(OTFCPT PUBLIC MPI::MPI_CXX)
 target_compile_definitions(OTFCPT PUBLIC -DUSE_MPI=1)
 target_link_options(OTFCPT PUBLIC ${STDCPLUS_LINK_FLAGS})
 target_compile_options(OTFCPT PUBLIC ${STDCPLUS_COMPILE_FLAGS})
@@ -110,7 +111,7 @@ target_link_options(OTFCPT_omp PUBLIC ${STDCPLUS_LINK_FLAGS})
 target_compile_options(OTFCPT_omp PUBLIC ${STDCPLUS_COMPILE_FLAGS})
 
 add_library(OTFCPT_static STATIC ${OTFCPT_SOURCES})
-target_link_libraries(OTFCPT_static ${MPI_C_LIBRARIES})
+target_link_libraries(OTFCPT_static PUBLIC MPI::MPI_CXX)
 target_compile_definitions(OTFCPT_static PUBLIC -DUSE_MPI=1)
 target_link_options(OTFCPT_static PUBLIC ${STDCPLUS_LINK_FLAGS})
 target_compile_options(OTFCPT_static PUBLIC ${STDCPLUS_COMPILE_FLAGS})

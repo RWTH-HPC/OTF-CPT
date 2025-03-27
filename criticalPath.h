@@ -10,7 +10,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <inttypes.h>
-#include <mutex>
 #include <sys/resource.h>
 #include <unistd.h>
 

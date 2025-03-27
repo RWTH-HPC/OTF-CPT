@@ -206,6 +206,10 @@ protected:
     uptr num_symbols_should_write = snprintf(buffer, size, "%s", str_to_use);
     return num_symbols_should_write < size;
   }
+
+  void *operator new(size_t size) { return malloc(size); }
+
+  void operator delete(void *p) { free(p); }
 };
 
 template <typename T> class FlagHandler final : public FlagHandlerBase {
