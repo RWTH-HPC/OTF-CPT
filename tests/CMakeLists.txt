@@ -44,6 +44,13 @@ if(NOT FileCheck_FOUND)
 set(OTFCPT_Test_avail FALSE)
 endif()
 
+include_directories(./)
+
+set(OTFCPT_TEST_UB 1.01 CACHE STRING "Sets an upper bound for the relative error.")
+set(OTFCPT_TEST_LB 0.95 CACHE STRING "Sets a lower bound for the relative error.")
+
+add_compile_definitions(UB_FAK=${OTFCPT_TEST_UB} LB_FAK=${OTFCPT_TEST_LB})
+
 add_custom_target(build-tests)
 add_custom_target(build-mpi-only-tests)
 add_custom_target(build-omp-only-tests)

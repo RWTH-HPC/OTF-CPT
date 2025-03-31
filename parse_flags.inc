@@ -19,6 +19,8 @@ PARSE_FLAG(bool, report_data_leak, false, "Report tool internal data leaks.")
 
 PARSE_FLAG(bool, stopped, false, "Delay start of measurement.")
 
+PARSE_FLAG(bool, dump_on_stop, false, "Print output on stop.")
+
 PARSE_FLAG(bool, barrier, false,
            "Synchronize start of measurement with an MPI_Barrier.")
 
@@ -33,6 +35,8 @@ PARSE_FLAG(bool, stacktrace, false,
 #endif
 
 PARSE_FLAG(bool, abort_on_error, false, "Abort instead of exit on error.")
+
+PARSE_FLAG(int, metric_factor, 1, "Factor for metric output.")
 
 PARSE_FLAG(int, exitcode, 23, "Exit code for errors.")
 

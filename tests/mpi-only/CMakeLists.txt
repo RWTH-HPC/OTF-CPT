@@ -10,7 +10,6 @@ set(mpiOnlyTests
     mpi-bcast-serialization
 )
 
-
 FOREACH(tests ${mpiOnlyTests})
     add_executable(${tests}.c.tmp ${tests}.c)
     target_link_libraries(${tests}.c.tmp OTFCPT)
