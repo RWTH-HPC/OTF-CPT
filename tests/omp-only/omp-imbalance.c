@@ -23,10 +23,10 @@ int main(int argc, char **argv) {
 {
     int tid = omp_get_thread_num();
 #pragma omp for schedule(static, 1) reduction(+:sum)
-  for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 12; i++) {
       sum += i;
-      usleep(10000 * (1 + 2*tid));
-  }
+      usleep(WORK * (1 + 2 * tid));
+    }
 }
 omp_control_tool(omp_control_tool_end, 0, NULL);
 printf("sum = %i\n", sum);

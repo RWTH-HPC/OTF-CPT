@@ -8,6 +8,7 @@ SET(CMAKE_MODULE_PATH
     )
 
 set(MPI_CXX_SKIP_MPICXX TRUE)
+
 find_package(MPI REQUIRED)
 find_package(OpenMP REQUIRED)
 
@@ -94,6 +95,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" IN_LIST GnuCompatible)
 endif ()
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   set(STDCPLUS_COMPILE_FLAGS -fno-exceptions)
+  set(STDCPLUS_LINK_FLAGS -cxxlib-nostd)
 endif ()
 
 set(WRAP_FLAGS -s -n)
@@ -103,11 +105,11 @@ add_wrapped_file(gen-wrappers.cpp gen-wrappers.w)
 add_library(OTFCPT SHARED ${OTFCPT_SOURCES})
 target_link_libraries(OTFCPT PUBLIC MPI::MPI_CXX)
 target_compile_definitions(OTFCPT PUBLIC -DUSE_MPI=1)
-target_link_options(OTFCPT PUBLIC ${STDCPLUS_LINK_FLAGS})
+target_link_options(OTFCPT PUBLIC ${STDCPLUS_LINK_FLAGS} "LINKER:-as-needed")
 target_compile_options(OTFCPT PUBLIC ${STDCPLUS_COMPILE_FLAGS})
 
 add_library(OTFCPT_omp SHARED ${OTFCPT_OMP_SOURCES})
-target_link_options(OTFCPT_omp PUBLIC ${STDCPLUS_LINK_FLAGS})
+target_link_options(OTFCPT_omp PUBLIC ${STDCPLUS_LINK_FLAGS} "LINKER:-as-needed")
 target_compile_options(OTFCPT_omp PUBLIC ${STDCPLUS_COMPILE_FLAGS})
 
 add_library(OTFCPT_static STATIC ${OTFCPT_SOURCES})

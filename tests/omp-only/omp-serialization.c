@@ -21,13 +21,11 @@ int main(int argc, char **argv) {
   omp_control_tool(omp_control_tool_start, 0, NULL);
 #pragma omp parallel for ordered schedule(static, 1)
   for (int i = 0; i < nt; i++) {
-    // usleep(20000);
 #pragma omp ordered
     {
       sum += i;
-      usleep(250000);
+      usleep(2 * WORK);
     }
-    // usleep(20000);
   }
   omp_control_tool(omp_control_tool_end, 0, NULL);
   printf("sum = %i\n", sum);

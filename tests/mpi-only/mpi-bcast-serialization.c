@@ -21,12 +21,12 @@ int main(int argc, char **argv) {
   }
   MPI_Pcontrol(1);
   if (rank == 0)
-    usleep(100000);
+    usleep(WORK);
 
   MPI_Bcast(&sum, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
   if (rank > 0)
-    usleep(100000);
+    usleep(WORK);
   MPI_Pcontrol(0);
 
   MPI_Finalize();

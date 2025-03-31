@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
   if (rank > 0)
     MPI_Recv(&sum, 1, MPI_INT, rank - 1, 42, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-  usleep(100000);
+  usleep(WORK);
 
   if (rank < size - 1)
     MPI_Send(&sum, 1, MPI_INT, rank + 1, 42, MPI_COMM_WORLD);

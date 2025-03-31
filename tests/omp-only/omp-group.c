@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
 #pragma omp task
       {
         printf("Thread %i executing Task %i\n", omp_get_thread_num(), i);
-        usleep(100000 * (1 + i));
+        usleep(WORK * (1 + i));
       }
     }
   }

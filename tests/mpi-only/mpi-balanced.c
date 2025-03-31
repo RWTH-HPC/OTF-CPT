@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
   }
 
   MPI_Pcontrol(1);
-  usleep(100000);
+  usleep(WORK);
   MPI_Pcontrol(0);
   MPI_Finalize();
 }

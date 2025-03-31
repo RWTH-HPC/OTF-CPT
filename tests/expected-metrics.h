@@ -9,6 +9,10 @@ typedef struct metrics {
   int MTE;
 } metrics;
 
+#ifndef WORK
+#define WORK 100000
+#endif
+
 #define printC(m)                                                              \
   printf("Expected %i < " #m " < %i\n", (int)(m * LB_FAK), (int)(m * UB_FAK)); \
   printf("Expected %i < " #m " < %i\n", (int)(m * LB_FAK), (int)(m * UB_FAK))

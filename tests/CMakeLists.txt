@@ -48,8 +48,9 @@ include_directories(./)
 
 set(OTFCPT_TEST_UB 1.01 CACHE STRING "Sets an upper bound for the relative error.")
 set(OTFCPT_TEST_LB 0.95 CACHE STRING "Sets a lower bound for the relative error.")
+set(OTFCPT_TEST_WORK 100000 CACHE STRING "Sets the time in micro seconds used to emulate work.")
 
-add_compile_definitions(UB_FAK=${OTFCPT_TEST_UB} LB_FAK=${OTFCPT_TEST_LB})
+add_compile_definitions(UB_FAK=${OTFCPT_TEST_UB} LB_FAK=${OTFCPT_TEST_LB} WORK=${OTFCPT_TEST_WORK})
 
 add_custom_target(build-tests)
 add_custom_target(build-mpi-only-tests)
