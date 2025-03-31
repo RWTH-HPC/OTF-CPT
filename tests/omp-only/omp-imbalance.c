@@ -1,19 +1,24 @@
 // ALLOW_RETRIES: 1
-// RUN: env OMP_NUM_THREADS=2 %load_otfcpt %t | %FileCheck \
-// RUN: --check-prefixes=CHECK2,CHECK %s
-// RUN: env OMP_NUM_THREADS=4 %load_otfcpt %t | %FileCheck \
-// RUN: --check-prefixes=CHECK4,CHECK %s
-// RUN: env OMP_NUM_THREADS=2 %load_otfcpt_omp %t | %FileCheck \
-// RUN: --check-prefixes=CHECK2,CHECK %s
-// RUN: env OMP_NUM_THREADS=4 %load_otfcpt_omp %t | %FileCheck \
-// RUN: --check-prefixes=CHECK4,CHECK %s
+// RUN: env OMP_NUM_THREADS=2 %load_otfcpt %otfcpt_options_dump_stopped \
+// RUN: %t | %FileCheck --check-prefixes=CHECK2,CHECK %metricfile
+// RUN: env OMP_NUM_THREADS=4 %load_otfcpt %otfcpt_options_dump_stopped \
+// RUN: %t | %FileCheck --check-prefixes=CHECK4,CHECK %metricfile
+// RUN: env OMP_NUM_THREADS=2 %load_otfcpt_omp %otfcpt_options_dump_stopped \
+// RUN: %t | %FileCheck --check-prefixes=CHECK2,CHECK %metricfile
+// RUN: env OMP_NUM_THREADS=4 %load_otfcpt_omp %otfcpt_options_dump_stopped \
+// RUN: %t | %FileCheck --check-prefixes=CHECK4,CHECK %metricfile
 
 #include <omp.h>
 #include <stdio.h>
 #include <unistd.h>
 
+#include "expected-metrics.h"
+
 int main(int argc, char **argv) {
   int sum = 0, nt = omp_get_max_threads();
+  metrics m = {1000 * nt / (2 * nt - 1), 1000, 1000, 1000, 1000, 1000};
+  printMetrics(m);
+  omp_control_tool(omp_control_tool_start, 0, NULL);
 #pragma omp parallel 
 {
     int tid = omp_get_thread_num();
@@ -23,7 +28,8 @@ int main(int argc, char **argv) {
       usleep(10000 * (1 + 2*tid));
   }
 }
-  printf("sum = %i\n", sum);
+omp_control_tool(omp_control_tool_end, 0, NULL);
+printf("sum = %i\n", sum);
 }
 
 // CHECK2: Parallel Efficiency:                [[PE:0.6[67][0-9]+]]

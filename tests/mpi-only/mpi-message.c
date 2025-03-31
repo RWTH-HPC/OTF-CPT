@@ -1,18 +1,23 @@
 // ALLOW_RETRIES: 1
-// RUN: %mpirunnp 2 %load_otfcpt %otfcpt_options_stopped %t | \
-// RUN: %FileCheck --check-prefixes=CHECK2,CHECK %s
-// RUN: %mpirunnp 4 %load_otfcpt %otfcpt_options_stopped %t | \
-// RUN: %FileCheck --check-prefixes=CHECK4,CHECK %s
+// RUN: %mpirunnp 2 %load_otfcpt %otfcpt_options_dump_stopped %t | \
+// RUN: %FileCheck --check-prefixes=CHECK2,CHECK %metricfile
+// RUN: %mpirunnp 4 %load_otfcpt %otfcpt_options_dump_stopped %t | \
+// RUN: %FileCheck --check-prefixes=CHECK4,CHECK %metricfile
 
 #include <mpi.h>
-#include <stdio.h>
 #include <unistd.h>
+
+#include "expected-metrics.h"
 
 int main(int argc, char **argv) {
   int sum = 0, rank, size;
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
+  metrics m = {1000, 1000, 1000, 1000, 1000 / size, 1000};
+  if (rank == 0) {
+    printMetrics(m);
+  }
   MPI_Pcontrol(1);
 
   if (rank > 0) {

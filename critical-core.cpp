@@ -153,6 +153,10 @@ void stopMeasurement(double time) { endProgrammTime = time; }
 #define NUM_SHARED_METRICS 7
 
 void finishMeasurement() {
+  static int finished = 0;
+  if (finished)
+    return;
+  finished = 1;
   int number_of_procs = 1;
   int total_threads = 0;
   int num_threads = 0;
@@ -387,21 +391,36 @@ void finishMeasurement() {
     }
 
     fprintf(of, "\n----------------POP metrics----------------\n");
-    fprintf(of, "Parallel Efficiency:                %6.3lf\n", PE);
-    fprintf(of, "  Load Balance:                     %6.3lf\n", LB);
-    fprintf(of, "  Communication Efficiency:         %6.3lf\n", CommE);
-    fprintf(of, "    Serialisation Efficiency:       %6.3lf\n", SerE);
-    fprintf(of, "    Transfer Efficiency:            %6.3lf\n", TE);
-    fprintf(of, "  MPI Parallel Efficiency:          %6.3lf\n", mpiPE);
-    fprintf(of, "    MPI Load Balance:               %6.3lf\n", mpiLB);
-    fprintf(of, "    MPI Communication Efficiency:   %6.3lf\n", mpiCommE);
-    fprintf(of, "      MPI Serialisation Efficiency: %6.3lf\n", mpiSerE);
-    fprintf(of, "      MPI Transfer Efficiency:      %6.3lf\n", mpiTE);
-    fprintf(of, "  OMP Parallel Efficiency:          %6.3lf\n", ompPE);
-    fprintf(of, "    OMP Load Balance:               %6.3lf\n", ompLB);
-    fprintf(of, "    OMP Communication Efficiency:   %6.3lf\n", ompCommE);
-    fprintf(of, "      OMP Serialisation Efficiency: %6.3lf\n", ompSerE);
-    fprintf(of, "      OMP Transfer Efficiency:      %6.3lf\n", ompTE);
+    fprintf(of, "Parallel Efficiency:                %6.3lf\n",
+            PE * analysis_flags->metric_factor);
+    fprintf(of, "  Load Balance:                     %6.3lf\n",
+            LB * analysis_flags->metric_factor);
+    fprintf(of, "  Communication Efficiency:         %6.3lf\n",
+            CommE * analysis_flags->metric_factor);
+    fprintf(of, "    Serialisation Efficiency:       %6.3lf\n",
+            SerE * analysis_flags->metric_factor);
+    fprintf(of, "    Transfer Efficiency:            %6.3lf\n",
+            TE * analysis_flags->metric_factor);
+    fprintf(of, "  MPI Parallel Efficiency:          %6.3lf\n",
+            mpiPE * analysis_flags->metric_factor);
+    fprintf(of, "    MPI Load Balance:               %6.3lf\n",
+            mpiLB * analysis_flags->metric_factor);
+    fprintf(of, "    MPI Communication Efficiency:   %6.3lf\n",
+            mpiCommE * analysis_flags->metric_factor);
+    fprintf(of, "      MPI Serialisation Efficiency: %6.3lf\n",
+            mpiSerE * analysis_flags->metric_factor);
+    fprintf(of, "      MPI Transfer Efficiency:      %6.3lf\n",
+            mpiTE * analysis_flags->metric_factor);
+    fprintf(of, "  OMP Parallel Efficiency:          %6.3lf\n",
+            ompPE * analysis_flags->metric_factor);
+    fprintf(of, "    OMP Load Balance:               %6.3lf\n",
+            ompLB * analysis_flags->metric_factor);
+    fprintf(of, "    OMP Communication Efficiency:   %6.3lf\n",
+            ompCommE * analysis_flags->metric_factor);
+    fprintf(of, "      OMP Serialisation Efficiency: %6.3lf\n",
+            ompSerE * analysis_flags->metric_factor);
+    fprintf(of, "      OMP Transfer Efficiency:      %6.3lf\n",
+            ompTE * analysis_flags->metric_factor);
     fprintf(of, "-------------------------------------------\n");
     if (openedFile) {
       fclose(of);
@@ -494,6 +513,13 @@ void startTool(bool toolControl, ClockContext cc) {
     assert(thread_local_clock->outsideomp_critical_nooffset == 0);
     assert(thread_local_clock->outsideomp_proc == 0);
 
+#if 0 && defined(USE_MPI)
+    if (useMpi) {
+      if (analysis_flags->barrier) {
+        PMPI_Barrier(MPI_COMM_WORLD);
+      }
+    }
+#endif
     if (analysis_flags->verbose)
       fprintf(analysis_flags->output, "starting tool\n");
     double time = getTime();
@@ -504,6 +530,13 @@ void startTool(bool toolControl, ClockContext cc) {
 }
 
 void stopTool() {
+#if 0 && defined(USE_MPI)
+  if (useMpi) {
+    if (analysis_flags->barrier) {
+      PMPI_Barrier(MPI_COMM_WORLD);
+    }
+  }
+#endif
   if (analysis_flags->running) {
     if (analysis_flags->verbose)
       fprintf(analysis_flags->output, "ending tool\n");
@@ -511,5 +544,8 @@ void stopTool() {
     thread_local_clock->Stop(time, CLOCK_ALL, __func__);
     analysis_flags->running = false;
     stopMeasurement(time);
+  }
+  if (analysis_flags->dump_on_stop) {
+    finishMeasurement();
   }
 }
