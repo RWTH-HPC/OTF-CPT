@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
     MPI_Imrecv(&sum, 1, MPI_INT, &msg, &req);
     MPI_Wait(&req, MPI_STATUS_IGNORE);
   }
-  usleep(20000);
+  usleep(WORK);
 
   MPI_Send(&sum, 1, MPI_INT, (rank + 1) % size, 42, MPI_COMM_WORLD);
   {
@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
                MPI_STATUS_IGNORE);
     MPI_Mrecv(&sum, 1, MPI_INT, &msg, MPI_STATUS_IGNORE);
   }
-  usleep(20000);
+  usleep(WORK);
 
 #if 0 // polling introduces execution time
   MPI_Send(&sum, 1, MPI_INT, (rank + 1) % size, 42, MPI_COMM_WORLD);
@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
     MPI_Imrecv(&sum, 1, MPI_INT, &msg, &req);
     MPI_Wait(&req, MPI_STATUS_IGNORE);
   }
-  usleep(20000);
+  usleep(WORK);
 
   MPI_Send(&sum, 1, MPI_INT, (rank + 1) % size, 42, MPI_COMM_WORLD);
   {
@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
                   MPI_STATUS_IGNORE);
     MPI_Mrecv(&sum, 1, MPI_INT, &msg, MPI_STATUS_IGNORE);
   }
-  usleep(20000);
+  usleep(WORK);
 #endif
 
   if (rank < size - 1) {

@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
 #pragma omp parallel for schedule(static, 1) reduction(+:sum)
   for (int i = 0; i < 20; i++) {
     sum += i;
-    usleep(100000);
+    usleep(WORK);
   }
   omp_control_tool(omp_control_tool_end, 0, NULL);
 

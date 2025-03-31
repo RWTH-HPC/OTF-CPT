@@ -87,7 +87,7 @@ exclude_strings = [ "c2f", "f2c", "f2f08", "f082c", "f082f", "typedef", "MPI_T_"
 
 # Regular expressions for start and end of declarations in mpi.h. These are
 # used to get the declaration strings out for parsing with formal_re below.
-begin_decl_re = re.compile("(" + "|".join(rtypes) + r")\s+(MPI_\w+)\s*\(")
+begin_decl_re = re.compile("(" + "|".join(rtypes) + r")\s+P(MPI_\w+)\s*\(")
 exclude_re =    re.compile("|".join(exclude_strings))
 end_decl_re =   re.compile(r"\).*\;")
 

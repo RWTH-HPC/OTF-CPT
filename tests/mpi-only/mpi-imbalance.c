@@ -19,7 +19,7 @@ int main(int argc, char **argv) {
     printMetrics(m);
   }
   MPI_Pcontrol(1);
-  usleep(100000*(1 + 2*rank));
+  usleep(WORK * (1 + 2 * rank));
   MPI_Pcontrol(0);
   MPI_Finalize();
 }
