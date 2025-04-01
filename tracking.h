@@ -166,6 +166,9 @@ public:
       if (i)
         free(i);
   }
+  void *operator new(size_t size) { return malloc(size); }
+
+  void operator delete(void *p) { free(p); }
 };
 #else
 // No memory management for ToolData, just use new/delete

@@ -5,9 +5,15 @@
 
 #ifdef USE_ERRHANDLER
 #include <execinfo.h>
-#include <signal.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#if !__cpp_exceptions
+namespace std {
+void __throw_system_error(int) { abort(); }
+void __throw_bad_function_call() { abort(); }
+} // namespace std
+#endif
 
 #ifdef USE_MPI
 static MPI_Errhandler CommErrHandler{MPI_ERRHANDLER_NULL};

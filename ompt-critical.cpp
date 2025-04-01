@@ -15,6 +15,7 @@
 
 #include "criticalPath.h"
 #include "errorhandler.h"
+#include <mutex>
 #include <omp-tools.h>
 #include <omp.h>
 

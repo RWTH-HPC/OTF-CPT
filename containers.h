@@ -195,6 +195,7 @@ public:
     }
     it = end_ - 1;
     it->first = key;
+    new (&it->second)V();
     it->Next = hbegin()[h & mask_];
     hbegin()[h & mask_] = it;
     return it->second;

@@ -1,7 +1,5 @@
 set(RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Output/)
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/Output/)
-set(CMAKE_EXECUTABLE_SUFFIX_C .c.tmp)
-set(CMAKE_EXECUTABLE_SUFFIX_CXX .cpp.tmp)
 
 set(mpiOnlyTests
     mpi-balanced 
@@ -14,7 +12,8 @@ set(mpiOnlyTests
 
 
 FOREACH(tests ${mpiOnlyTests})
-    add_executable(${tests} ${tests}.c)
-    target_link_libraries(${tests} ${MPI_C_LIBRARIES})
-    add_dependencies(build-mpi-only-tests ${tests})
+    add_executable(${tests}.c.tmp ${tests}.c)
+    target_link_libraries(${tests}.c.tmp OTFCPT)
+    target_link_libraries(${tests}.c.tmp MPI::MPI_C)
+    add_dependencies(build-mpi-only-tests ${tests}.c.tmp)
 ENDFOREACH()
