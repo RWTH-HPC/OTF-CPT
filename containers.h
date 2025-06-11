@@ -27,6 +27,10 @@ public:
       free(begin_);
   }
 
+  // Default copy constructor would lead to double-free
+  Vector(const Vector &) = delete;
+  Vector& operator=(const Vector &) = delete;
+
   void Reset() {
     if (begin_)
       free(begin_);
@@ -138,9 +142,6 @@ private:
     end_ = begin_ + size;
     last_ = begin_ + cap;
   }
-
-  Vector(const Vector &);
-  void operator=(const Vector &);
 };
 
 template <typename K, typename V> class Pair {
@@ -165,6 +166,10 @@ public:
     if (begin_)
       free(begin_);
   }
+
+  // Default copy constructor would lead to double-free
+  CompactHashMap(const CompactHashMap &) = delete;
+  CompactHashMap& operator=(const CompactHashMap &) = delete;
 
   void Reset() {
     if (begin_)
@@ -283,8 +288,6 @@ private:
     return true;
   }
 
-  CompactHashMap(const CompactHashMap &);
-  void operator=(const CompactHashMap &);
 };
 
 } // namespace __otfcpt
