@@ -205,6 +205,7 @@ void finishMeasurement() {
     uc_max[0] = uc_avg[0] =
         thread_local_clock->useful_computation_thread.load();
     uc_max[2] = uc_avg[2] = thread_local_clock->outsideomp_thread.load();
+    proc_counts.add(*thread_local_clock);
   }
   uc_max[1] = uc_avg[1] = thread_local_clock->outsidempi_proc.load();
   uc_max[3] = uc_avg[3] = thread_local_clock->useful_computation_proc.load();
