@@ -8,6 +8,8 @@
 // RUN: env OMP_NUM_THREADS=4 %load_otfcpt_omp %otfcpt_options_dump_stopped \
 // RUN: %t | %FileCheck --check-prefixes=CHECK4,CHECK %metricfile
 
+// UNSUPPORTED: GNU
+
 #include <omp.h>
 #include <stdio.h>
 #include <unistd.h>

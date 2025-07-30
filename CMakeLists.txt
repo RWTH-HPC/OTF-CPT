@@ -2,6 +2,18 @@ cmake_minimum_required(VERSION 3.13.4...3.27.4)
 
 project(OTFCPT C CXX)
 
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "Installation directory" FORCE)
+  message(WARNING "No build type selected. OTF-CPT will be built as Release.
+Available options are:
+  * -DCMAKE_BUILD_TYPE=Release - For an optimized build with no assertions or debug info.
+  * -DCMAKE_BUILD_TYPE=Debug - For an unoptimized build with assertions and debug info.
+  * -DCMAKE_BUILD_TYPE=RelWithDebInfo - For an optimized build with no assertions but with debug info.
+  * -DCMAKE_BUILD_TYPE=MinSizeRel - For a build optimized for size instead of speed.
+Learn more about these options in LLVM's documentation at https://llvm.org/docs/CMake.html#cmake-build-type
+")
+endif()
+
 SET(CMAKE_MODULE_PATH
     "${CMAKE_SOURCE_DIR}/cmakemodules"
     ${CMAKE_MODULE_PATH}
@@ -96,6 +108,9 @@ endif ()
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   set(STDCPLUS_COMPILE_FLAGS -fno-exceptions)
   set(STDCPLUS_LINK_FLAGS -cxxlib-nostd)
+endif ()
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  include_directories(external/ompt)
 endif ()
 
 set(WRAP_FLAGS -s -n)
