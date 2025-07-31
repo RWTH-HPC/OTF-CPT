@@ -111,6 +111,7 @@ private:
   // operator new/delete must never be called directly
   void *operator new(size_t size) = delete;
   void operator delete(void *p) = delete;
+  void operator delete(void *p, unsigned long size) = delete;
 };
 
 class alignas(64) CommData {
@@ -147,6 +148,7 @@ private:
                                   // never be called directly");
     assert(false && "operator delete must never be called directly");
   }
+  void operator delete(void *p, unsigned long size) { operator delete(p); }
 };
 
 typedef enum {

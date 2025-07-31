@@ -113,6 +113,7 @@ public:
   void *operator new(size_t size) { return malloc(size); }
 
   void operator delete(void *p) { free(p); }
+  void operator delete(void *p, unsigned long size) { operator delete(p); }
 
 protected:
   T *begin_;
@@ -247,6 +248,7 @@ public:
   void *operator new(size_t size) { return malloc(size); }
 
   void operator delete(void *p) { free(p); }
+  void operator delete(void *p, unsigned long size) { operator delete(p); }
 
 protected:
   I *begin_{};

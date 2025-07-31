@@ -210,6 +210,7 @@ protected:
   void *operator new(size_t size) { return malloc(size); }
 
   void operator delete(void *p) { free(p); }
+  void operator delete(void *p, unsigned long size) { operator delete(p); }
 };
 
 template <typename T> class FlagHandler final : public FlagHandlerBase {
@@ -223,6 +224,7 @@ public:
   // define new/delete operator to avoid dependency to libstdc++
   void *operator new(size_t size) { return malloc(size); }
   void operator delete(void *p) { free(p); }
+  void operator delete(void *p, unsigned long size) { operator delete(p); }
 };
 
 inline bool ParseBool(const char *value, bool *b) {

@@ -98,6 +98,7 @@ struct SYNC_CLOCK {
   void *operator new(size_t size) { return malloc(size); }
 
   void operator delete(void *p) { free(p); }
+  void operator delete(void *p, unsigned long size) { operator delete(p); }
 };
 
 enum ClockContext {
@@ -127,6 +128,7 @@ struct MPI_COUNTS {
   void *operator new(size_t size) { return malloc(size); }
 
   void operator delete(void *p) { free(p); }
+  void operator delete(void *p, unsigned long size) { operator delete(p); }
 };
 
 struct omptCounts {
@@ -150,6 +152,7 @@ struct omptCounts {
   void *operator new(size_t size) { return malloc(size); }
 
   void operator delete(void *p) { free(p); }
+  void operator delete(void *p, unsigned long size) { operator delete(p); }
 };
 
 struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
@@ -257,6 +260,7 @@ struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
   void *operator new(size_t size) { return malloc(size); }
 
   void operator delete(void *p) { free(p); }
+  void operator delete(void *p, unsigned long size) { operator delete(p); }
 };
 
 typedef SYNC_CLOCK ompt_tsan_clockid;
