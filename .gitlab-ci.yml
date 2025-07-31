@@ -29,6 +29,7 @@ stages:
   parallel:
     matrix:
        - MPI: [ mpich, openmpi ]
+         USE_CLANG: ["0", "1"]
   needs: []
   variables:
     CMAKE_BUILD_TYPE: Debug
@@ -36,6 +37,7 @@ stages:
     OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: "1"
     OMPI_MCA_mpi_yield_when_idle: "1"
     OMPI_MCA_rmaps_base_oversubscribe: "1"
+    FF_SCRIPT_SECTIONS: "1"
   before_script:
     - export DEBIAN_FRONTEND=noninteractive
     - apt-get update
@@ -53,6 +55,7 @@ stages:
       libxml2-dev
       libomp-dev
       llvm-14-tools
+  script:
     - |
       if [[ "${USE_CLANG}" == "1" ]]; then
         apt-get install -y --no-install-recommends clang
@@ -62,7 +65,6 @@ stages:
         export MPICH_CC=gcc MPICH_CXX=g++
         export OMPI_CC=gcc OMPI_CXX=g++
       fi
-  script:
     - export PATH=$PATH:/usr/lib/llvm-14/bin
     - export FI_PROVIDER=shm MPIR_CVAR_POLLS_BEFORE_YIELD=1
     - export OMPI_MCA_btl=vader,self OMPI_MCA_mpi_yield_when_idle=1
@@ -90,9 +92,6 @@ ubuntu:
   variables:
     MPIEXEC: mpiexec.openmpi # TODO: Change to ${MPI} when Ubuntu's mpich hydra launcher is fixed
     LDFLAGS: "-flto=auto"
-  parallel:
-    matrix:
-      - USE_CLANG: ["0", "1"]
 
 debian:
   stage: test
@@ -100,9 +99,6 @@ debian:
   extends: .debian-based
   variables:
     MPIEXEC: mpiexec.${MPI} # TODO: Change to ${MPI} when Debian's mpich hydra launcher is fixed
-  parallel:
-    matrix:
-      - USE_CLANG: ["0", "1"]
 
 .cluster-template:
     tags: 
@@ -156,7 +152,7 @@ debian:
       - cmake --build build --parallel ${SLURM_CPUS_PER_TASK}
       - cmake --install build
 
-cluster:
+.cluster:
     stage: test
     extends: .cluster-template
     script:
