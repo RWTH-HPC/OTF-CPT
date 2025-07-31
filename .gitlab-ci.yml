@@ -51,13 +51,19 @@ stages:
       git
       python3
       libxml2-dev
-      clang
       libomp-dev
       llvm-14-tools
+    - |
+      if [[ "${USE_CLANG}" == "1" ]]; then
+        apt-get install -y --no-install-recommends clang
+        export MPICH_CC=clang MPICH_CXX=clang++
+        export OMPI_CC=clang OMPI_CXX=clang++
+      else
+        export MPICH_CC=gcc MPICH_CXX=g++
+        export OMPI_CC=gcc OMPI_CXX=g++
+      fi
   script:
     - export PATH=$PATH:/usr/lib/llvm-14/bin
-    - export MPICH_CC=clang MPICH_CXX=clang++
-    - export OMPI_CC=clang OMPI_CXX=clang++
     - export FI_PROVIDER=shm MPIR_CVAR_POLLS_BEFORE_YIELD=1
     - export OMPI_MCA_btl=vader,self OMPI_MCA_mpi_yield_when_idle=1
     - >-
@@ -68,10 +74,10 @@ stages:
                            -DOTFCPT_TEST_UB=1.05 \
                            -DOTFCPT_TEST_WORK=300000
     - cmake --build build
-    - ldd build/libOTFCPT.so | grep -q "libstdc++" && echo -e "\e[1;31mFound libstdc++ dependency, failure\e[0m" && exit 1
     - cmake --install build
     - EXIT_CODE=0
     - cmake --build build -- check || EXIT_CODE=$?
+    - ldd build/libOTFCPT.so | grep -q "libstdc++" && echo -e "\e[1;31mFound libstdc++ dependency, failure\e[0m" && exit 1
     - exit $EXIT_CODE
   artifacts:
     reports:
@@ -84,6 +90,9 @@ ubuntu:
   variables:
     MPIEXEC: mpiexec.openmpi # TODO: Change to ${MPI} when Ubuntu's mpich hydra launcher is fixed
     LDFLAGS: "-flto=auto"
+  parallel:
+    matrix:
+      - USE_CLANG: ["0", "1"]
 
 debian:
   stage: test
@@ -91,16 +100,19 @@ debian:
   extends: .debian-based
   variables:
     MPIEXEC: mpiexec.${MPI} # TODO: Change to ${MPI} when Debian's mpich hydra launcher is fixed
+  parallel:
+    matrix:
+      - USE_CLANG: ["0", "1"]
 
 .cluster-template:
     tags: 
-      - "unstable"
+      - "downscope-testing"
     variables:
-      SLURM_CPUS_PER_TASK: "4"
-      SRUN_CPUS_PER_TASK: "4"
-      SLURM_ACCOUNT: "rwth1282" 
-      SLURM_PARTITION: "c23ms" 
-      SLURM_TIME: "15" 
+      SLURM_PARAM_CPUS_PER_TASK: "-c 4"
+      SLURM_PARAM_ACCOUNT: "-A rwth1282" 
+      SLURM_PARAM_PARTITION: "-p c23ms" 
+      SLURM_DPARAM_ACCOUNT: "-A rwth1282" 
+      SLURM_DPARAM_PARTITION: "-p c23ms" 
     before_script:
       - module purge
       - module load "${TOOLCHAIN}/${VERSION}"
@@ -121,32 +133,37 @@ debian:
     parallel:
       matrix:
         - TOOLCHAIN: ["iimpi"]
-          VERSION: ["2022a", "2022b", "2023a", "2023b", "2024a"]
+          VERSION: ["2022a", "2022b", "2023a", "2023b"]
           COMPILER: [""]
           USE_ONEAPI: ["0", "1"]
         - TOOLCHAIN: ["iimpi"]
-          VERSION: ["2020b", "2021b", "2022a", "2022b", "2023a", "2023b"]
+          VERSION: ["2024a", "2025a"] # These versions do not include the legacy compilers
+          COMPILER: [""]
+          USE_ONEAPI: ["1"]
+        - TOOLCHAIN: ["iimpi"]
+          VERSION: ["2022a", "2023a", "2023b", "2024a", "2025a"]
           COMPILER: ["Clang"]
         - TOOLCHAIN: ["gompi"]
-          VERSION: ["2020b", "2021b", "2022a", "2022b", "2023a", "2023b"]
-          COMPILER: ["Clang"]
+          VERSION: ["2022a", "2023a", "2023b", "2024a", "2025a"]
+          COMPILER: ["Clang", ""]
 
-cluster-build:
+.cluster-build:
     stage: build
     extends: .cluster-template
     script:
       - mkdir build
       - cmake -S ./ -B build -DCMAKE_INSTALL_PREFIX=$PWD/install -DCMAKE_BUILD_TYPE=RelWithDebInfo
-      - cmake --build build
-      - ldd build/libOTFCPT.so | grep -q "libstdc++" && echo -e "\e[1;31mFound libstdc++ dependency, failure\e[0m" && exit 1
+      - cmake --build build --parallel ${SLURM_CPUS_PER_TASK}
       - cmake --install build
 
 cluster:
     stage: test
     extends: .cluster-template
     script:
-      - !reference [cluster-build, script]
-      - cmake --build build -- check
+      - !reference [.cluster-build, script]
+      - EXIT_CODE=0
+      - cmake --build build -- check || EXIT_CODE=$?
+      - ldd build/libOTFCPT.so | grep -q "libstdc++" && echo -e "\e[1;31mFound libstdc++ dependency, failure\e[0m" && exit 1
     artifacts:
       reports:
         junit: build/tests/check.xunit.xml
