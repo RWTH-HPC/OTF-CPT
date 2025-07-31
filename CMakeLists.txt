@@ -89,8 +89,12 @@ set(OTFCPT_OMP_SOURCES
 list(APPEND GnuCompatible "Clang" "IntelLLVM" "GNU")
 list(APPEND ClangCompatible "Clang" "IntelLLVM")
 if ("${CMAKE_CXX_COMPILER_ID}" IN_LIST GnuCompatible)
+  set(NOSTDLIB_FLAG "-nostdlib++")
+  if ("${CMAKE_CXX_COMPILER_ID}" EQUAL "GNU" AND MAKE_CXX_COMPILER_VERSION VERSION_LESS_EQUAL 12)
+      set(NOSTDLIB_FLAG -nodefaultlibs -lc)
+  endif ()
   set(STDCPLUS_COMPILE_FLAGS -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections)
-  set(STDCPLUS_LINK_FLAGS -fno-rtti -fno-exceptions -nostdlib++ -Wl,--gc-sections)
+  set(STDCPLUS_LINK_FLAGS -fno-rtti -fno-exceptions ${NOSTDLIB_FLAG} -Wl,--gc-sections)
 
   if ("${CMAKE_CXX_COMPILER_ID}" IN_LIST ClangCompatible)
     option(OTFCPT_USE_LLVM_LIBCPP "Use LLVM libc++, which might reduce portability." OFF)
