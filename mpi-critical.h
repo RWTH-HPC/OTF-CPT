@@ -487,6 +487,7 @@ struct mpiRecvPB {
   int src;
   int tag;
   int rank;
+  bool hasMessage{false};
 
   mpiRecvPB(MPI_Message *message, MPI_Status **status) : pStatus(*status) {
     auto *mData = mf.detachHandle(*message);
@@ -500,6 +501,8 @@ struct mpiRecvPB {
     mData->fini();
     mf.returnData(mData);
     src = rData.remote;
+    tag = rData.tag;
+    hasMessage = true;
   }
 
   mpiRecvPB(int src, int tag, MPI_Comm comm, MPI_Status **status)
@@ -530,8 +533,10 @@ struct mpiRecvPB {
     if (src == MPI_PROC_NULL)
       return;
     if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
-      src = pStatus->MPI_SOURCE;
-      tag = pStatus->MPI_TAG;
+      if (!hasMessage) {
+        src = pStatus->MPI_SOURCE;
+        tag = pStatus->MPI_TAG;
+      }
       PMPI_Recv(uc, 1, ipcData::ipcMpiType, src, tag, cData->getDupComm(),
                 MPI_STATUS_IGNORE);
     } else {
