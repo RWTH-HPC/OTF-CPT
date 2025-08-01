@@ -149,7 +149,7 @@ debian:
     script:
       - mkdir build
       - cmake -S ./ -B build -DCMAKE_INSTALL_PREFIX=$PWD/install -DCMAKE_BUILD_TYPE=RelWithDebInfo
-      - cmake --build build --parallel ${SLURM_CPUS_PER_TASK}
+      - cmake --build build --parallel ${SLURM_CPUS_PER_TASK} -v
       - cmake --install build
 
 cluster:
@@ -159,6 +159,7 @@ cluster:
       - !reference [.cluster-build, script]
       - EXIT_CODE=0
       - cmake --build build -- check || EXIT_CODE=$?
+      - ldd build/libOTFCPT.so
       - ldd build/libOTFCPT.so | grep -q "libstdc++" && echo -e "\e[1;31mFound libstdc++ dependency, failure\e[0m" && exit 1
     artifacts:
       reports:
