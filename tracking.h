@@ -106,7 +106,6 @@ public:
   virtual M &getHandle(M &handle) = 0;
   virtual M &getHandleLocked(M &handle) = 0;
   virtual std::shared_lock<std::shared_mutex> getSharedLock() = 0;
-  virtual ~AbstractHandleFactory(){};
   virtual void initPredefined() {
     predefHandles[T::nullHandle].init(T::nullHandle);
   }
@@ -125,7 +124,6 @@ public:
                                       MPI_Status *status) = 0;
   virtual MPI_Request startRequest(MPI_Request req) = 0;
   virtual MPI_Request cancelRequest(MPI_Request req) = 0;
-  virtual ~AbstractRequestFactory(){};
 };
 
 #ifdef REAL_DATAPOOL
