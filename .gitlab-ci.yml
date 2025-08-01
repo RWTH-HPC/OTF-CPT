@@ -160,10 +160,10 @@ cluster:
       - !reference [.cluster-build, script]
       - EXIT_CODE=0
       - cmake --build build -- check || EXIT_CODE=$?
-      - ldd_out=$(ldd build/libOTFCPT.so)
-      - echo $ldd_out
+      - ldd build/libOTFCPT.so
+      - ldd_out=$(ldd build/libOTFCPT.so | grep -q "libstdc++")
       - |
-        if [[ grep -q "libstdc++" "${ldd_out}" ]]; then
+        if [[ "{ldd_out}" == "0" ]]; then
           echo "Error: libOTFCPT.so is linked against libstdc++"
           EXIT_CODE=1
         fi
