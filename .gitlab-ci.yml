@@ -152,7 +152,7 @@ debian:
       - cmake --build build --parallel ${SLURM_CPUS_PER_TASK}
       - cmake --install build
 
-.cluster:
+cluster:
     stage: test
     extends: .cluster-template
     script:
