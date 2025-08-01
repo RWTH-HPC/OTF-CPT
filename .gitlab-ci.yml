@@ -134,15 +134,18 @@ debian:
           COMPILER: [""]
           USE_ONEAPI: ["0", "1"]
         - TOOLCHAIN: ["iimpi"]
-          VERSION: ["2024a", "2025a"] # These versions do not include the legacy compilers
+          VERSION: ["2024a"] # These versions do not include the legacy compilers
           COMPILER: [""]
           USE_ONEAPI: ["1"]
         - TOOLCHAIN: ["iimpi"]
-          VERSION: ["2022a", "2023a", "2023b", "2024a", "2025a"]
+          VERSION: ["2022a", "2023a", "2023b", "2024a"]
           COMPILER: ["Clang"]
         - TOOLCHAIN: ["gompi"]
-          VERSION: ["2022a", "2023a", "2023b", "2024a", "2025a"]
+          VERSION: ["2022a", "2023a", "2023b", "2024a"]
           COMPILER: ["Clang", ""]
+        - TOOLCHAIN: ["iimpi", "gompi"]
+          VERSION: ["2025a"]
+          COMPILER: ["LLVM", ""]
 
 .cluster-build:
     stage: build
