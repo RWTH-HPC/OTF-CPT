@@ -160,8 +160,14 @@ cluster:
       - !reference [.cluster-build, script]
       - EXIT_CODE=0
       - cmake --build build -- check || EXIT_CODE=$?
-      - ldd build/libOTFCPT.so
-      - ldd build/libOTFCPT.so | grep -q "libstdc++" && echo -e "\e[1;31mFound libstdc++ dependency, failure\e[0m" && exit 1
+      - ldd_out=$(ldd build/libOTFCPT.so)
+      - echo $ldd_out
+      - |
+        if [[ grep -q "libstdc++" "${ldd_out}" ]]; then
+          echo "Error: libOTFCPT.so is linked against libstdc++"
+          EXIT_CODE=1
+        fi
+      - exit $EXIT_CODE
     artifacts:
       reports:
         junit: build/tests/check.xunit.xml
