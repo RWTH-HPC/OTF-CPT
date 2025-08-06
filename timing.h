@@ -55,10 +55,9 @@ public:
     double mean = total / samples;
     double stddev2 = (sumsqr / samples) - (mean * mean);
     double error = sqrt(stddev2);
-    printf(
-        "%-25s total = %f, iter runtime (ms) = %f +/- %1.9f (%2.1f%%), min / max "
-        "(ms) = %f / %f\n",
-        description.c_str(), total, mean * 1000, error * 1000,
-        error / mean * 100, imin * 1000, imax * 1000);
+    printf("%-25s total = %f, iter runtime (ms) = %f +/- %1.9f (%2.1f%%), min "
+           "/ max (ms) = %f / %f\n",
+           description.c_str(), total, mean * 1000, error * 1000,
+           error / mean * 100, imin * 1000, imax * 1000);
   }
 };
