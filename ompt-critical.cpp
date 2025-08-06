@@ -165,7 +165,6 @@ template <typename T> struct DataPool final {
   void *operator new(size_t size) { return malloc(size); }
 
   void operator delete(void *p) { free(p); }
-  void operator delete(void *p, unsigned long size) { operator delete(p); }
 };
 
 template <typename T> struct DataPoolEntry {
