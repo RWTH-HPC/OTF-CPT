@@ -164,7 +164,7 @@ cluster:
       - EXIT_CODE=0
       - cmake --build build -- check || EXIT_CODE=$?
       - ldd build/libOTFCPT.so
-      - ldd build/libOTFCPT.so | grep -q 'libcstd++' && echo "Error libstdc++ linked" && exit 1 || echo "Info No libstdc++ dependency found"
+      - ldd build/libOTFCPT.so | grep -q 'libstdc++' && echo "Error libstdc++ linked" && exit 1 || echo "Info No libstdc++ dependency found"
       - exit $EXIT_CODE
     artifacts:
       reports:
