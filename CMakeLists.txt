@@ -2,6 +2,18 @@ cmake_minimum_required(VERSION 3.13.4...3.27.4)
 
 project(OTFCPT C CXX)
 
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "Installation directory" FORCE)
+  message(WARNING "No build type selected. OTF-CPT will be built as Release.
+Available options are:
+  * -DCMAKE_BUILD_TYPE=Release - For an optimized build with no assertions or debug info.
+  * -DCMAKE_BUILD_TYPE=Debug - For an unoptimized build with assertions and debug info.
+  * -DCMAKE_BUILD_TYPE=RelWithDebInfo - For an optimized build with no assertions but with debug info.
+  * -DCMAKE_BUILD_TYPE=MinSizeRel - For a build optimized for size instead of speed.
+Learn more about these options in LLVM's documentation at https://llvm.org/docs/CMake.html#cmake-build-type
+")
+endif()
+
 SET(CMAKE_MODULE_PATH
     "${CMAKE_SOURCE_DIR}/cmakemodules"
     ${CMAKE_MODULE_PATH}
@@ -77,8 +89,12 @@ set(OTFCPT_OMP_SOURCES
 list(APPEND GnuCompatible "Clang" "IntelLLVM" "GNU")
 list(APPEND ClangCompatible "Clang" "IntelLLVM")
 if ("${CMAKE_CXX_COMPILER_ID}" IN_LIST GnuCompatible)
+  set(NOSTDLIB_FLAG "-nostdlib++")
+  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 13)
+    set(NOSTDLIB_FLAG -nodefaultlibs -lc)
+  endif ()
   set(STDCPLUS_COMPILE_FLAGS -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections)
-  set(STDCPLUS_LINK_FLAGS -fno-rtti -fno-exceptions -nostdlib++ -Wl,--gc-sections)
+  set(STDCPLUS_LINK_FLAGS -fno-rtti -fno-exceptions ${NOSTDLIB_FLAG} -Wl,--gc-sections)
 
   if ("${CMAKE_CXX_COMPILER_ID}" IN_LIST ClangCompatible)
     option(OTFCPT_USE_LLVM_LIBCPP "Use LLVM libc++, which might reduce portability." OFF)
@@ -97,6 +113,9 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   set(STDCPLUS_COMPILE_FLAGS -fno-exceptions)
   set(STDCPLUS_LINK_FLAGS -cxxlib-nostd)
 endif ()
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  include_directories(external/ompt)
+endif ()
 
 set(WRAP_FLAGS -s -n)
 add_wrapped_file(gen-nb-wrappers.cpp gen-nb-wrappers.w)
@@ -105,8 +124,8 @@ add_wrapped_file(gen-wrappers.cpp gen-wrappers.w)
 add_library(OTFCPT SHARED ${OTFCPT_SOURCES})
 target_link_libraries(OTFCPT PUBLIC MPI::MPI_CXX)
 target_compile_definitions(OTFCPT PUBLIC -DUSE_MPI=1)
-target_link_options(OTFCPT PUBLIC ${STDCPLUS_LINK_FLAGS} "LINKER:-as-needed")
-target_compile_options(OTFCPT PUBLIC ${STDCPLUS_COMPILE_FLAGS})
+target_link_options(OTFCPT PUBLIC "$<$<COMPILE_LANGUAGE:CXX>:${STDCPLUS_LINK_FLAGS}>" "LINKER:-as-needed")
+target_compile_options(OTFCPT PUBLIC "$<$<COMPILE_LANGUAGE:CXX>:${STDCPLUS_COMPILE_FLAGS}>")
 
 add_library(OTFCPT_omp SHARED ${OTFCPT_OMP_SOURCES})
 target_link_options(OTFCPT_omp PUBLIC ${STDCPLUS_LINK_FLAGS} "LINKER:-as-needed")

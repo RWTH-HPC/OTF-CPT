@@ -500,6 +500,7 @@ struct mpiRecvPB {
     mData->fini();
     mf.returnData(mData);
     src = rData.remote;
+    tag = rData.tag;
   }
 
   mpiRecvPB(int src, int tag, MPI_Comm comm, MPI_Status **status)
