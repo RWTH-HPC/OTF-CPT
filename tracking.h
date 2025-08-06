@@ -245,7 +245,6 @@ public:
   std::shared_lock<std::shared_mutex> getSharedLock() {
     return std::shared_lock<std::shared_mutex>{DummyMutex, std::defer_lock};
   }
-  virtual ~HandleFactory() {}
 };
 
 // Specialized template of RequestFactory for pointer-type handles
@@ -402,7 +401,6 @@ public:
   std::shared_lock<std::shared_mutex> getSharedLock() {
     return std::shared_lock<std::shared_mutex>{DTMutex};
   }
-  virtual ~HandleFactory() {}
 };
 
 // Specialized template of RequestFactory for int-type handles
