@@ -16,6 +16,13 @@
 #define mpiImrecvPBMacro(m,r)  mpiIrecvPB pb{m, r};
 #define mpiRecvInitPBMacro(c,r)  mpiRecvInitPB pb{source, tag, c, r};
 
+#ifdef HAVE_MPI_ISENDRECV_REPLACE
+#define mpiSendrecvPBMacro(c,s)  mpiSendrecvPB pb{dest, source, sendtag, recvtag, c, &s};
+#define mpiIsendrecvPBMacro(c,r)  mpiSendrecvPB pb{dest, source, sendtag, recvtag, c, r};
+#else
+#define mpiSendrecvPBMacro(c,s)
+#define mpiIsendrecvPBMacro(c,r)
+#endif
 
 {{fn fn_name MPI_Bsend MPI_Rsend MPI_Ssend MPI_Send MPI_Bsend_c MPI_Rsend_c MPI_Ssend_c MPI_Send_c }}
   mpiTimer mt{false, __func__};
@@ -67,6 +74,28 @@
     thread_local_clock->irecv++;
 
   {{apply_to_type {{list 'MPI_Comm' 'MPI_Request*'}} 'mpiIrecvPBMacro'}}
+  {{apply_to_type MPI_Comm preComm}}
+   
+  {{ret_val}} = P{{fn_name}}({{args}});
+{{endfn}}
+
+{{fn fn_name MPI_Sendrecv MPI_Sendrecv_c MPI_Sendrecv_replace MPI_Sendrecv_replace_c }}
+  mpiTimer mt{false, __func__};
+  if (analysis_flags->running)
+    thread_local_clock->recv++;
+
+  {{apply_to_type {{list 'MPI_Comm' 'MPI_Status*'}} 'mpiSendrecvPBMacro'}}
+  {{apply_to_type MPI_Comm preComm}}
+   
+  {{ret_val}} = P{{fn_name}}({{args}});
+{{endfn}}
+
+{{fn fn_name MPI_Isendrecv MPI_Isendrecv_c MPI_Isendrecv_replace MPI_Isendrecv_replace_c }}
+  mpiTimer mt{false, __func__};
+  if (analysis_flags->running)
+    thread_local_clock->irecv++;
+
+  {{apply_to_type {{list 'MPI_Comm' 'MPI_Request*'}} 'mpiIsendrecvPBMacro'}}
   {{apply_to_type MPI_Comm preComm}}
    
   {{ret_val}} = P{{fn_name}}({{args}});
