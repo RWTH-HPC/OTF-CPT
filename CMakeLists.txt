@@ -66,7 +66,7 @@ endif()
 if(HAVE_MPI_BARRIER_INIT)
     add_definitions(-DHAVE_PCOLL)
 endif()
-if(HAVE_MPI_ISENDRECV_REPLACE)
+if(HAVE_PMPI_ISENDRECV_REPLACE)
     add_definitions(-DHAVE_ISRR)
 endif()
 

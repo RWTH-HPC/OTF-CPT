@@ -643,7 +643,7 @@ struct mpiRecvInitPB {
   }
 };
 
-#ifdef HAVE_MPI_ISENDRECV_REPLACE
+#ifdef HAVE_ISRR
 
 struct mpiSendrecvPB {
   double *uc{nullptr};

@@ -16,7 +16,7 @@
 #define mpiImrecvPBMacro(m,r)  mpiIrecvPB pb{m, r};
 #define mpiRecvInitPBMacro(c,r)  mpiRecvInitPB pb{source, tag, c, r};
 
-#ifdef HAVE_MPI_ISENDRECV_REPLACE
+#ifdef HAVE_ISRR
 #define mpiSendrecvPBMacro(c,s)  mpiSendrecvPB pb{dest, source, sendtag, recvtag, c, &s};
 #define mpiIsendrecvPBMacro(c,r)  mpiSendrecvPB pb{dest, source, sendtag, recvtag, c, r};
 #else
