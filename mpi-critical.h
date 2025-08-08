@@ -713,7 +713,7 @@ struct mpiIsendrecvPB {
     rank = cData->getRank();
     uc = loadThreadTimers(rData);
     PMPI_Isendrecv_replace(uc, 1, ipcData::ipcMpiType, dest, stag, src, rtag,
-                           cData->getDupComm(), rData.pb_reqs);
+                           cData->getDupComm(), rData->pb_reqs);
   }
   ~mpiIsendrecvPB() {
 #if OnlyActivePB
