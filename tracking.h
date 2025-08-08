@@ -222,7 +222,7 @@ public:
     return (M)T::nullHandle;
   }
   T *detachHandle(M handle) {
-    assert (!this->isPredefined(handle));
+    assert(!this->isPredefined(handle));
     return (T *)(uintptr_t)(handle);
   }
   T *findData(M handle) {
@@ -370,7 +370,7 @@ public:
     return T::nullHandle;
   }
   T *detachHandle(M handle) {
-    assert (!this->isPredefined(handle));
+    assert(!this->isPredefined(handle));
     T *ret;
     {
       std::unique_lock<std::shared_mutex> lock(AHMutex);

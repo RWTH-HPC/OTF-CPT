@@ -244,10 +244,10 @@ void finishMeasurement() {
       maxComputation[i] = uc_max[i];
       avgComputation[i] = uc_avg[i];
     }
-    avgComputation[0]/=num_threads;
-    avgComputation[2]/=num_threads;
-    avgComputation[5]/=num_threads;
-    avgComputation[6]/=num_threads;
+    avgComputation[0] /= num_threads;
+    avgComputation[2] /= num_threads;
+    avgComputation[5] /= num_threads;
+    avgComputation[6] /= num_threads;
   }
   if (myProcId == 0) { // display results on master thread
                        // calculate pop metrics
@@ -335,22 +335,22 @@ void finishMeasurement() {
       if (total_counts.wait)
         fprintf(of, "MPI_Wait*: %i\n", total_counts.wait);
 
-      if(thread_counts){
+      if (thread_counts) {
         fprintf(of, "\n\n--------OMPT stats:--------\n");
         auto *tCounts = (*thread_counts)[0];
-        if(tCounts->taskCreate)
+        if (tCounts->taskCreate)
           fprintf(of, "taskCreate: %i\n", tCounts->taskCreate);
-        if(tCounts->taskSchedule)
+        if (tCounts->taskSchedule)
           fprintf(of, "taskSchedule: %i\n", tCounts->taskSchedule);
-        if(tCounts->implTaskBegin)
+        if (tCounts->implTaskBegin)
           fprintf(of, "implTaskBegin: %i\n", tCounts->implTaskBegin);
-        if(tCounts->implTaskEnd)
+        if (tCounts->implTaskEnd)
           fprintf(of, "implTaskEnd: %i\n", tCounts->implTaskEnd);
-        if(tCounts->syncRegionBegin)
+        if (tCounts->syncRegionBegin)
           fprintf(of, "syncRegionBegin: %i\n", tCounts->syncRegionBegin);
-        if(tCounts->syncRegionEnd)
+        if (tCounts->syncRegionEnd)
           fprintf(of, "syncRegionEnd: %i\n", tCounts->syncRegionEnd);
-        if(tCounts->mutexAcquire)
+        if (tCounts->mutexAcquire)
           fprintf(of, "mutexAcquire: %i\n", tCounts->mutexAcquire);
       }
 
