@@ -2,7 +2,7 @@ set(RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Output/)
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/Output/)
 
 set(mpiOnlyTests
-    mpi-balanced 
+    mpi-balanced
     mpi-imbalance
     mpi-message
     mpi-serialization

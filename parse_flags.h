@@ -187,6 +187,7 @@ enum HandleSignalMode {
   kHandleSignalExclusive,
 };
 
+class FlagParser;
 class FlagHandlerBase {
 public:
   virtual bool Parse(const char *value) { return false; }
@@ -210,6 +211,7 @@ protected:
   void *operator new(size_t size) { return malloc(size); }
 
   void operator delete(void *p) { free(p); }
+  friend FlagParser;
 };
 
 template <typename T> class FlagHandler final : public FlagHandlerBase {
@@ -337,6 +339,7 @@ class FlagParser {
 
 public:
   FlagParser();
+  ~FlagParser();
   void RegisterHandler(const char *name, FlagHandlerBase *handler,
                        const char *desc);
   void ParseString(const char *s, const char *env_name = 0);

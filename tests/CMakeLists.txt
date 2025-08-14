@@ -56,10 +56,16 @@ add_custom_target(build-tests)
 add_custom_target(build-mpi-only-tests)
 add_custom_target(build-omp-only-tests)
 add_custom_target(build-hybrid-tests)
-add_dependencies(build-tests build-mpi-only-tests build-omp-only-tests build-hybrid-tests OTFCPT OTFCPT_omp)
+add_dependencies(build-tests build-mpi-only-tests build-omp-only-tests build-hybrid-tests build-fortran-tests OTFCPT OTFCPT_omp)
 if (TARGET FileCheck_Standalone AND BUILD_FILECHECK)
     add_dependencies(build-tests FileCheck_Standalone)
 endif()
+IF(CMAKE_Fortran_COMPILER)
+   add_dependencies(build-tests build-fortran-tests)
+   add_custom_target(build-fortran-tests)
+   add_subdirectory(fortran)
+ENDIF()
+
 
 add_subdirectory(datastructures)
 add_subdirectory(mpi-only)
@@ -85,6 +91,7 @@ set(LIT_TEST_WORKERS 1 CACHE STRING "Sets the amount of workers when running tes
 
 pythonize_bool(OpenMP_FOUND)
 pythonize_bool(LIT_FORWARD_FULL_ENV)
+pythonize_bool(OTFCPT_HAVE_Fortran)
 
 configure_file(lit.site.cfg.in lit.site.cfg.configured @ONLY)
 file(GENERATE

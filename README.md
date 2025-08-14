@@ -4,7 +4,6 @@
 Tool to collect and report model factors (aka. fundamental performance factors) for hybrid MPI + OpenMP applications on-the-fly.
 
 ## Building with CMake
-The C/C++ compiler needs to support OMPT (which is provided by icc/clang and others, but not gcc)
 ### Basic Cmake
 ```
 mkdir BUILD
@@ -144,6 +143,14 @@ encountered.</td>
 </tr>
 </tbody>
 </table>
+
+## GNU compilers and OpenMP
+
+To analyze OpenMP applications, the OpenMP library needs to support OMPT (which is provided by icc/clang and others, but not gcc/libgomp). To analyze applications compiled with GNU compilers, you can explicitly link the LLVM/Intel OpenMP runtime using `-lomp`/`-liomp5`
+
+## Fortran support
+
+Fortran support of the tool is tested with OpenMPI, MPICH and IntelMPI. For OpenMPI, the MPI Fortran 2008 interface does not work. For MPICH and IntelMPI, we rely on intercepting only the C-Interface, which provides support for Fortran 2008.
 
 ## Plotting results of a scaling experiment
 

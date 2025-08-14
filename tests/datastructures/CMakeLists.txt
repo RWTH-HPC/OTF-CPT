@@ -1,3 +1,5 @@
+add_definitions(-DOMPI_SKIP_MPICXX)
+
 add_executable(test test.cpp)
 target_link_libraries(test PUBLIC MPI::MPI_CXX)
 add_executable(test-wc-source test-wc-source.cpp)
