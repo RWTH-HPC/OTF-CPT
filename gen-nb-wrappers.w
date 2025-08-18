@@ -17,8 +17,8 @@
 #define mpiRecvInitPBMacro(c,r)  mpiRecvInitPB pb{source, tag, c, r};
 
 #ifdef HAVE_ISRR
-#define mpiSendrecvPBMacro(c,s)  mpiSendrecvPB pb{dest, source, sendtag, recvtag, c, &s};
-#define mpiIsendrecvPBMacro(c,r)  mpiIsendrecvPB pb{dest, source, sendtag, recvtag, c, r};
+#define mpiSendrecvPBMacro(c,s)  mpiSendrecvPB pb{dest, sendtag, source, recvtag, c, &s};
+#define mpiIsendrecvPBMacro(c,r)  mpiIsendrecvPB pb{dest, sendtag, source, recvtag, c, r};
 #else
 #define mpiSendrecvPBMacro(c,s)
 #define mpiIsendrecvPBMacro(c,r)

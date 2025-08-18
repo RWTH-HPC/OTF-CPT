@@ -647,7 +647,7 @@ struct mpiRecvInitPB {
 
 struct mpiSendrecvPB {
   double *uc{nullptr};
-  RequestData rData;
+  RequestData rData{};
   CommData *cData;
   MPI_Status tStatus;
   MPI_Status *pStatus;
