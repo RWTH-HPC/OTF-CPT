@@ -27,7 +27,7 @@ using namespace __otfcpt;
 
 #include <omp-tools.h>
 
-//#define DEBUG_CLOCKS 1
+// #define DEBUG_CLOCKS 1
 
 extern int myProcId;
 extern bool useMpi;
@@ -111,7 +111,7 @@ enum ClockContext {
 struct MPI_COUNTS {
   int send{0}, recv{0}, isend{0}, irecv{0}, coll{0}, icoll{0}, test{0}, wait{0},
       pers{0}, probe{0};
-  void add(const MPI_COUNTS& o) {
+  void add(const MPI_COUNTS &o) {
     send += o.send;
     recv += o.recv;
     isend += o.isend;
@@ -137,7 +137,7 @@ struct omptCounts {
   int syncRegionBegin{0};
   int syncRegionEnd{0};
   int mutexAcquire{0};
-  void add(const omptCounts& o){
+  void add(const omptCounts &o) {
     taskCreate += o.taskCreate;
     taskSchedule += o.taskSchedule;
     implTaskBegin += o.implTaskBegin;
