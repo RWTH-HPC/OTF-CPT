@@ -228,8 +228,7 @@ void NORETURN __otfcpt::Die() {
 
 void NORETURN __otfcpt::CheckFailed(const char *file, int line,
                                     const char *cond, u64 v1, u64 v2) {
-  fprintf(get_otfcpt_flags()->output,
-          "Check failed in %s:%d %llu %s %llu\n",
+  fprintf(get_otfcpt_flags()->output, "Check failed in %s:%d %llu %s %llu\n",
           file, line, v1, cond, v2);
   Die();
 }
