@@ -17,7 +17,7 @@ int main()
     char mpich_version[] = MPICH_VERSION;
 #endif
 #ifdef I_MPI_NUMVERSION
-    int i_mpi_numversion = I_MPI_NUMVERSION;
+    long i_mpi_numversion = I_MPI_NUMVERSION;
 #endif
 #ifdef I_MPI_VERSION
     char i_mpi_version[] = I_MPI_VERSION;
