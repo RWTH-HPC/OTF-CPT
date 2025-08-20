@@ -27,8 +27,15 @@ macro (set_mpi_test_features)
     endif()
     set(TEST_COMPILER_FEATURE_LIST ${comp} ${comp}-${major} ${comp}-${majorminor} ${comp}-${CMAKE_C_COMPILER_VERSION} )
 
+    # Conditionally set include flag only if MPI_C_HEADER_DIR is not empty (avoids bug with Intel oneAPI compilers)
+    if(MPI_C_HEADER_DIR)
+        set(mpi_include_flag "-I '${MPI_C_HEADER_DIR}'")
+    else()
+        set(mpi_include_flag "")
+    endif()
+
     execute_process(
-        COMMAND         bash "-c" "${CMAKE_C_COMPILER} -I '${MPI_C_HEADER_DIR}' -E -P ${OTFCPT_SOURCE_DIR}/cmakemodules/mpi_implementation_version.c | sed -n '/int main/,$p'"
+        COMMAND         bash "-c" "${CMAKE_C_COMPILER} ${mpi_include_flag} -E -P ${OTFCPT_SOURCE_DIR}/cmakemodules/mpi_implementation_version.c"
         OUTPUT_VARIABLE mpi_implementation_version_output
     )
 
