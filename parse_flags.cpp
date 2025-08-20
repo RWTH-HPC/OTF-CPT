@@ -10,7 +10,7 @@ class UnknownFlags {
 public:
   void Add(const char *name) {
     CHECK_LT(n_unknown_flags_, kMaxUnknownFlags);
-    unknown_flags_[n_unknown_flags_++] = name;
+    unknown_flags_[n_unknown_flags_++] = strdup(name);
   }
 
   void Report() {
@@ -98,6 +98,8 @@ void FlagParser::parse_flag(const char *env_option_name) {
   }
 
   bool res = run_handler(name, value);
+  free(name);
+  free(value);
   if (!res)
     fatal_error("Flag parsing failed.");
 }
@@ -153,6 +155,11 @@ void FlagParser::RegisterHandler(const char *name, FlagHandlerBase *handler,
 
 FlagParser::FlagParser() : n_flags_(0), buf_(nullptr), pos_(0) {
   flags_ = (Flag *)malloc(sizeof(Flag) * kMaxFlags);
+}
+FlagParser::~FlagParser() {
+  for (int i = 0; i < n_flags_; i++)
+    delete flags_[i].handler;
+  free(flags_);
 }
 
 OtfcptFlags __otfcpt::otfcpt_flags_dont_use;

@@ -14,14 +14,58 @@ Learn more about these options in LLVM's documentation at https://llvm.org/docs/
 ")
 endif()
 
+find_package(MPI REQUIRED)
+
 SET(CMAKE_MODULE_PATH
     "${CMAKE_SOURCE_DIR}/cmakemodules"
     ${CMAKE_MODULE_PATH}
     )
 
-set(MPI_CXX_SKIP_MPICXX TRUE)
+include(TestMpiFeatures)
+set_mpi_test_features()
 
-find_package(MPI REQUIRED)
+include(CheckLanguage)
+
+set(MPI_CXX_SKIP_MPICXX TRUE)
+add_definitions(-DOMPI_SKIP_MPICXX)
+
+set(OTFCPT_HAVE_Fortran False)
+set(OTFCPT_USE_Fortran False)
+
+check_language(Fortran)
+if(CMAKE_Fortran_COMPILER)
+  set(OTFCPT_HAVE_Fortran True)
+  if("${TEST_MPI_FEATURES}" MATCHES "ompi")
+    set(OTFCPT_USE_Fortran True)
+    # We don't test for OpenMPI 4 with <4.1.6, because MPI_F_STATUS_IGNORE 
+    # is broken with some of these versions
+    if("${TEST_MPI_FEATURES}" MATCHES "ompi-4.0" OR 
+       "${TEST_MPI_FEATURES}" MATCHES "ompi-4.1.[0-5]")
+      set(OTFCPT_HAVE_Fortran False)
+      set(OTFCPT_USE_Fortran False)
+    endif()
+  endif()
+  if("${TEST_MPI_FEATURES}" MATCHES "\\[\\]")
+    message(STATUS "Detection of MPI implementation failed, disabling Fortran support")
+    set(OTFCPT_HAVE_Fortran False)
+    set(OTFCPT_USE_Fortran False)
+  endif()
+endif()
+
+option(OTFCPT_ENABLE_FORTRAN_SUPPORT "Build OTF-CPT with pmpi Fortran wrappers" ${OTFCPT_USE_Fortran})
+
+if(OTFCPT_ENABLE_FORTRAN_SUPPORT)
+  if(NOT OTFCPT_HAVE_Fortran)
+    message(ERROR "No Fortran support available, but requested with OTFCPT_ENABLE_FORTRAN_SUPPORT")
+  endif()
+  enable_language(Fortran)
+  find_package(MPI REQUIRED)
+elseif(OTFCPT_HAVE_Fortran AND NOT OTFCPT_USE_Fortran)
+  message(STATUS "Assuming native Fortran support for MPICH-3 and IntelMPI")
+else()
+  message(STATUS "No Fortran support")
+endif()
+
 find_package(OpenMP REQUIRED)
 
 set(WRAP ${OTFCPT_SOURCE_DIR}/external/wrap/wrap.py)
@@ -86,6 +130,11 @@ set(OTFCPT_OMP_SOURCES
     parse_flags.cpp
 )
 
+if(OTFCPT_ENABLE_FORTRAN_SUPPORT)
+    add_definitions(-DFORTRAN_SUPPORT)
+    list(APPEND OTFCPT_SOURCES fort-wrappers.c)
+endif()
+
 list(APPEND GnuCompatible "Clang" "IntelLLVM" "GNU")
 list(APPEND ClangCompatible "Clang" "IntelLLVM")
 if ("${CMAKE_CXX_COMPILER_ID}" IN_LIST GnuCompatible)
@@ -118,6 +167,11 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif ()
 
 set(WRAP_FLAGS -s -n)
+
+if(OTFCPT_ENABLE_FORTRAN_SUPPORT)
+  set(WRAP_FLAGS -n -f)
+endif()
+
 add_wrapped_file(gen-nb-wrappers.cpp gen-nb-wrappers.w)
 add_wrapped_file(gen-wrappers.cpp gen-wrappers.w)
 

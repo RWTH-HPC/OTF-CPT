@@ -142,7 +142,7 @@ fortran_wrapper_includes = '''
 _EXTERN_C_ void *MPIR_ToPointer(int);
 #endif // MPICH_HAS_C2F
 
-void char_p_f2c(const char* fstr, int len, char** cstr)
+static void char_p_f2c(const char* fstr, int len, char** cstr)
 {
   const char* end;
   int i;
@@ -168,7 +168,7 @@ void char_p_f2c(const char* fstr, int len, char** cstr)
   /* Allocate space for the C string, if necessary. */
 
   if (*cstr == NULL) {
-    if ((*cstr = malloc(len + 1)) == NULL) {
+    if ((*cstr = (char*) malloc(len + 1)) == NULL) {
       return;
     }
   }
@@ -181,7 +181,7 @@ void char_p_f2c(const char* fstr, int len, char** cstr)
   (*cstr)[len] = '\\0';
 }
 
-void char_p_c2f(const char* cstr, char* fstr, int len)
+static void char_p_c2f(const char* cstr, char* fstr, int len)
 {
   int i;
 
