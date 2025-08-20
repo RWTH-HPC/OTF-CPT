@@ -86,7 +86,8 @@ using namespace __otfcpt;
 
 // Abstract interface of the HandleFactor
 template <typename M, typename T, auto E> class AbstractHandleFactory {
-  using A = M; // A is the application facing handle, M is the MPI facing handle.
+  using A =
+      M; // A is the application facing handle, M is the MPI facing handle.
 protected:
   CompactHashMap<M, T> predefHandles{};
   virtual bool isPredefined(A handle) { return handle == T::nullHandle; }
@@ -126,7 +127,7 @@ public:
   virtual void initPredefined() {
     predefHandles[T::nullHandle].init(T::nullHandle);
 #ifdef FORTRAN_SUPPORT
-    auto& nHandle = predefHandles[T::nullHandle];
+    auto &nHandle = predefHandles[T::nullHandle];
     predefFHandles[nHandle.fHandle] = &nHandle;
 #endif
   }
@@ -139,13 +140,12 @@ class AbstractRequestFactory
   using A = MPI_Request;
   using M = MPI_Request;
   using T = RequestData;
+
 public:
   virtual A newRequest(M req, bool persistent = false) = 0;
-  virtual A newRequest(M req, RequestData *data,
-                                 bool persistent = false) = 0;
+  virtual A newRequest(M req, RequestData *data, bool persistent = false) = 0;
   virtual A completeRequest(A req, MPI_Status *status) = 0;
-  virtual A completeRequest(A req, MPI_Request mpi_req,
-                                      MPI_Status *status) = 0;
+  virtual A completeRequest(A req, MPI_Request mpi_req, MPI_Status *status) = 0;
   virtual A startRequest(A req) = 0;
   virtual A cancelRequest(A req) = 0;
 };

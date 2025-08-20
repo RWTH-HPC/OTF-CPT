@@ -157,7 +157,7 @@ FlagParser::FlagParser() : n_flags_(0), buf_(nullptr), pos_(0) {
   flags_ = (Flag *)malloc(sizeof(Flag) * kMaxFlags);
 }
 FlagParser::~FlagParser() {
-  for (int i=0; i<n_flags_; i++)
+  for (int i = 0; i < n_flags_; i++)
     delete flags_[i].handler;
   free(flags_);
 }

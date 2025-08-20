@@ -102,19 +102,19 @@ public:
   int fHandle{-1};
 #endif
   HandleData() {}
-/*  HandleData(M group
-#ifdef FORTRAN_SUPPORT
-             ,
-             MPI_Fint fGroup
-#endif
-             )
-      : handle(group)
-#ifdef FORTRAN_SUPPORT
-        ,
-        fHandle(fGroup)
-#endif
-  {
-  }*/
+  /*  HandleData(M group
+  #ifdef FORTRAN_SUPPORT
+               ,
+               MPI_Fint fGroup
+  #endif
+               )
+        : handle(group)
+  #ifdef FORTRAN_SUPPORT
+          ,
+          fHandle(fGroup)
+  #endif
+    {
+    }*/
   HandleData(const HandleData &o) { this->init(o.handle); }
   HandleData(HandleData &&o) noexcept { this->init(o.handle); }
   virtual void init(M group
@@ -122,7 +122,8 @@ public:
                     ,
                     MPI_Fint fGroup
 #endif
-  ) { handle = group; 
+  ) {
+    handle = group;
 #ifdef FORTRAN_SUPPORT
     fHandle = fGroup;
 #endif
@@ -157,8 +158,8 @@ public:
 #endif
   void init(MPI_Comm comm
 #ifdef FORTRAN_SUPPORT
-                    ,
-                    MPI_Fint fComm = -1
+            ,
+            MPI_Fint fComm = -1
 #endif
   ) {
     this->handle = comm;
@@ -317,10 +318,8 @@ public:
 #ifdef FORTRAN_SUPPORT
   MPI_Fint fHandle{-1};
 #endif
-  
 
-  void init(MPI_Request request, KIND _kind, 
-  int _remote = -1, int _tag = -1,
+  void init(MPI_Request request, KIND _kind, int _remote = -1, int _tag = -1,
             CommData *_comm = nullptr, int _root = -1,
             bool _persistent = false) {
     handle = request;
@@ -337,11 +336,12 @@ public:
     cancelled = false;
   }
 
-  template <typename M> void init(M request,
+  template <typename M>
+  void init(M request,
 #ifdef FORTRAN_SUPPORT
             MPI_Fint fRequest = -1,
 #endif
-  bool _persistent = false) {
+            bool _persistent = false) {
     persistent = _persistent;
     handle = (MPI_Request)request;
 #ifdef FORTRAN_SUPPORT

@@ -244,7 +244,8 @@ int MPI_Finalize(void) {
 
 int MPI_Pcontrol(const int level, ...) {
   if (useMpi == false) {
-    printf("MPI_Pcontrol called before MPI_Init or something is wrong with Fortran setup\n");
+    printf("MPI_Pcontrol called before MPI_Init or something is wrong with "
+           "Fortran setup\n");
     MPI_Abort(MPI_COMM_SELF, -1);
   }
   if (level == 1) {
@@ -262,21 +263,13 @@ static void MPI_Pcontrol_fortran_wrapper(MPI_Fint *level) {
   MPI_Pcontrol(*level);
 }
 
-void MPI_PCONTROL(MPI_Fint *level) {
-  MPI_Pcontrol_fortran_wrapper(level);
-}
+void MPI_PCONTROL(MPI_Fint *level) { MPI_Pcontrol_fortran_wrapper(level); }
 
-void mpi_pcontrol(MPI_Fint *level) {
-  MPI_Pcontrol_fortran_wrapper(level);
-}
+void mpi_pcontrol(MPI_Fint *level) { MPI_Pcontrol_fortran_wrapper(level); }
 
-void mpi_pcontrol_(MPI_Fint *level) {
-  MPI_Pcontrol_fortran_wrapper(level);
-}
+void mpi_pcontrol_(MPI_Fint *level) { MPI_Pcontrol_fortran_wrapper(level); }
 
-void mpi_pcontrol__(MPI_Fint *level) {
-  MPI_Pcontrol_fortran_wrapper(level);
-}
+void mpi_pcontrol__(MPI_Fint *level) { MPI_Pcontrol_fortran_wrapper(level); }
 
 /* ================= End Wrappers for MPI_Pcontrol ================= */
 

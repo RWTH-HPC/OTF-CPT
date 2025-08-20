@@ -47,7 +47,7 @@ static void printMetrics(struct metrics m) {
   printM(OTE);
 }
 
-void printmetrics_(int* olb, int* ose, int* ote, int* mlb, int* mse, int* mte){
+void printmetrics_(int *olb, int *ose, int *ote, int *mlb, int *mse, int *mte) {
   metrics m = {*olb, *ose, *ote, *mlb, *mse, *mte};
   printMetrics(m);
 }
