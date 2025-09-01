@@ -78,6 +78,11 @@ public:
     return end_[-1];
   }
 
+  const T &getBack() const {
+    DCHECK_GT(end_, begin_);
+    return end_[-1];
+  }
+
   void Resize(uptr size) {
     if (size == 0) {
       end_ = begin_;

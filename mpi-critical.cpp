@@ -16,20 +16,13 @@ void MpiHappensAfter(ipcData &uc, int remote) { MpiHappensAfter(&uc, remote); }
 void MpiHappensAfter(ipcData *uc, int remote) {
   if (!analysis_flags->running)
     return;
-  DCHECK(thread_local_clock->stopped_mpi_clock == true);
-  DCHECK(remote >= -1);
-  double offset = 0;
-#ifdef DO_OFFSET
-  if (remote != -1)
-    offset = timeOffsets[remote];
-#endif
-  update_maximum(thread_local_clock->useful_computation_critical,
+  DCHECK_EQ(thread_local_clock->getState(), STATE_MPI);
+  update_maximum(thread_local_clock->clocks[CLOCK_USEFUL].critical,
                  uc->uc_double[0]);
-  update_maximum(thread_local_clock->outsidempi_critical, uc->uc_double[1]);
-  update_maximum(thread_local_clock->outsideomp_critical,
-                 uc->uc_double[2] - offset);
-  update_maximum(thread_local_clock->outsideomp_critical_nooffset,
-                 uc->uc_double[3]);
+  update_maximum(thread_local_clock->clocks[CLOCK_OMPI].critical,
+                 uc->uc_double[1]);
+  update_maximum(thread_local_clock->clocks[CLOCK_OOMP].critical,
+                 uc->uc_double[2]);
 }
 
 double *loadThreadTimers(ipcData &uc, int remote) {
@@ -37,15 +30,9 @@ double *loadThreadTimers(ipcData &uc, int remote) {
 }
 
 double *loadThreadTimers(ipcData *uc, int remote) {
-  double offset = 0;
-#ifdef DO_OFFSET
-  if (remote != -1)
-    offset = timeOffsets[remote];
-#endif
-  uc->uc_double[0] = thread_local_clock->useful_computation_critical.load();
-  uc->uc_double[1] = thread_local_clock->outsidempi_critical.load();
-  uc->uc_double[2] = thread_local_clock->outsideomp_critical.load() + offset;
-  uc->uc_double[3] = thread_local_clock->outsideomp_critical_nooffset.load();
+  uc->uc_double[0] = thread_local_clock->clocks[CLOCK_USEFUL].critical.load();
+  uc->uc_double[1] = thread_local_clock->clocks[CLOCK_OMPI].critical.load();
+  uc->uc_double[2] = thread_local_clock->clocks[CLOCK_OOMP].critical.load();
   return uc->uc_double;
 }
 
@@ -203,8 +190,8 @@ void init_processes(mpiTimer &mt) {
   }
   init_timer_offsets();
   if (!analysis_flags->running) {
-    startTool(false, CLOCK_ALL);
-    resetMpiClock(thread_local_clock);
+    startTool(false, STATE_MPI);
+    // resetMpiClock(thread_local_clock);
   }
 }
 
@@ -218,20 +205,15 @@ extern "C" {
 
 int MPI_Finalize(void) {
   mpiTimer mt{false, __func__};
-  DCHECK(thread_local_clock->stopped_clock == true);
-  DCHECK(thread_local_clock->stopped_mpi_clock == true);
+  if (analysis_flags->running)
+    DCHECK_EQ(thread_local_clock->getState(), STATE_MPI);
+  else
+    DCHECK_EQ(thread_local_clock->getState(), STATE_INIT);
   ipcData max_uc;
   loadThreadTimers(max_uc, REF_RANK);
   max_uc.Allreduce(cf.findData(MPI_COMM_WORLD));
-  thread_local_clock->useful_computation_critical = max_uc.uc_double[0];
-  thread_local_clock->outsidempi_critical = max_uc.uc_double[1];
-  double offset = 0;
-#ifdef DO_OFFSET
-  if (REF_RANK != -1)
-    offset = timeOffsets[REF_RANK];
-#endif
-  thread_local_clock->outsideomp_critical = max_uc.uc_double[2] - offset;
-  thread_local_clock->outsideomp_critical_nooffset = max_uc.uc_double[3];
+  MpiHappensAfter(max_uc, 0);
+
   finishMeasurement();
   analysis_flags->running = false;
   ipcData::finiIpcData();
@@ -250,9 +232,11 @@ int MPI_Pcontrol(const int level, ...) {
   }
   if (level == 1) {
     if (analysis_flags->barrier)
-      PMPI_Barrier(cf.findData(MPI_COMM_WORLD)->getDupComm());
+      MPI_Barrier(MPI_COMM_WORLD);
     startTool();
   } else if (level == 0) {
+    if (analysis_flags->barrier)
+      MPI_Barrier(MPI_COMM_WORLD);
     stopTool();
   }
   return MPI_SUCCESS;

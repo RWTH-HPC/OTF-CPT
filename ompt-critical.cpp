@@ -41,23 +41,14 @@ static int hasTaskCreation = 0;
 
 static __thread omptCounts *omptThreadCount;
 
-template <bool always = true> struct ompTimer {
+struct ompTimer {
   const char *loc;
-  bool stopped{false};
   ompTimer(const char *loc = NULL) : loc(loc) {
     if (thread_local_clock == nullptr)
       thread_local_clock = new THREAD_CLOCK(my_next_id(), 0);
-    else {
-      if (always || !thread_local_clock->stopped_clock)
-        thread_local_clock->Stop(CLOCK_OMP, loc);
-      else
-        stopped = true;
-    }
+    thread_local_clock->enterState(STATE_OMP, loc);
   }
-  ~ompTimer() {
-    if (always || !stopped)
-      thread_local_clock->Start(CLOCK_OMP, loc);
-  }
+  ~ompTimer() { thread_local_clock->exitState(loc); }
 };
 
 static int pagesize{0};
@@ -319,6 +310,9 @@ struct TaskData final : DataPoolEntry<TaskData> {
   /// this task.
   ompt_tsan_clockid Taskwait{0};
 
+  /// Whether this task was started while analysis_flags->running == true
+  bool isRunning{false};
+
   /// Whether this task is currently executing a barrier.
   bool InBarrier{false};
 
@@ -381,6 +375,7 @@ struct TaskData final : DataPoolEntry<TaskData> {
   ompt_tsan_clockid *GetTaskwaitPtr() { return &Taskwait; }
 
   TaskData *Init(TaskData *parent, int taskType) {
+    isRunning = analysis_flags->running;
     TaskType = taskType;
     Parent = parent;
     Team = Parent->Team;
@@ -394,6 +389,7 @@ struct TaskData final : DataPoolEntry<TaskData> {
   }
 
   TaskData *Init(ParallelData *team, int taskType) {
+    isRunning = analysis_flags->running;
     TaskType = taskType;
     execution = 1;
     ImplicitTask = this;
@@ -402,6 +398,7 @@ struct TaskData final : DataPoolEntry<TaskData> {
   }
 
   TaskData *Init(ParallelData *team, int threadNum, int taskType) {
+    isRunning = analysis_flags->running;
     TaskType = taskType;
     execution = 1;
     ImplicitTask = this;
@@ -411,6 +408,7 @@ struct TaskData final : DataPoolEntry<TaskData> {
   }
 
   void Reset() {
+    isRunning = false;
     InBarrier = false;
     TaskType = 0;
     execution = 0;
@@ -480,6 +478,7 @@ static void ompt_tsan_thread_begin(ompt_thread_t thread_type,
     thread_clocks->PushBack(thread_local_clock);
     thread_counts->PushBack(omptThreadCount);
   }
+  thread_local_clock->enterState(startProgrammTime, STATE_OMP, __func__);
 }
 
 static void ompt_tsan_thread_end(ompt_data_t *thread_data) {
@@ -501,7 +500,7 @@ static void ompt_tsan_parallel_begin(ompt_data_t *parent_task_data,
   parallel_data->ptr = Data;
 
   // end of computation
-  thread_local_clock->Stop(CLOCK_OMP, "ParallelBegin");
+  thread_local_clock->enterState(STATE_OMP, __func__);
   OmpHappensBefore(Data->GetParallelPtr());
 }
 
@@ -509,7 +508,7 @@ static void ompt_tsan_parallel_end(ompt_data_t *parallel_data,
                                    ompt_data_t *task_data, int flag,
                                    const void *codeptr_ra) {
   ParallelData *Data = ToParallelData(parallel_data);
-  thread_local_clock->Start(CLOCK_OMP, "ParallelEnd");
+  thread_local_clock->exitState(__func__);
 
   Data->Delete();
 }
@@ -526,22 +525,16 @@ static void ompt_tsan_implicit_task(ompt_scope_endpoint_t endpoint,
     if (type & ompt_task_initial) {
       parallel_data->ptr = ParallelData::New(nullptr);
     } else {
-      if (thread_local_clock->stopped_mpi_clock) {
-        thread_local_clock->Start(CLOCK_MPI_ONLY, __func__);
+      // In case of reusing OMP threads from a parallel region
+      // created when the tool was not yet running
+      if (thread_local_clock->getState() == STATE_INIT) {
+        thread_local_clock->enterState(STATE_OMP, "ImplicitTaskBegin");
       }
       OmpHappensAfter(ToParallelData(parallel_data)->GetParallelPtr());
     }
     task_data->ptr =
         TaskData::New(ToParallelData(parallel_data), thread_num, type);
-
-    if (!(type & ompt_task_initial) || thread_local_clock->stopped_clock) {
-      if (thread_local_clock->stopped_mpi_clock) {
-        thread_local_clock->Start(CLOCK_ALL, __func__);
-      } else {
-        thread_local_clock->Start(CLOCK_OMP, __func__);
-      }
-    }
-    // start of the task, useful computation start
+    thread_local_clock->enterState(STATE_USEFUL, "ImplicitTaskBegin");
     break;
   case ompt_scope_end: {
     if (analysis_flags->running)
@@ -552,24 +545,13 @@ static void ompt_tsan_implicit_task(ompt_scope_endpoint_t endpoint,
     DCHECK(Data->freed == 0 && "Implicit task end should only be called once!");
     Data->freed = 1;
 #endif
+    thread_local_clock->exitState("ImplicitTaskEnd", Data->isRunning);
     DCHECK(Data->RefCount == 1 &&
            "All tasks should have finished at the implicit barrier!");
     Data->Delete();
     if (type & ompt_task_initial) {
       ToParallelData(parallel_data)->Delete();
-      if (!thread_local_clock->stopped_clock) {
-        if (!thread_local_clock->stopped_mpi_clock) {
-          thread_local_clock->Stop(CLOCK_ALL, __func__);
-        } else {
-          thread_local_clock->Stop(CLOCK_OMP, __func__);
-        }
-      }
-    } else if (team_size == 1) {
-      thread_local_clock->Stop(CLOCK_OMP, __func__);
     }
-
-    DCHECK(thread_local_clock->stopped_clock);
-
     break;
   }
   case ompt_scope_beginend:
@@ -600,7 +582,7 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
     case ompt_sync_region_barrier_teams:
     case ompt_sync_region_barrier: {
       Data->InBarrier = true;
-      thread_local_clock->Stop(CLOCK_OMP, "SyncRegionBegin");
+      thread_local_clock->enterState(STATE_OMP, "SyncRegionBegin");
       char BarrierIndex = Data->BarrierIndex;
       if (Data->ThreadNum == 0)
         OmpClockReset(Data->Team->GetBarrierPtr((BarrierIndex + 1) % 3));
@@ -610,7 +592,7 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
 
     case ompt_sync_region_taskwait: {
       Data->InBarrier = true;
-      thread_local_clock->Stop(CLOCK_OMP, "SyncRegionBegin");
+      thread_local_clock->enterState(STATE_OMP, "SyncRegionBegin");
       break;
     }
 
@@ -648,8 +630,7 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
       // address.
       Data->BarrierIndex = (BarrierIndex + 1) % 3;
       Data->InBarrier = false;
-      if (parallel_data && kind != ompt_sync_region_barrier_implicit_parallel)
-        thread_local_clock->Start(CLOCK_OMP, "SyncRegionEnd");
+      thread_local_clock->exitState("SyncRegionEnd", Data->isRunning);
       break;
     }
 
@@ -657,14 +638,14 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
       if (Data->execution > 1)
         OmpHappensAfter(Data->GetTaskwaitPtr());
       Data->InBarrier = false;
-      thread_local_clock->Start(CLOCK_OMP, "SyncRegionEnd");
+      thread_local_clock->exitState("SyncRegionEnd", Data->isRunning);
       break;
     }
 
     case ompt_sync_region_taskgroup: {
       DCHECK(Data->TaskGroup != nullptr &&
              "Should have at least one taskgroup!");
-      ompTimer<> ot{"TaskGroup"};
+      ompTimer ot{"TaskGroup"};
 
       OmpHappensAfter(Data->TaskGroup->GetPtr());
 
@@ -699,7 +680,7 @@ static void ompt_tsan_sync_region_wait(ompt_sync_region_t kind,
         omptThreadCount->syncRegionBegin++;
 
       Data->InBarrier = true;
-      thread_local_clock->Stop(CLOCK_OMP, "SyncRegionBegin");
+      thread_local_clock->enterState(STATE_OMP, "SyncRegionBegin");
       if (endpoint == ompt_scope_begin)
         break;
       KMP_FALLTHROUGH();
@@ -708,7 +689,7 @@ static void ompt_tsan_sync_region_wait(ompt_sync_region_t kind,
         omptThreadCount->syncRegionEnd++;
 
       Data->InBarrier = false;
-      thread_local_clock->Start(CLOCK_OMP, "SyncRegionEnd");
+      thread_local_clock->exitState("SyncRegionEnd", Data->isRunning);
       break;
     }
   }
@@ -717,6 +698,7 @@ static void ompt_tsan_sync_region_wait(ompt_sync_region_t kind,
 static int ompt_tsan_control_tool(uint64_t command, uint64_t modifier,
                                   void *arg, const void *codeptr_ra) {
   if (command == omp_control_tool_start) {
+    // TODO start with no arguments = USEFUL
     startTool();
   } else if (command == omp_control_tool_pause) {
     return 1;
@@ -761,7 +743,7 @@ static void ompt_tsan_task_create(
     // Use the newly created address. We cannot use a single address from the
     // parent because that would declare wrong relationships with other
     // sibling tasks that may be created before this task is started!
-    ompTimer<false> ot{"TaskCreate"};
+    ompTimer ot{"TaskCreate"};
     OmpHappensBefore(Data->GetTaskPtr());
     ToTaskData(parent_task_data)->execution++;
   }
@@ -774,12 +756,12 @@ ompt_tsan_task_creation(ompt_scope_endpoint_t endpoint,
 {
   switch (endpoint) {
   case ompt_scope_begin:
-    // runtime overhead, stop useful
-    thread_local_clock->Stop(CLOCK_OMP, "TaskCreationBegin");
+    // runtime overhead, enter OpenMP
+    thread_local_clock->enterState(STATE_OMP, "TaskCreationBegin");
     break;
   case ompt_scope_end:
-    // runtime overhead, stop useful
-    thread_local_clock->Start(CLOCK_OMP, "TaskCreationEnd");
+    // runtime overhead, exit OpenMP
+    thread_local_clock->exitState("TaskCreationEnd");
     break;
   case ompt_scope_beginend:
     // Should not occur according to OpenMP 5.1
@@ -843,7 +825,7 @@ static void ompt_tsan_task_schedule(ompt_data_t *first_task_data,
 
   // Legacy handling for missing reduction callback
   if (!FromTask->InBarrier) {
-    thread_local_clock->Stop(CLOCK_OMP, "TaskEnd");
+    thread_local_clock->exitState("TaskEnd", FromTask->isRunning);
   }
 
   // The late fulfill happens after the detached task finished execution
@@ -908,14 +890,14 @@ static void ompt_tsan_task_schedule(ompt_data_t *first_task_data,
   OmpHappensAfter(ToTask->GetTaskPtr());
   // only start the clock if the next task is not in a barrier
   if (!ToTask->InBarrier) {
-    thread_local_clock->Start(CLOCK_OMP, "TaskBegin");
+    thread_local_clock->enterState(STATE_USEFUL, "TaskBegin");
   }
 }
 
 static void ompt_tsan_dependences(ompt_data_t *task_data,
                                   const ompt_dependence_t *deps, int ndeps) {
   if (ndeps > 0) {
-    ompTimer<false> ot{"TaskDepend"};
+    ompTimer ot{"TaskDepend"};
     // Copy the data to use it in task_switch and task_end.
     TaskData *Data = ToTaskData(task_data);
     if (!Data->Parent->DependencyMap)
@@ -944,7 +926,7 @@ static void ompt_tsan_mutex_acquire(ompt_mutex_t kind, unsigned int hint,
                                     const void *codeptr_ra) {
   if (analysis_flags->running)
     omptThreadCount->mutexAcquire++;
-  thread_local_clock->Stop(CLOCK_OMP, "MutexAcquire");
+  thread_local_clock->enterState(STATE_OMP, "MutexAcquire");
 }
 
 /// OMPT event callbacks for handling locking.
@@ -967,12 +949,12 @@ static void ompt_tsan_mutex_acquired(ompt_mutex_t kind, ompt_wait_id_t wait_id,
   LocksMutex.unlock();
   LockIdPair->first.lock();
   OmpHappensAfter(&LockIdPair->second);
-  thread_local_clock->Start(CLOCK_OMP, "MutexAcquired");
+  thread_local_clock->exitState("MutexAcquired");
 }
 
 static void ompt_tsan_mutex_released(ompt_mutex_t kind, ompt_wait_id_t wait_id,
                                      const void *codeptr_ra) {
-  ompTimer<> ot{"MutexRelease"};
+  ompTimer ot{"MutexRelease"};
   LocksMutex.lock();
   auto &Lock = Locks[wait_id];
   LocksMutex.unlock();
@@ -1042,7 +1024,8 @@ static int ompt_tsan_initialize(ompt_function_lookup_t lookup, int device_num,
   SET_CALLBACK_T(mutex_acquired, mutex);
   SET_CALLBACK_T(mutex_released, mutex);
 
-  thread_local_clock = new THREAD_CLOCK(my_next_id(), 0);
+  if (!thread_local_clock)
+    thread_local_clock = new THREAD_CLOCK(my_next_id(), 0);
   startTool(false);
   return 1; // success
 }
@@ -1061,7 +1044,8 @@ static void ompt_tsan_finalize(ompt_data_t *tool_data) {
             end.ru_maxrss);
   }
 }
-extern "C" ompt_start_tool_result_t *__attribute__((visibility("default")))
+
+extern "C" __attribute__((visibility("default"))) ompt_start_tool_result_t *
 ompt_start_tool(unsigned int omp_version, const char *runtime_version) {
   InitializeOtfcptFlags();
   if (!analysis_flags->enabled) {
