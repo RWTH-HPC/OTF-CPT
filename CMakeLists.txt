@@ -141,6 +141,11 @@ if(OTFCPT_ENABLE_FORTRAN_WRAPPERS)
     list(APPEND OTFCPT_SOURCES fort-wrappers.c)
 endif()
 
+option(OTFCPT_DEBUG_CLOCKS "Detailed clock printing at every sync point" OFF)
+if (OTFCPT_DEBUG_CLOCKS)
+  add_compile_definitions(-DDEBUG_CLOCKS)
+endif()
+
 list(APPEND GnuCompatible "Clang" "IntelLLVM" "GNU")
 list(APPEND ClangCompatible "Clang" "IntelLLVM")
 option(OTFCPT_USE_BACKWARD "Use Backward-CPP for stacktraces" OFF)
@@ -191,6 +196,7 @@ if (OTFCPT_USE_GNU_LIBCPP)
     set(STDCPLUS_COMPILE_FLAGS "")
     set(STDCPLUS_LINK_FLAGS "")
   endif()
+  set(LINK_EXTERNAL_LIBRARIES Backward::Interface)
   add_compile_definitions(-DUSE_STL)
   if (OTFCPT_USE_BACKWARD)
     add_compile_definitions(-DUSE_BACKWARD)
@@ -231,6 +237,8 @@ target_link_libraries(OTFCPT_static PUBLIC MPI::MPI_CXX ${LINK_EXTERNAL_LIBRARIE
 target_compile_definitions(OTFCPT_static PUBLIC -DUSE_MPI=1)
 target_link_options(OTFCPT_static PUBLIC ${STDCPLUS_LINK_FLAGS})
 target_compile_options(OTFCPT_static PUBLIC ${STDCPLUS_COMPILE_FLAGS})
+
+add_library(KMPC SHARED kmpc-intercept.c)
 
 if (EXISTS ${CMAKE_CURRENT_LIST_DIR}/external/FileCheck/CMakeLists.txt)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/external/FileCheck EXCLUDE_FROM_ALL)

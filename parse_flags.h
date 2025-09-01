@@ -15,6 +15,9 @@
 #include <unistd.h>
 
 #define ANALYSIS_FLAGS "OTFCPT_OPTIONS"
+#define analysis_flags get_otfcpt_flags()
+#define analysis_flag_output                                                   \
+  (get_otfcpt_flags()->output ? get_otfcpt_flags()->output : stderr)
 
 namespace __otfcpt {
 
@@ -131,6 +134,20 @@ template <> inline bool FlagHandler<int>::Parse(const char *value) {
 
 template <> inline bool FlagHandler<int>::Format(char *buffer, uptr size) {
   uptr num_symbols_should_write = snprintf(buffer, size, "%d", *t_);
+  return num_symbols_should_write < size;
+}
+
+template <> inline bool FlagHandler<double>::Parse(const char *value) {
+  char *value_end;
+  *t_ = strtod(value, &value_end);
+  bool ok = *value_end == 0;
+  if (!ok)
+    printf("ERROR: Invalid value for double option: '%s'\n", value);
+  return ok;
+}
+
+template <> inline bool FlagHandler<double>::Format(char *buffer, uptr size) {
+  uptr num_symbols_should_write = snprintf(buffer, size, "%lf", *t_);
   return num_symbols_should_write < size;
 }
 
