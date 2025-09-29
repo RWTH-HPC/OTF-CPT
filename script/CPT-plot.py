@@ -26,7 +26,7 @@ edir=args.experiment_directory
 if args.prefix is not None:
     ename=args.prefix
 else:
-    ename=edir.split("/")[-1]
+    ename=os.path.basename(os.path.normpath(edir))
 
 # show preview
 preview=False
