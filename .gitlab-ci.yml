@@ -57,6 +57,7 @@ stages:
       libmpich-dev
       git
       python3
+      python3-venv
       libxml2-dev
       libomp-dev
       llvm-14-tools
