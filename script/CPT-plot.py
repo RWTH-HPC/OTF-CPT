@@ -6,9 +6,7 @@ import os
 import re
 
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 import matplotlib.backends.backend_pdf as plt_backend
-from matplotlib import cm
 from matplotlib.patches import Rectangle
 from matplotlib.colors import ListedColormap
 
@@ -111,11 +109,6 @@ def draw_table(mode):
         ax.set_ylim(0, nrows)
         ax.set_axis_off()
 
-        summer = mpl.colormaps["summer"]
-        autumn = mpl.colormaps["autumn"]
-
-        cutpoint=.20
-
         for y, n in enumerate(data[tuple(scales[0][:2])].keys()):
             for x, (p, t, f) in enumerate(scales):
                 scale = (p,t)
@@ -174,8 +167,6 @@ def draw_table(mode):
                 lstyle = "solid"
                 c = 'black'
             ax.plot([y+fwidth, y+fwidth], [ax.get_ylim()[0], ax.get_ylim()[1]], lw=1.15, color=c, ls=lstyle, zorder=3 , marker='')
-
-        cb = plt.colorbar(cm.ScalarMappable(cmap=newcmp), cax=cbax)
 
         fig.tight_layout()
         pdf.savefig()
@@ -288,7 +279,7 @@ def plot_data(mode):
                 pdata[k]=pdata.get(k,[])+[v]
         y = list(pdata.values())
         ax_tot.stackplot(xticks, y, labels=labs, colors=COLORS)
-        ax_tot.set_ylim([0,1])
+        ax_tot.set_ylim(0,1)
         if args.mpi_only:
             ax_tot.set_title("Breakdown")
             ax_tot.set_xlabel("#ranks")
@@ -318,7 +309,7 @@ def plot_data(mode):
                     pdata[k]=pdata.get(k,[])+[v]
             y = list(pdata.values())
             ax_omp.stackplot(xticks, y, labels=labs, colors=COLORS)
-            ax_omp.set_ylim([0,1])
+            ax_omp.set_ylim(0,1)
             ax_omp.set_title("OpenMP breakdown")
             ax_omp.set_ylabel("Efficiency")
             ax_omp.set_xlabel("#ranks x #threads")
@@ -339,7 +330,7 @@ def plot_data(mode):
                     pdata[k]=pdata.get(k,[])+[v]
             y = list(pdata.values())
             ax_mpi.stackplot(xticks, y, labels=labs, colors=COLORS)
-            ax_mpi.set_ylim([0,1])
+            ax_mpi.set_ylim(0,1)
             ax_mpi.set_title("MPI breakdown")
             ax_mpi.set_ylabel("Efficiency")
             ax_mpi.set_xlabel("Number of MPI ranks")
@@ -356,8 +347,6 @@ def plot_data(mode):
 
         if multiscale:
             for y in range(len(scales)-1):
-                lstyle = ":"
-                c = 'gray'
                 if scales[y][0] * scales[y][1] != scales[y+1][0] * scales[y+1][1]:
                     ax_tot.plot([y+.5, y+.5], [ax_tot.get_ylim()[0], ax_tot.get_ylim()[1]], lw=1.5, color="red", ls="solid", zorder=3 , marker='')
                     if not args.mpi_only:
