@@ -105,7 +105,7 @@ def draw_table(mode):
 
         fwidth = 4.2
 
-        fig, (ax, cbax) = plt.subplots(1,2,width_ratios=[ncols+fwidth,.25],figsize=((ncols+fwidth+1)*.7,3*.8), dpi=200)
+        fig, (ax, cbax) = plt.subplots(1,2,width_ratios=[ncols+fwidth,.25],figsize=((ncols+fwidth+1)*.7,6*.8), dpi=200)
 
         ax.set_xlim(0, ncols+fwidth-1)
         ax.set_ylim(0, nrows)
