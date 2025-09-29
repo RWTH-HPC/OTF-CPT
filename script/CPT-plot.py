@@ -52,8 +52,8 @@ if corescales != len(scales) and corescales != 1:
     multiscale = True    
 
 # Colormap
-top = cm.get_cmap('RdYlGn', 40)
-bottom = cm.get_cmap('RdYlGn', 80)
+top = plt.get_cmap('RdYlGn', 40)
+bottom = plt.get_cmap('RdYlGn', 80)
 newcolors = np.vstack((
     bottom([i**2*.5 for i in np.linspace(0, 1, 800)]),
     top(np.linspace(.5, .8, 200))
