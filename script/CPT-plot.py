@@ -6,6 +6,7 @@ import os
 import re
 
 import matplotlib.pyplot as plt
+from matplotlib import cm
 import matplotlib.backends.backend_pdf as plt_backend
 from matplotlib.patches import Rectangle
 from matplotlib.colors import ListedColormap
@@ -167,6 +168,8 @@ def draw_table(mode):
                 lstyle = "solid"
                 c = 'black'
             ax.plot([y+fwidth, y+fwidth], [ax.get_ylim()[0], ax.get_ylim()[1]], lw=1.15, color=c, ls=lstyle, zorder=3 , marker='')
+
+        plt.colorbar(cm.ScalarMappable(cmap=newcmp), cax=cbax)
 
         fig.tight_layout()
         pdf.savefig()
