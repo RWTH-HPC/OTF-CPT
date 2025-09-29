@@ -1,3 +1,4 @@
+# REQUIRES: plot-requirements
 # RUN: rm -rf %t/out
 # RUN: %plotscript -o %t/out %project_src_dir/script/data
 # RUN: test -f %t/out/data_graph.pdf
