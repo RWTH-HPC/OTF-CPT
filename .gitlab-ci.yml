@@ -116,7 +116,7 @@ debian:
     MPIEXEC: mpiexec.${MPI} # TODO: Change to ${MPI} when Debian's mpich hydra launcher is fixed
 
 .cluster-template:
-  extends: .artifacts-template
+    extends: .artifacts-template
     tags: 
       - "downscope-testing"
     variables:
