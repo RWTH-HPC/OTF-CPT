@@ -93,7 +93,7 @@ def draw_table(mode):
             "    MPI Load Balance",
             "    MPI Communication Efficiency",
             "      MPI Serialisation Efficiency",
-            "      MPI Transfer Efficiency"
+            "      MPI Transfer Efficiency",
             "  OMP Parallel Efficiency",
             "    OMP Load Balance",
             "    OMP Communication Efficiency",
