@@ -1,18 +1,16 @@
-import matplotlib.pyplot as plt
-import matplotlib.backends.backend_pdf as plt_backend
-
-import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
-import matplotlib as mpl
-from matplotlib import cm
-from matplotlib.colors import ListedColormap
 import argparse
-
-from PIL import Image
 import os
 import re
+
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import matplotlib.backends.backend_pdf as plt_backend
+from matplotlib import cm
+from matplotlib.patches import Rectangle
+from matplotlib.colors import ListedColormap
+
+
 
 parser = argparse.ArgumentParser(description='Plot CPT metrics from an experiment directory.')
 parser.add_argument('experiment_directory', type=str, help='Path to the experiment directory containing output files. The script expects the relative or absolute path of this directory as an argument. The individual output files should follow the naming convention <prefix>-<nprocs>x<nthreads>.<suffix>.')
