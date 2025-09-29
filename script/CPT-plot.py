@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import numpy as np
 import argparse
 import os
@@ -9,7 +11,6 @@ import matplotlib.backends.backend_pdf as plt_backend
 from matplotlib import cm
 from matplotlib.patches import Rectangle
 from matplotlib.colors import ListedColormap
-
 
 
 parser = argparse.ArgumentParser(description='Plot CPT metrics from an experiment directory.')
