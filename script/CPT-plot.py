@@ -7,26 +7,42 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import matplotlib as mpl
 from matplotlib import cm
-from matplotlib.colors import ListedColormap, LinearSegmentedColormap
-
+from matplotlib.colors import ListedColormap
+import argparse
 
 from PIL import Image
-import urllib
-import os, sys
+import os
 import re
 
-if (len(sys.argv) != 2):
-    print("Usage: %s <experiment-directory>" % sys.argv[0])
-    exit()
+parser = argparse.ArgumentParser(description='Plot CPT metrics from an experiment directory.')
+parser.add_argument('experiment_directory', type=str, help='Path to the experiment directory containing output files. The script expects the relative or absolute path of this directory as an argument. The individual output files should follow the naming convention <prefix>-<nprocs>x<nthreads>.<suffix>.')
+parser.add_argument('-o', '--out-dir', type=str, default='.', help='Path to the output directory where the plots will be saved.')
+parser.add_argument('-p', '--prefix', type=str, default=None, help='Prefix of the output files to consider. If not specified, the experiment directory name will be used.')
+parser.add_argument('--mpi-only', action='store_true', dest='mpi_only', help='Show only MPI metrics')
+# Parse arguments
+args = parser.parse_args()
 
 # Name of experiment directory. Will also be used as prefix for output
-edir=sys.argv[1]
-ename=edir.split("/")[-1]
+edir=args.experiment_directory
+if args.prefix is not None:
+    ename=args.prefix
+else:
+    ename=edir.split("/")[-1]
 
 # show preview
 preview=False
 
+# Check if experiment dir exists
+if not os.path.exists(edir):
+    raise FileNotFoundError(f"Experiment directory {edir} does not exist.")
+
 scales = sorted([(int(m.group(1)), int(m.group(2)), f) for f in os.listdir(edir) if (m := re.search(r'-(\d+)x(\d+)\.', f))], key=lambda k: (k[0]*k[1], k[0]))
+
+if len(scales) == 0:
+    raise ValueError(f"No valid output files found in {edir}. Ensure files follow the naming convention <prefix>-<nprocs>x<nthreads>.<suffix>.")
+
+# Create output directory
+os.makedirs(args.out_dir, exist_ok=True)
 
 data={}
 runtimes={}
@@ -64,30 +80,33 @@ for proc,threads,file in scales:
         print("File not found: %s/%s"%(edir, file) )
 
 def draw_table(mode):
-    with plt_backend.PdfPages(mode + "_metrics.pdf") as pdf:
+    with plt_backend.PdfPages(os.path.join(args.out_dir, mode + '_metrics.pdf')) as pdf:
         rows = [
         "Parallel Efficiency",
         "  Load Balance",
         "  Communication Efficiency",
         "    Serialisation Efficiency",
-        "    Transfer Efficiency",
-        "  MPI Parallel Efficiency",
-        "    MPI Load Balance",
-        "    MPI Communication Efficiency",
-        "      MPI Serialisation Efficiency",
-        "      MPI Transfer Efficiency",
-        "  OMP Parallel Efficiency",
-        "    OMP Load Balance",
-        "    OMP Communication Efficiency",
-        "      OMP Serialisation Efficiency",
-        "      OMP Transfer Efficiency",
+        "    Transfer Efficiency"
         ]
+        if not args.mpi_only:
+            rows.extend([
+            "  MPI Parallel Efficiency",
+            "    MPI Load Balance",
+            "    MPI Communication Efficiency",
+            "      MPI Serialisation Efficiency",
+            "      MPI Transfer Efficiency"
+            "  OMP Parallel Efficiency",
+            "    OMP Load Balance",
+            "    OMP Communication Efficiency",
+            "      OMP Serialisation Efficiency",
+            "      OMP Transfer Efficiency",
+                ])
         nrows = len(rows)+1
         ncols = len(scales)+1
 
         fwidth = 4.2
 
-        fig, (ax, cbax) = plt.subplots(1,2,width_ratios=[ncols+fwidth,.25],figsize=((ncols+fwidth+1)*.7,6*.8), dpi=200)
+        fig, (ax, cbax) = plt.subplots(1,2,width_ratios=[ncols+fwidth,.25],figsize=((ncols+fwidth+1)*.7,3*.8), dpi=200)
 
         ax.set_xlim(0, ncols+fwidth-1)
         ax.set_ylim(0, nrows)
@@ -115,7 +134,7 @@ def draw_table(mode):
 
         ax.annotate(
             xy=(fwidth - .1,nrows -.5),
-            text="#ranks x #threads",
+            text="#Ranks" if args.mpi_only else "#Ranks x #Threads",
             weight='bold',
             ha='right',
             va='center'
@@ -162,7 +181,7 @@ def draw_table(mode):
         fig.tight_layout()
         pdf.savefig()
         plt.savefig(
-            mode + '_metrics.png',
+            os.path.join(args.out_dir, mode + '_metrics.png'),
             dpi=200,
             transparent=False
         )
@@ -228,14 +247,14 @@ def getRelMpiMetrics(series):
     return relMpiMetrics
 
 def plot_data(mode):
-    with plt_backend.PdfPages(mode + "_graph.pdf") as pdf:
+    with plt_backend.PdfPages(os.path.join(args.out_dir, mode + "_graph.pdf")) as pdf:
         fig = plt.figure(figsize=(12, 6), dpi=200)
-        ax1 = plt.subplot2grid(shape=(6, 3), loc=(1, 0), colspan=2, rowspan=5, fig=fig)
-        ax2 = plt.subplot2grid(shape=(6, 3), loc=(0, 2), rowspan=2, fig=fig)
-        ax3 = plt.subplot2grid(shape=(6, 3), loc=(2, 2), rowspan=2, fig=fig)
-        ax4 = plt.subplot2grid(shape=(6, 3), loc=(4, 2), rowspan=2, fig=fig)
-        axl = plt.subplot2grid(shape=(6, 3), loc=(0, 0), colspan=2, fig=fig, frameon=False)
-        axes = [ax1, ax2, ax3, ax4, axl]
+        ax_tot = plt.subplot2grid(shape=(6, 3), loc=(1, 0), colspan=2, rowspan=5, fig=fig)
+        if not args.mpi_only:
+            ax_omp = plt.subplot2grid(shape=(6, 3), loc=(0, 2), rowspan=2, fig=fig)
+            ax_mpi = plt.subplot2grid(shape=(6, 3), loc=(2, 2), rowspan=2, fig=fig)
+        ax_scaling = plt.subplot2grid(shape=(6, 3), loc=(4, 2), rowspan=2, fig=fig)
+        ax_legend = plt.subplot2grid(shape=(6, 3), loc=(0, 0), colspan=2, fig=fig, frameon=False)
 
 
         blues = plt.get_cmap("Blues")
@@ -269,88 +288,95 @@ def plot_data(mode):
             for k,v in relMetrics.items():
                 pdata[k]=pdata.get(k,[])+[v]
         y = list(pdata.values())
-        ax1.stackplot(xticks, y, labels=labs, colors=COLORS)
-        ax1.set_ylim([0,1])
-        ax1.set_title("Hybrid breakdown")
-        ax1.set_ylabel("Efficiency")
-        ax1.set_xlabel("#ranks x #threads")
-        handles, labels = ax1.get_legend_handles_labels()
+        ax_tot.stackplot(xticks, y, labels=labs, colors=COLORS)
+        ax_tot.set_ylim([0,1])
+        if args.mpi_only:
+            ax_tot.set_title("Breakdown")
+            ax_tot.set_xlabel("#ranks")
+        else:
+            ax_tot.set_title("Hybrid breakdown")
+            ax_tot.set_xlabel("#ranks x #threads")
+        ax_tot.set_ylabel("Efficiency")
+        handles, labels = ax_tot.get_legend_handles_labels()
         handles.reverse()
         labels.reverse()
-        ax1.set_xticks(ax1.get_xticks())
-        ax1.set_xticklabels(xticks, rotation=rotation, fontsize=lsize)
-        
-        axl.set_xticks([])
-        axl.set_yticks([])
+        ax_tot.set_xticks(ax_tot.get_xticks())
+        ax_tot.set_xticklabels(xticks, rotation=rotation, fontsize=lsize)
+
+        ax_legend.set_xticks([])
+        ax_legend.set_yticks([])
+
+        if not args.mpi_only:
+            pdata={}
+            COLORS = [reds(DARK), greens(DARK), oranges(DARK), blues(DARK)]
+            COLORS.reverse()
+
+            for p,t,f in scales:
+                scale = p,t
+                relOmpMetrics = getRelOmpMetrics(data[scale])
+                labs = list(relOmpMetrics.keys())
+                for k,v in relOmpMetrics.items():
+                    pdata[k]=pdata.get(k,[])+[v]
+            y = list(pdata.values())
+            ax_omp.stackplot(xticks, y, labels=labs, colors=COLORS)
+            ax_omp.set_ylim([0,1])
+            ax_omp.set_title("OpenMP breakdown")
+            ax_omp.set_ylabel("Efficiency")
+            ax_omp.set_xlabel("#ranks x #threads")
+            ax_omp.set_xticks(ax_omp.get_xticks())
+            ax_omp.set_xticklabels(xticks, rotation=rotation, fontsize=ssize)
 
 
-        pdata={}
-        COLORS = [reds(DARK), greens(DARK), oranges(DARK), blues(DARK)]
-        COLORS.reverse()
+            pdata={}
+            COLORS = [reds(LIGHT), greens(LIGHT), oranges(LIGHT), blues(DARK)]
+            COLORS.reverse()
 
-        for p,t,f in scales:
-            scale = p,t
-            relOmpMetrics = getRelOmpMetrics(data[scale])
-            labs = list(relOmpMetrics.keys())
-            for k,v in relOmpMetrics.items():
-                pdata[k]=pdata.get(k,[])+[v]
-        y = list(pdata.values())
-        ax2.stackplot(xticks, y, labels=labs, colors=COLORS)
-        ax2.set_ylim([0,1])
-        ax2.set_title("OpenMP breakdown")
-        ax2.set_ylabel("Efficiency")
-        ax2.set_xlabel("#ranks x #threads")
-        ax2.set_xticks(ax2.get_xticks())
-        ax2.set_xticklabels(xticks, rotation=rotation, fontsize=ssize)
+            for p,t,f in scales:
+                scale = p,t
+                relMpiMetrics = getRelMpiMetrics(data[scale])
+                labs = list(relMpiMetrics.keys())
+                
+                for k,v in relMpiMetrics.items():
+                    pdata[k]=pdata.get(k,[])+[v]
+            y = list(pdata.values())
+            ax_mpi.stackplot(xticks, y, labels=labs, colors=COLORS)
+            ax_mpi.set_ylim([0,1])
+            ax_mpi.set_title("MPI breakdown")
+            ax_mpi.set_ylabel("Efficiency")
+            ax_mpi.set_xlabel("Number of MPI ranks")
+            ax_mpi.set_xticks(ax_mpi.get_xticks())
+            ax_mpi.set_xticklabels(xticks, rotation=rotation, fontsize=ssize)
 
-        pdata={}
-        COLORS = [reds(LIGHT), greens(LIGHT), oranges(LIGHT), blues(DARK)]
-        COLORS.reverse()
-
-        for p,t,f in scales:
-            scale = p,t
-            relMpiMetrics = getRelMpiMetrics(data[scale])
-            labs = list(relMpiMetrics.keys())
             
-            for k,v in relMpiMetrics.items():
-                pdata[k]=pdata.get(k,[])+[v]
-        y = list(pdata.values())
-        ax3.stackplot(xticks, y, labels=labs, colors=COLORS)
-        ax3.set_ylim([0,1])
-        ax3.set_title("MPI breakdown")
-        ax3.set_ylabel("Efficiency")
-        ax3.set_xlabel("Number of MPI ranks")
-        ax3.set_xticks(ax3.get_xticks())
-        ax3.set_xticklabels(xticks, rotation=rotation, fontsize=ssize)
-        ax4.plot(xticks, list(runtimes.values()))
-        ax4.set_ylabel("runtime in $s$")
-        ax4.set_xlabel("Number of MPI ranks")
-        ax4.set_ylim(bottom=0)
-        ax4.set_xticks(ax4.get_xticks())
-        ax4.set_xticklabels(xticks, rotation=rotation, fontsize=ssize)
+        ax_scaling.plot(xticks, list(runtimes.values()))
+        ax_scaling.set_ylabel("runtime in $s$")
+        ax_scaling.set_xlabel("Number of MPI ranks")
+        ax_scaling.set_ylim(bottom=0)
+        ax_scaling.set_xticks(ax_scaling.get_xticks())
+        ax_scaling.set_xticklabels(xticks, rotation=rotation, fontsize=ssize)
 
         if multiscale:
             for y in range(len(scales)-1):
                 lstyle = ":"
                 c = 'gray'
                 if scales[y][0] * scales[y][1] != scales[y+1][0] * scales[y+1][1]:
-                    ax1.plot([y+.5, y+.5], [ax1.get_ylim()[0], ax1.get_ylim()[1]], lw=1.5, color="red", ls="solid", zorder=3 , marker='')
-                    ax2.plot([y+.5, y+.5], [ax2.get_ylim()[0], ax2.get_ylim()[1]], lw=1, color="red", ls="solid", zorder=3 , marker='')
-                    ax3.plot([y+.5, y+.5], [ax3.get_ylim()[0], ax3.get_ylim()[1]], lw=1, color="red", ls="solid", zorder=3 , marker='')
-                    ax4.plot([y+.5, y+.5], [ax4.get_ylim()[0], ax4.get_ylim()[1]], lw=1, color="red", ls="solid", zorder=3 , marker='')
+                    ax_tot.plot([y+.5, y+.5], [ax_tot.get_ylim()[0], ax_tot.get_ylim()[1]], lw=1.5, color="red", ls="solid", zorder=3 , marker='')
+                    if not args.mpi_only:
+                        ax_omp.plot([y+.5, y+.5], [ax_omp.get_ylim()[0], ax_omp.get_ylim()[1]], lw=1, color="red", ls="solid", zorder=3 , marker='')
+                        ax_mpi.plot([y+.5, y+.5], [ax_mpi.get_ylim()[0], ax_mpi.get_ylim()[1]], lw=1, color="red", ls="solid", zorder=3 , marker='')
+                    ax_scaling.plot([y+.5, y+.5], [ax_scaling.get_ylim()[0], ax_scaling.get_ylim()[1]], lw=1, color="red", ls="solid", zorder=3 , marker='')
 
-        axl.legend(handles, labels, loc='center', ncol=4)
+        ax_legend.legend(handles, labels, loc='center', ncol=4)
         fig.tight_layout()
         pdf.savefig()
         plt.savefig(
-            mode + '_graph.png',
+            os.path.join(args.out_dir, mode + '_graph.png'),
             dpi=200,
             transparent=False
         )
         if preview:
             plt.show()
         plt.close()
-
 
 
 plot_data(ename)
