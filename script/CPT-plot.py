@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser(description='Plot CPT metrics from an experimen
 parser.add_argument('experiment_directory', type=str, help='Path to the experiment directory containing output files. The script expects the relative or absolute path of this directory as an argument. The individual output files should follow the naming convention <prefix>-<nprocs>x<nthreads>.<suffix>.')
 parser.add_argument('-o', '--out-dir', type=str, default='.', help='Path to the output directory where the plots will be saved.')
 parser.add_argument('-p', '--prefix', type=str, default=None, help='Prefix of the output files to consider. If not specified, the experiment directory name will be used.')
-parser.add_argument('--mpi-only', action='store_true', dest='mpi_only', help='Show only MPI metrics')
+parser.add_argument('--mpi-only', action='store_true', dest='mpi_only', help='Show only MPI metrics (if the application does not use OpenMP at all)')
 # Parse arguments
 args = parser.parse_args()
 
