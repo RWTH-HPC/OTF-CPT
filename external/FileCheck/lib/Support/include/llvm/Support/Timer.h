@@ -12,6 +12,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/DataTypes.h"
+#include "llvm/Support/Mutex.h"
 #include <cassert>
 #include <memory>
 #include <string>
@@ -19,19 +20,18 @@
 
 namespace llvm {
 
+class TimerGlobals;
 class TimerGroup;
 class raw_ostream;
 
 class TimeRecord {
-  double WallTime;               ///< Wall clock time elapsed in seconds.
-  double UserTime;               ///< User time elapsed.
-  double SystemTime;             ///< System time elapsed.
-  ssize_t MemUsed;               ///< Memory allocated (in bytes).
-  uint64_t InstructionsExecuted; ///< Number of instructions executed
+  double WallTime = 0.0;             ///< Wall clock time elapsed in seconds.
+  double UserTime = 0.0;             ///< User time elapsed.
+  double SystemTime = 0.0;           ///< System time elapsed.
+  ssize_t MemUsed = 0;               ///< Memory allocated (in bytes).
+  uint64_t InstructionsExecuted = 0; ///< Number of instructions executed
 public:
-  TimeRecord()
-      : WallTime(0), UserTime(0), SystemTime(0), MemUsed(0),
-        InstructionsExecuted(0) {}
+  TimeRecord() = default;
 
   /// Get the current time and memory usage.  If Start is true we get the memory
   /// usage before the time, otherwise we get time before memory usage.  This
@@ -131,6 +131,9 @@ public:
   /// Clear the timer state.
   void clear();
 
+  /// Stop the timer and start another timer.
+  void yieldTo(Timer &);
+
   /// Return the duration for which this timer has been running.
   TimeRecord getTotalTime() const { return Time; }
 
@@ -198,6 +201,10 @@ class TimerGroup {
   TimerGroup(const TimerGroup &TG) = delete;
   void operator=(const TimerGroup &TG) = delete;
 
+  friend class TimerGlobals;
+  explicit TimerGroup(StringRef Name, StringRef Description,
+                      sys::SmartMutex<true> &lock);
+
 public:
   explicit TimerGroup(StringRef Name, StringRef Description);
 
@@ -231,14 +238,14 @@ public:
   /// Prints all timers as JSON key/value pairs.
   static const char *printAllJSONValues(raw_ostream &OS, const char *delim);
 
-  /// Ensure global timer group lists are initialized. This function is mostly
-  /// used by the Statistic code to influence the construction and destruction
-  /// order of the global timer lists.
-  static void ConstructTimerLists();
+  /// Ensure global objects required for statistics printing are initialized.
+  /// This function is used by the Statistic code to ensure correct order of
+  /// global constructors and destructors.
+  static void constructForStatistics();
 
-  /// This makes the default group unmanaged, and lets the user manage the
-  /// group's lifetime.
-  static std::unique_ptr<TimerGroup> aquireDefaultGroup();
+  /// This makes the timer globals unmanaged, and lets the user manage the
+  /// lifetime.
+  static void *acquireTimerGlobals();
 
 private:
   friend class Timer;

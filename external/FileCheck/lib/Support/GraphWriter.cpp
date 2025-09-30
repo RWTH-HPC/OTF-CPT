@@ -28,6 +28,7 @@
 
 #ifdef __APPLE__
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ManagedStatic.h"
 #endif
 
 #include <string>
@@ -74,7 +75,7 @@ std::string llvm::DOT::EscapeString(const std::string &Label) {
             Str.erase(Str.begin()+i); continue;
           default: break;
         }
-      LLVM_FALLTHROUGH;
+      [[fallthrough]];
     case '{': case '}':
     case '<': case '>':
     case '|': case '"':
@@ -115,7 +116,8 @@ std::string llvm::createGraphFilename(const Twine &Name, int &FD) {
 
   // Windows can't always handle long paths, so limit the length of the name.
   std::string N = Name.str();
-  N = N.substr(0, std::min<std::size_t>(N.size(), 140));
+  if (N.size() > 140)
+    N.resize(140);
 
   // Replace illegal characters in graph Filename with '_' if needed
   std::string CleansedName = replaceIllegalFilenameChars(N, '_');
@@ -128,7 +130,7 @@ std::string llvm::createGraphFilename(const Twine &Name, int &FD) {
   }
 
   errs() << "Writing '" << Filename << "'... ";
-  return std::string(Filename.str());
+  return std::string(Filename);
 }
 
 // Execute the graph viewer. Return true if there were errors.
@@ -136,14 +138,14 @@ static bool ExecGraphViewer(StringRef ExecPath, std::vector<StringRef> &args,
                             StringRef Filename, bool wait,
                             std::string &ErrMsg) {
   if (wait) {
-    if (sys::ExecuteAndWait(ExecPath, args, None, {}, 0, 0, &ErrMsg)) {
+    if (sys::ExecuteAndWait(ExecPath, args, std::nullopt, {}, 0, 0, &ErrMsg)) {
       errs() << "Error: " << ErrMsg << "\n";
       return true;
     }
     sys::fs::remove(Filename);
     errs() << " done. \n";
   } else {
-    sys::ExecuteNoWait(ExecPath, args, None, {}, 0, &ErrMsg);
+    sys::ExecuteNoWait(ExecPath, args, std::nullopt, {}, 0, &ErrMsg);
     errs() << "Remember to erase graph file: " << Filename << "\n";
   }
   return false;
