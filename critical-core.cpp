@@ -351,12 +351,14 @@ void finishMeasurement() {
         if (tCounts->mutexAcquire)
           fprintf(of, "mutexAcquire: %i\n", tCounts->mutexAcquire);
       }
+    }
 
-      fprintf(of, "\n\n--------CritPath Analysis Tool results:--------\n");
-      fprintf(of, "=> Number of processes:          %i\n", number_of_procs);
-      fprintf(of, "=> Number of threads:            %i\n", total_threads);
-      fprintf(of, "=> Average Computation (in s):   %6.3lf\n",
-              avgComputation[0]);
+    fprintf(of, "\n\n--------CritPath Analysis Tool results:--------\n");
+    fprintf(of, "=> Number of processes:          %i\n", number_of_procs);
+    fprintf(of, "=> Number of threads:            %i\n", total_threads);
+    fprintf(of, "=> Average Computation (in s):   %6.3lf\n",
+            avgComputation[0]);
+    if (analysis_flags->verbose) {
       fprintf(of, "=> Maximum Computation (in s):   %6.3lf\n",
               maxComputation[0]);
       fprintf(of, "=> Max crit. computation (in s): %6.3lf\n",
@@ -385,9 +387,9 @@ void finishMeasurement() {
               totalOutsideOMPIdeal);
       fprintf(of, "=> Max crit. Outside OpenMP w/o o,%6.3lf\n",
               totalOutsideOMPIdealNoOffset);
-      fprintf(of, "=> Total runtime (in s):         %6.3lf\n",
-              totalRuntimeReal);
     }
+    fprintf(of, "=> Total runtime (in s):         %6.3lf\n",
+            totalRuntimeReal);
 
     fprintf(of, "\n----------------POP metrics----------------\n");
     fprintf(of, "Parallel Efficiency:                %6.3lf\n",
