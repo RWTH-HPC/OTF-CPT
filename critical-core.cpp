@@ -194,9 +194,6 @@ void finishMeasurement() {
       uc_avg[0] += curr_uc;
       uc_avg[2] += curr_oot;
     }
-    uc_avg[0] = uc_avg[0];
-
-    uc_avg[2] = uc_avg[2];
     if (thread_counts)
       for (int i = 1; i < thread_counts->Size(); i++)
         (*thread_counts)[0]->add(*(*thread_counts)[i]);
