@@ -11,12 +11,12 @@ import matplotlib.backends.backend_pdf as plt_backend
 from matplotlib.patches import Rectangle
 from matplotlib.colors import ListedColormap
 
-
 parser = argparse.ArgumentParser(description='Plot CPT metrics from an experiment directory.')
 parser.add_argument('experiment_directory', type=str, help='Path to the experiment directory containing output files. The script expects the relative or absolute path of this directory as an argument. The individual output files should follow the naming convention <prefix>-<nprocs>x<nthreads>.<suffix>.')
 parser.add_argument('-o', '--out-dir', type=str, default='.', help='Path to the output directory where the plots will be saved.')
 parser.add_argument('-p', '--prefix', type=str, default=None, help='Prefix of the output files to consider. If not specified, the experiment directory name will be used.')
 parser.add_argument('--mpi-only', action='store_true', dest='mpi_only', help='Show only MPI metrics (if the application does not use OpenMP at all)')
+parser.add_argument('--weak-scaling', action='store_true', dest='weak_scaling', help='Assume weak scaling for computational efficieny. Default is strong scaling.')
 # Parse arguments
 args = parser.parse_args()
 
@@ -63,10 +63,13 @@ for proc,threads,file in scales:
     scale = (proc, threads)
     try:
         with open(edir+"/"+file) as data_file:
-            data[scale]={}
+            data[scale]={'Global Efficiency': -100} # We later rely on the ordering of the keys
+            runtimes[scale] = {}
             for line in data_file:
+                if line.startswith("=> Average Computation (in s):"):
+                    runtimes[scale]['computation']=float(line.split(":")[1])
                 if line.startswith("=> Total runtime (in s):"):
-                    runtimes[scale]=float(line.split(":")[1])
+                    runtimes[scale]['total']=float(line.split(":")[1])
                 if line.startswith("----------------POP"):
                     break
             for line in data_file:
@@ -77,12 +80,22 @@ for proc,threads,file in scales:
     except FileNotFoundError:
         print("File not found: %s/%s"%(edir, file) )
 
+basescale = next(iter(data))
+for scale in data.keys():
+    uct_base = runtimes[basescale]['computation']*basescale[0]*basescale[1]
+    uct_series = runtimes[scale]['computation']*scale[0]*scale[1]
+    data[scale]["Computational Scalability"] = uct_base / uct_series
+    if args.weak_scaling:
+        data[scale]["Computational Scalability"] *= (scale[0]*scale[1])/(basescale[0]*basescale[1])
+    data[scale]["Global Efficiency"] = data[scale]["Parallel Efficiency"] * data[scale]["Computational Scalability"]
+
 def draw_table(mode):
     with plt_backend.PdfPages(os.path.join(args.out_dir, mode + '_metrics.pdf')) as pdf:
         rows = [
-        "Parallel Efficiency",
-        "  Load Balance",
-        "  Communication Efficiency",
+        "Global Efficiency",
+        "  Parallel Efficiency",
+        "    Load Balance",
+        "    Communication Efficiency",
         "    Serialisation Efficiency",
         "    Transfer Efficiency"
         ]
@@ -99,6 +112,7 @@ def draw_table(mode):
             "      OMP Serialisation Efficiency",
             "      OMP Transfer Efficiency",
                 ])
+        rows.append("  Computational Scalability")
         nrows = len(rows)+1
         ncols = len(scales)+1
 
@@ -110,8 +124,11 @@ def draw_table(mode):
         ax.set_ylim(0, nrows)
         ax.set_axis_off()
 
-        for y, n in enumerate(data[tuple(scales[0][:2])].keys()):
-            for x, (p, t, f) in enumerate(scales):
+        metric_names = data[basescale].keys()
+        if args.mpi_only:
+            metric_names = [m for m in metric_names if not any(sub in m for sub in ['OMP', 'MPI'])]
+        for y, n in enumerate(metric_names):
+            for x, (p, t, _) in enumerate(scales):
                 scale = (p,t)
                 ax.add_patch(
                     Rectangle(xy=(fwidth+x,nrows - y - 2), width=1,
@@ -341,7 +358,7 @@ def plot_data(mode):
             ax_mpi.set_xticklabels(xticks, rotation=rotation, fontsize=ssize)
 
             
-        ax_scaling.plot(xticks, list(runtimes.values()))
+        ax_scaling.plot(xticks, [s['total'] for s in runtimes.values()])
         ax_scaling.set_ylabel("runtime in $s$")
         ax_scaling.set_xlabel("Number of MPI ranks")
         ax_scaling.set_ylim(bottom=0)
