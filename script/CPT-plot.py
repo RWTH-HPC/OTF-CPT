@@ -96,8 +96,8 @@ def draw_table(mode):
         "  Parallel Efficiency",
         "    Load Balance",
         "    Communication Efficiency",
-        "    Serialisation Efficiency",
-        "    Transfer Efficiency"
+        "      Serialisation Efficiency",
+        "      Transfer Efficiency"
         ]
         if not args.mpi_only:
             rows.extend([
