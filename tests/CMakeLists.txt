@@ -60,7 +60,7 @@ add_dependencies(build-tests build-mpi-only-tests build-omp-only-tests build-hyb
 if (TARGET FileCheck_Standalone AND BUILD_FILECHECK)
     add_dependencies(build-tests FileCheck_Standalone)
 endif()
-IF(CMAKE_Fortran_COMPILER)
+IF(OTFCPT_ENABLE_FORTRAN_SUPPORT)
     add_custom_target(build-fortran-tests)
     add_dependencies(build-tests build-fortran-tests)
     add_subdirectory(fortran)
