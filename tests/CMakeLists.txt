@@ -92,6 +92,8 @@ set(LIT_TEST_WORKERS 1 CACHE STRING "Sets the amount of workers when running tes
 pythonize_bool(OpenMP_FOUND)
 pythonize_bool(LIT_FORWARD_FULL_ENV)
 pythonize_bool(OTFCPT_HAVE_Fortran)
+pythonize_bool(OTFCPT_USE_Fortran)
+pythonize_bool(OTFCPT_ENABLE_FORTRAN_SUPPORT)
 
 configure_file(lit.site.cfg.in lit.site.cfg.configured @ONLY)
 file(GENERATE
