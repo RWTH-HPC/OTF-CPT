@@ -224,8 +224,9 @@ void finishMeasurement() {
                 MPI_SUM, 0, MPI_COMM_WORLD);
     PMPI_Reduce(&num_threads, &total_threads, 1, MPI_INT, MPI_SUM, 0,
                 MPI_COMM_WORLD);
-    PMPI_Reduce(&proc_counts, &total_counts, sizeof(proc_counts) / sizeof(int),
-                MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    PMPI_Reduce(&proc_counts, &total_counts,
+                sizeof(proc_counts) / sizeof(uint64_t), MPI_UINT64_T, MPI_SUM,
+                0, MPI_COMM_WORLD);
     double localRuntimeReal = totalRuntimeReal;
     PMPI_Reduce(&localRuntimeReal, &totalRuntimeReal, 1, MPI_DOUBLE, MPI_MAX, 0,
                 MPI_COMM_WORLD);
@@ -317,23 +318,23 @@ void finishMeasurement() {
           avgComputation[0], maxComputation[0]);
       fprintf(of, "\n\n--------MPI stats:--------\n");
       if (total_counts.send)
-        fprintf(of, "MPI_*send: %i\n", total_counts.send);
+        fprintf(of, "MPI_*send: %lu\n", total_counts.send);
       if (total_counts.isend)
-        fprintf(of, "MPI_I*send: %i\n", total_counts.isend);
+        fprintf(of, "MPI_I*send: %lu\n", total_counts.isend);
       if (total_counts.probe)
-        fprintf(of, "MPI_*mprobe: %i\n", total_counts.probe);
+        fprintf(of, "MPI_*mprobe: %lu\n", total_counts.probe);
       if (total_counts.recv)
-        fprintf(of, "MPI_Recv: %i\n", total_counts.recv);
+        fprintf(of, "MPI_Recv: %lu\n", total_counts.recv);
       if (total_counts.irecv)
-        fprintf(of, "MPI_Irecv: %i\n", total_counts.irecv);
+        fprintf(of, "MPI_Irecv: %lu\n", total_counts.irecv);
       if (total_counts.coll)
-        fprintf(of, "MPI_*coll: %i\n", total_counts.coll);
+        fprintf(of, "MPI_*coll: %lu\n", total_counts.coll);
       if (total_counts.coll)
-        fprintf(of, "MPI_I*coll: %i\n", total_counts.coll);
+        fprintf(of, "MPI_I*coll: %lu\n", total_counts.coll);
       if (total_counts.test)
-        fprintf(of, "MPI_Test*: %i\n", total_counts.test);
+        fprintf(of, "MPI_Test*: %lu\n", total_counts.test);
       if (total_counts.wait)
-        fprintf(of, "MPI_Wait*: %i\n", total_counts.wait);
+        fprintf(of, "MPI_Wait*: %lu\n", total_counts.wait);
 
       if (thread_counts) {
         fprintf(of, "\n\n--------OMPT stats:--------\n");
