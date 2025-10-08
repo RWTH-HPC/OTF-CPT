@@ -35,8 +35,8 @@ set(OTFCPT_USE_Fortran False)
 check_language(Fortran)
 if(CMAKE_Fortran_COMPILER)
   set(OTFCPT_HAVE_Fortran True)
+  set(OTFCPT_USE_Fortran True)
   if("${TEST_MPI_FEATURES}" MATCHES "ompi")
-    set(OTFCPT_USE_Fortran True)
     # We don't test for OpenMPI 4 with <4.1.6, because MPI_F_STATUS_IGNORE 
     # is broken with some of these versions
     if("${TEST_MPI_FEATURES}" MATCHES "ompi-4.0" OR 
