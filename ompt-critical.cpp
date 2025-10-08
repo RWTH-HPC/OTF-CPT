@@ -812,8 +812,8 @@ static void ompt_tsan_task_schedule(ompt_data_t *first_task_data,
                                     ompt_task_status_t prior_task_status,
                                     ompt_data_t *second_task_data) {
 
-  if (analysis_flags->running)
-    omptThreadCount->taskSchedule++;
+    if (analysis_flags->running)
+      omptThreadCount->taskSchedule++;
   //
   //  The necessary action depends on prior_task_status:
   //
@@ -942,8 +942,8 @@ static void ompt_tsan_dependences(ompt_data_t *task_data,
 static void ompt_tsan_mutex_acquire(ompt_mutex_t kind, unsigned int hint,
                                     unsigned int impl, ompt_wait_id_t wait_id,
                                     const void *codeptr_ra) {
-  if (analysis_flags->running)
-    omptThreadCount->mutexAcquire++;
+    if (analysis_flags->running)
+      omptThreadCount->mutexAcquire++;
   thread_local_clock->Stop(CLOCK_OMP, "MutexAcquire");
 }
 
