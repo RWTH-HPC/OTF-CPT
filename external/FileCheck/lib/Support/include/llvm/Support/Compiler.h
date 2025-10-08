@@ -39,10 +39,6 @@
 # define __has_builtin(x) 0
 #endif
 
-#ifndef __has_include
-# define __has_include(x) 0
-#endif
-
 // Only use __has_cpp_attribute in C++ mode. GCC defines __has_cpp_attribute in
 // C mode, but the :: in __has_cpp_attribute(scoped::attribute) is invalid.
 #ifndef LLVM_HAS_CPP_ATTRIBUTE
@@ -113,17 +109,113 @@
 /// LLVM_EXTERNAL_VISIBILITY - classes, functions, and variables marked with
 /// this attribute will be made public and visible outside of any shared library
 /// they are linked in to.
-#if __has_attribute(visibility) && !defined(__MINGW32__) &&                    \
-    !defined(__CYGWIN__) && !defined(_WIN32)
-#define LLVM_LIBRARY_VISIBILITY __attribute__ ((visibility("hidden")))
+
+#if LLVM_HAS_CPP_ATTRIBUTE(gnu::visibility) && defined(__GNUC__) &&            \
+    !defined(__clang__)
+#define LLVM_ATTRIBUTE_VISIBILITY_HIDDEN [[gnu::visibility("hidden")]]
+#define LLVM_ATTRIBUTE_VISIBILITY_DEFAULT [[gnu::visibility("default")]]
+#elif __has_attribute(visibility)
+#define LLVM_ATTRIBUTE_VISIBILITY_HIDDEN __attribute__((visibility("hidden")))
+#define LLVM_ATTRIBUTE_VISIBILITY_DEFAULT __attribute__((visibility("default")))
+#else
+#define LLVM_ATTRIBUTE_VISIBILITY_HIDDEN
+#define LLVM_ATTRIBUTE_VISIBILITY_DEFAULT
+#endif
+
 #if defined(LLVM_BUILD_LLVM_DYLIB) || defined(LLVM_BUILD_SHARED_LIBS)
-#define LLVM_EXTERNAL_VISIBILITY __attribute__((visibility("default")))
+#define LLVM_EXTERNAL_VISIBILITY LLVM_ATTRIBUTE_VISIBILITY_DEFAULT
 #else
 #define LLVM_EXTERNAL_VISIBILITY
 #endif
+
+#if (!(defined(_WIN32) || defined(__CYGWIN__)) ||                              \
+     (defined(__MINGW32__) && defined(__clang__)))
+#define LLVM_LIBRARY_VISIBILITY LLVM_ATTRIBUTE_VISIBILITY_HIDDEN
+// Clang compilers older then 15 do not support gnu style attributes on
+// namespaces.
+#if defined(__clang__) && __clang_major__ < 15
+#define LLVM_LIBRARY_VISIBILITY_NAMESPACE [[gnu::visibility("hidden")]]
+#else
+#define LLVM_LIBRARY_VISIBILITY_NAMESPACE LLVM_ATTRIBUTE_VISIBILITY_HIDDEN
+#endif
+#define LLVM_ALWAYS_EXPORT LLVM_ATTRIBUTE_VISIBILITY_DEFAULT
+#elif defined(_WIN32)
+#define LLVM_ALWAYS_EXPORT __declspec(dllexport)
+#define LLVM_LIBRARY_VISIBILITY
+#define LLVM_LIBRARY_VISIBILITY_NAMESPACE
 #else
 #define LLVM_LIBRARY_VISIBILITY
-#define LLVM_EXTERNAL_VISIBILITY
+#define LLVM_ALWAYS_EXPORT
+#define LLVM_LIBRARY_VISIBILITY_NAMESPACE
+#endif
+
+/// LLVM_ABI is the main export/visibility macro to mark something as explicitly
+/// exported when llvm is built as a shared library with everything else that is
+/// unannotated will have internal visibility.
+///
+/// LLVM_ABI_EXPORT is for the special case for things like plugin symbol
+/// declarations or definitions where we don't want the macro to be switching
+/// between dllexport and dllimport on windows based on what codebase is being
+/// built, it will only be dllexport. For non windows platforms this macro
+/// behaves the same as LLVM_ABI.
+///
+/// LLVM_EXPORT_TEMPLATE is used on explicit template instantiations in source
+/// files that were declared extern in a header. This macro is only set as a
+/// compiler export attribute on windows, on other platforms it does nothing.
+///
+/// LLVM_TEMPLATE_ABI is for annotating extern template declarations in headers
+/// for both functions and classes. On windows its turned in to dllimport for
+/// library consumers, for other platforms its a default visibility attribute.
+///
+/// LLVM_C_ABI is used to annotated functions and data that need to be exported
+/// for the libllvm-c API. This used both for the llvm-c headers and for the
+/// functions declared in the different Target's c++ source files that don't
+/// include the header forward declaring them.
+#ifndef LLVM_ABI_GENERATING_ANNOTATIONS
+// Marker to add to classes or functions in public headers that should not have
+// export macros added to them by the clang tool
+#define LLVM_ABI_NOT_EXPORTED
+#if defined(LLVM_BUILD_LLVM_DYLIB) || defined(LLVM_BUILD_SHARED_LIBS) ||       \
+    defined(LLVM_ENABLE_PLUGINS)
+// Some libraries like those for tablegen are linked in to tools that used
+// in the build so can't depend on the llvm shared library. If export macros
+// were left enabled when building these we would get duplicate or
+// missing symbol linker errors on windows.
+#if defined(LLVM_BUILD_STATIC)
+#define LLVM_ABI
+#define LLVM_TEMPLATE_ABI
+#define LLVM_EXPORT_TEMPLATE
+#define LLVM_ABI_EXPORT
+#elif defined(_WIN32) && !defined(__MINGW32__)
+#if defined(LLVM_EXPORTS)
+#define LLVM_ABI __declspec(dllexport)
+#define LLVM_TEMPLATE_ABI
+#define LLVM_EXPORT_TEMPLATE __declspec(dllexport)
+#else
+#define LLVM_ABI __declspec(dllimport)
+#define LLVM_TEMPLATE_ABI __declspec(dllimport)
+#define LLVM_EXPORT_TEMPLATE
+#endif
+#define LLVM_ABI_EXPORT __declspec(dllexport)
+#elif defined(__ELF__) || defined(__MINGW32__) || defined(_AIX) ||             \
+    defined(__MVS__)
+#define LLVM_ABI LLVM_ATTRIBUTE_VISIBILITY_DEFAULT
+#define LLVM_TEMPLATE_ABI LLVM_ATTRIBUTE_VISIBILITY_DEFAULT
+#define LLVM_EXPORT_TEMPLATE
+#define LLVM_ABI_EXPORT LLVM_ATTRIBUTE_VISIBILITY_DEFAULT
+#elif defined(__MACH__) || defined(__WASM__) || defined(__EMSCRIPTEN__)
+#define LLVM_ABI LLVM_ATTRIBUTE_VISIBILITY_DEFAULT
+#define LLVM_TEMPLATE_ABI
+#define LLVM_EXPORT_TEMPLATE
+#define LLVM_ABI_EXPORT LLVM_ATTRIBUTE_VISIBILITY_DEFAULT
+#endif
+#else
+#define LLVM_ABI
+#define LLVM_TEMPLATE_ABI
+#define LLVM_EXPORT_TEMPLATE
+#define LLVM_ABI_EXPORT
+#endif
+#define LLVM_C_ABI LLVM_ABI
 #endif
 
 #if defined(__GNUC__)
@@ -138,22 +230,30 @@
 #define LLVM_ATTRIBUTE_USED
 #endif
 
-/// LLVM_NODISCARD - Warn if a type or return value is discarded.
-
-// Use the 'nodiscard' attribute in C++17 or newer mode.
-#if defined(__cplusplus) && __cplusplus > 201402L && LLVM_HAS_CPP_ATTRIBUTE(nodiscard)
-#define LLVM_NODISCARD [[nodiscard]]
-#elif LLVM_HAS_CPP_ATTRIBUTE(clang::warn_unused_result)
-#define LLVM_NODISCARD [[clang::warn_unused_result]]
-// Clang in C++14 mode claims that it has the 'nodiscard' attribute, but also
-// warns in the pedantic mode that 'nodiscard' is a C++17 extension (PR33518).
-// Use the 'nodiscard' attribute in C++14 mode only with GCC.
-// TODO: remove this workaround when PR33518 is resolved.
-#elif defined(__GNUC__) && LLVM_HAS_CPP_ATTRIBUTE(nodiscard)
-#define LLVM_NODISCARD [[nodiscard]]
+#if defined(__clang__)
+#define LLVM_DEPRECATED(MSG, FIX) __attribute__((deprecated(MSG, FIX)))
 #else
-#define LLVM_NODISCARD
+#define LLVM_DEPRECATED(MSG, FIX) [[deprecated(MSG)]]
 #endif
+
+// clang-format off
+#if defined(__clang__) || defined(__GNUC__)
+#define LLVM_SUPPRESS_DEPRECATED_DECLARATIONS_PUSH                             \
+  _Pragma("GCC diagnostic push")                                               \
+  _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
+#define LLVM_SUPPRESS_DEPRECATED_DECLARATIONS_POP                              \
+  _Pragma("GCC diagnostic pop")
+#elif defined(_MSC_VER)
+#define LLVM_SUPPRESS_DEPRECATED_DECLARATIONS_PUSH                             \
+  _Pragma("warning(push)")                                                     \
+  _Pragma("warning(disable : 4996)")
+#define LLVM_SUPPRESS_DEPRECATED_DECLARATIONS_POP                              \
+  _Pragma("warning(pop)")
+#else
+#define LLVM_SUPPRESS_DEPRECATED_DECLARATIONS_PUSH
+#define LLVM_SUPPRESS_DEPRECATED_DECLARATIONS_POP
+#endif
+// clang-format on
 
 // Indicate that a non-static, non-const C++ member function reinitializes
 // the entire object to a known state, independent of the previous state of
@@ -257,6 +357,14 @@
 #define LLVM_ATTRIBUTE_RETURNS_NONNULL
 #endif
 
+/// LLVM_ATTRIBUTE_RESTRICT - Annotates a pointer to tell the compiler that
+/// it is not aliased in the current scope.
+#if defined(__clang__) || defined(__GNUC__) || defined(_MSC_VER)
+#define LLVM_ATTRIBUTE_RESTRICT __restrict
+#else
+#define LLVM_ATTRIBUTE_RESTRICT
+#endif
+
 /// \macro LLVM_ATTRIBUTE_RETURNS_NOALIAS Used to mark a function as returning a
 /// pointer that does not alias any other valid pointer.
 #ifdef __GNUC__
@@ -303,6 +411,18 @@
 #define LLVM_GSL_POINTER [[gsl::Pointer]]
 #else
 #define LLVM_GSL_POINTER
+#endif
+
+#if LLVM_HAS_CPP_ATTRIBUTE(clang::lifetimebound)
+#define LLVM_LIFETIME_BOUND [[clang::lifetimebound]]
+#else
+#define LLVM_LIFETIME_BOUND
+#endif
+
+#if LLVM_HAS_CPP_ATTRIBUTE(nodiscard) >= 201907L
+#define LLVM_CTOR_NODISCARD [[nodiscard]]
+#else
+#define LLVM_CTOR_NODISCARD
 #endif
 
 /// LLVM_EXTENSION - Support compilers where we have a keyword to suppress
@@ -433,6 +553,14 @@ void __asan_unpoison_memory_region(void const volatile *addr, size_t size);
 # define __asan_unpoison_memory_region(p, size)
 #endif
 
+/// \macro LLVM_HWADDRESS_SANITIZER_BUILD
+/// Whether LLVM itself is built with HWAddressSanitizer instrumentation.
+#if __has_feature(hwaddress_sanitizer)
+#define LLVM_HWADDRESS_SANITIZER_BUILD 1
+#else
+#define LLVM_HWADDRESS_SANITIZER_BUILD 0
+#endif
+
 /// \macro LLVM_THREAD_SANITIZER_BUILD
 /// Whether LLVM itself is built with ThreadSanitizer instrumentation.
 #if __has_feature(thread_sanitizer) || defined(__SANITIZE_THREAD__)
@@ -551,6 +679,14 @@ void AnnotateIgnoreWritesEnd(const char *file, int line);
   __attribute__((no_profile_instrument_function))
 #else
 #define LLVM_NO_PROFILE_INSTRUMENT_FUNCTION
+#endif
+
+/// \macro LLVM_PREFERRED_TYPE
+/// Adjust type of bit-field in debug info.
+#if __has_attribute(preferred_type)
+#define LLVM_PREFERRED_TYPE(T) __attribute__((preferred_type(T)))
+#else
+#define LLVM_PREFERRED_TYPE(T)
 #endif
 
 #endif

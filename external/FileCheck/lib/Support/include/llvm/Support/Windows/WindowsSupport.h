@@ -23,11 +23,9 @@
 
 // mingw-w64 tends to define it as 0x0502 in its headers.
 #undef _WIN32_WINNT
-#undef _WIN32_IE
 
 // Require at least Windows 7 API.
 #define _WIN32_WINNT 0x0601
-#define _WIN32_IE    0x0800 // MinGW at it again. FIXME: verify if still needed.
 #define WIN32_LEAN_AND_MEAN
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -58,6 +56,9 @@ namespace llvm {
 /// to supercede raw calls to GetVersionEx. Old SDKs, Cygwin, and MinGW don't
 /// yet have VersionHelpers.h, so we have our own helper.
 bool RunningWindows8OrGreater();
+
+/// Determines if the program is running on Windows 11 or Windows Server 2022.
+bool RunningWindows11OrGreater();
 
 /// Returns the Windows version as Major.Minor.0.BuildNumber. Uses
 /// RtlGetVersion or GetVersionEx under the hood depending on what is available.

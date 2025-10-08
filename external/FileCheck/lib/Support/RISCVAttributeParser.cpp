@@ -36,11 +36,23 @@ const RISCVAttributeParser::DisplayHandler
         {
             RISCVAttrs::UNALIGNED_ACCESS,
             &RISCVAttributeParser::unalignedAccess,
-        }};
+        },
+        {
+            RISCVAttrs::ATOMIC_ABI,
+            &RISCVAttributeParser::atomicAbi,
+        },
+};
+
+Error RISCVAttributeParser::atomicAbi(unsigned Tag) {
+  uint64_t Value = de.getULEB128(cursor);
+  printAttribute(Tag, Value, "Atomic ABI is " + utostr(Value));
+  return Error::success();
+}
 
 Error RISCVAttributeParser::unalignedAccess(unsigned tag) {
-  static const char *strings[] = {"No unaligned access", "Unaligned access"};
-  return parseStringAttribute("Unaligned_access", tag, makeArrayRef(strings));
+  static const char *const strings[] = {"No unaligned access",
+                                        "Unaligned access"};
+  return parseStringAttribute("Unaligned_access", tag, ArrayRef(strings));
 }
 
 Error RISCVAttributeParser::stackAlign(unsigned tag) {
@@ -53,10 +65,9 @@ Error RISCVAttributeParser::stackAlign(unsigned tag) {
 
 Error RISCVAttributeParser::handler(uint64_t tag, bool &handled) {
   handled = false;
-  for (unsigned AHI = 0, AHE = array_lengthof(displayRoutines); AHI != AHE;
-       ++AHI) {
-    if (uint64_t(displayRoutines[AHI].attribute) == tag) {
-      if (Error e = (this->*displayRoutines[AHI].routine)(tag))
+  for (const auto &AH : displayRoutines) {
+    if (uint64_t(AH.attribute) == tag) {
+      if (Error e = (this->*AH.routine)(tag))
         return e;
       handled = true;
       break;

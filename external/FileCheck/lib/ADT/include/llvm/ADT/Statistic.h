@@ -27,7 +27,6 @@
 #define LLVM_ADT_STATISTIC_H
 
 #include "llvm/Config/llvm-config.h"
-#include "llvm/Support/Compiler.h"
 #include <atomic>
 #include <memory>
 #include <vector>
@@ -178,8 +177,8 @@ void EnableStatistics(bool DoPrintOnExit = true);
 /// Check if statistics are enabled.
 bool AreStatisticsEnabled();
 
-/// Return a file stream to print our output on.
-std::unique_ptr<raw_fd_ostream> CreateInfoOutputFile();
+/// Return a stream to print our output on.
+std::unique_ptr<raw_ostream> CreateInfoOutputFile();
 
 /// Print statistics to the file returned by CreateInfoOutputFile().
 void PrintStatistics();
@@ -200,7 +199,7 @@ void PrintStatisticsJSON(raw_ostream &OS);
 /// during it's execution. It will return the value at the point that it is
 /// read. However, it will prevent new statistics from registering until it
 /// completes.
-const std::vector<std::pair<StringRef, uint64_t>> GetStatistics();
+std::vector<std::pair<StringRef, uint64_t>> GetStatistics();
 
 /// Reset the statistics. This can be used to zero and de-register the
 /// statistics in order to measure a compilation.

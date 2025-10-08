@@ -12,7 +12,7 @@ add_library(LLVMSupport_Standalone
         #AddressRanges.cpp
         #AArch64TargetParser.cpp
         ABIBreak.cpp
-        ARMTargetParser.cpp
+        #ARMTargetParser.cpp
         #AMDGPUMetadata.cpp
         #APFixedPoint.cpp
         APFloat.cpp
@@ -56,7 +56,7 @@ add_library(LLVMSupport_Standalone
         #ELFAttributes.cpp
         Error.cpp
         ErrorHandling.cpp
-        #ExtensibleRTTI.cpp
+        ExtensibleRTTI.cpp
         #FileCollector.cpp
         #FileUtilities.cpp
         #FileOutputBuffer.cpp
@@ -65,7 +65,7 @@ add_library(LLVMSupport_Standalone
         FormatVariadic.cpp
         #GlobPattern.cpp
         GraphWriter.cpp
-        Hashing.cpp
+        #Hashing.cpp
         InitLLVM.cpp
         #InstructionCost.cpp
         #IntEqClasses.cpp
@@ -79,6 +79,9 @@ add_library(LLVMSupport_Standalone
         #LockFileManager.cpp
         #LowLevelType.cpp
         ManagedStatic.cpp
+        OptimizedStructLayout.cpp
+        Optional.cpp
+        OptionStrCmp.cpp
         #MathExtras.cpp
         MemAlloc.cpp
         MemoryBuffer.cpp
@@ -121,7 +124,7 @@ add_library(LLVMSupport_Standalone
         Timer.cpp
         #ToolOutputFile.cpp
         #TrigramIndex.cpp
-        Triple.cpp
+        #Triple.cpp
         Twine.cpp
         TypeSize.cpp
         Unicode.cpp
@@ -141,7 +144,7 @@ add_library(LLVMSupport_Standalone
         regexec.c
         regfree.c
         regstrlcpy.c
-        #xxhash.cpp
+        xxhash.cpp
         #Z3Solver.cpp
 
         #${ALLOCATOR_FILES}
@@ -151,14 +154,14 @@ add_library(LLVMSupport_Standalone
         #Atomic.cpp
         #DynamicLibrary.cpp
         Errno.cpp
-        Host.cpp
+        #Host.cpp
         #Memory.cpp
         Path.cpp
         Process.cpp
         Program.cpp
         #RWMutex.cpp
         Signals.cpp
-        ThreadLocal.cpp
+        #ThreadLocal.cpp
         Threading.cpp
         #Valgrind.cpp
         #Watchdog.cpp

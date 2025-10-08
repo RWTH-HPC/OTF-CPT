@@ -13,9 +13,9 @@
 #include "llvm/Support/Path.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Config/config.h"
 #include "llvm/Config/llvm-config.h"
-#include "llvm/Support/Endian.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
@@ -102,7 +102,7 @@ namespace {
 
     if (is_style_windows(style)) {
       if (pos == StringRef::npos)
-        pos = str.find_last_of(':', str.size() - 2);
+        pos = str.find_last_of(':', str.size() - 1);
     }
 
     if (pos == StringRef::npos || (pos == 1 && is_separator(str[0], style)))
@@ -261,7 +261,7 @@ const_iterator &const_iterator::operator++() {
     // Root dir.
     if (was_net ||
         // c:/
-        (is_style_windows(S) && Component.endswith(":"))) {
+        (is_style_windows(S) && Component.ends_with(":"))) {
       Component = Path.substr(Position, 1);
       return *this;
     }
@@ -350,7 +350,7 @@ StringRef root_path(StringRef path, Style style) {
   if (b != e) {
     bool has_net =
         b->size() > 2 && is_separator((*b)[0], style) && (*b)[1] == (*b)[0];
-    bool has_drive = is_style_windows(style) && b->endswith(":");
+    bool has_drive = is_style_windows(style) && b->ends_with(":");
 
     if (has_net || has_drive) {
       if ((++pos != e) && is_separator((*pos)[0], style)) {
@@ -375,7 +375,7 @@ StringRef root_name(StringRef path, Style style) {
   if (b != e) {
     bool has_net =
         b->size() > 2 && is_separator((*b)[0], style) && (*b)[1] == (*b)[0];
-    bool has_drive = is_style_windows(style) && b->endswith(":");
+    bool has_drive = is_style_windows(style) && b->ends_with(":");
 
     if (has_net || has_drive) {
       // just {C:,//net}, return the first component.
@@ -392,7 +392,7 @@ StringRef root_directory(StringRef path, Style style) {
   if (b != e) {
     bool has_net =
         b->size() > 2 && is_separator((*b)[0], style) && (*b)[1] == (*b)[0];
-    bool has_drive = is_style_windows(style) && b->endswith(":");
+    bool has_drive = is_style_windows(style) && b->ends_with(":");
 
     if ((has_net || has_drive) &&
         // {C:,//net}, skip to the next component.
@@ -512,7 +512,7 @@ static bool starts_with(StringRef Path, StringRef Prefix,
     }
     return true;
   }
-  return Path.startswith(Prefix);
+  return Path.starts_with(Prefix);
 }
 
 bool replace_path_prefix(SmallVectorImpl<char> &Path, StringRef OldPrefix,
@@ -771,7 +771,7 @@ bool remove_dots(SmallVectorImpl<char> &the_path, bool remove_dot_dot,
 
   if (!components.empty()) {
     buffer += components[0];
-    for (StringRef C : makeArrayRef(components).drop_front()) {
+    for (StringRef C : ArrayRef(components).drop_front()) {
       buffer += preferred_separator(style);
       buffer += C;
     }
@@ -848,7 +848,7 @@ createTemporaryFile(const Twine &Model, int &ResultFD,
          "Model must be a simple filename.");
   // Use P.begin() so that createUniqueEntity doesn't need to recreate Storage.
   return createUniqueEntity(P.begin(), ResultFD, ResultPath, true, Type, Flags,
-                            owner_read | owner_write);
+                            all_read | all_write);
 }
 
 static std::error_code
@@ -1008,7 +1008,7 @@ static std::error_code copy_file_internal(int ReadFD, int WriteFD) {
   delete[] Buf;
 
   if (BytesRead < 0 || BytesWritten < 0)
-    return std::error_code(errno, std::generic_category());
+    return errnoAsErrorCode();
   return std::error_code();
 }
 
@@ -1054,11 +1054,11 @@ ErrorOr<MD5::MD5Result> md5_contents(int FD) {
     BytesRead = read(FD, Buf.data(), BufSize);
     if (BytesRead <= 0)
       break;
-    Hash.update(makeArrayRef(Buf.data(), BytesRead));
+    Hash.update(ArrayRef(Buf.data(), BytesRead));
   }
 
   if (BytesRead < 0)
-    return std::error_code(errno, std::generic_category());
+    return errnoAsErrorCode();
   MD5::MD5Result Result;
   Hash.final(Result);
   return Result;
@@ -1143,7 +1143,7 @@ void directory_entry::replace_filename(const Twine &Filename, file_type Type,
                                        basic_file_status Status) {
   SmallString<128> PathStr = path::parent_path(Path);
   path::append(PathStr, Filename);
-  this->Path = std::string(PathStr.str());
+  this->Path = std::string(PathStr);
   this->Type = Type;
   this->Status = Status;
 }
@@ -1181,7 +1181,7 @@ Error readNativeFileToEOF(file_t FileHandle, SmallVectorImpl<char> &Buffer,
   for (;;) {
     Buffer.resize_for_overwrite(Size + ChunkSize);
     Expected<size_t> ReadBytes = readNativeFile(
-        FileHandle, makeMutableArrayRef(Buffer.begin() + Size, ChunkSize));
+        FileHandle, MutableArrayRef(Buffer.begin() + Size, ChunkSize));
     if (!ReadBytes)
       return ReadBytes.takeError();
     if (*ReadBytes == 0)
@@ -1202,17 +1202,9 @@ Error readNativeFileToEOF(file_t FileHandle, SmallVectorImpl<char> &Buffer,
 #include "Windows/Path.inc"
 #endif
 
-bool IsLLVMDriver = false;
-
 namespace llvm {
 namespace sys {
 namespace fs {
-
-std::string getMainExecutable(const char *Argv0, void *MainAddr) {
-  if (IsLLVMDriver)
-    return sys::path::stem(Argv0).str();
-  return getMainExecutableImpl(Argv0, MainAddr);
-}
 
 TempFile::TempFile(StringRef Name, int FD)
     : TmpName(std::string(Name)), FD(FD) {}
@@ -1234,7 +1226,7 @@ TempFile::~TempFile() { assert(Done); }
 Error TempFile::discard() {
   Done = true;
   if (FD != -1 && close(FD) == -1) {
-    std::error_code EC = std::error_code(errno, std::generic_category());
+    std::error_code EC = errnoAsErrorCode();
     return errorCodeToError(EC);
   }
   FD = -1;
@@ -1303,10 +1295,8 @@ Error TempFile::keep(const Twine &Name) {
   if (!RenameEC)
     TmpName = "";
 
-  if (close(FD) == -1) {
-    std::error_code EC(errno, std::generic_category());
-    return errorCodeToError(EC);
-  }
+  if (close(FD) == -1)
+    return errorCodeToError(errnoAsErrorCode());
   FD = -1;
 
   return errorCodeToError(RenameEC);
@@ -1325,10 +1315,8 @@ Error TempFile::keep() {
 
   TmpName = "";
 
-  if (close(FD) == -1) {
-    std::error_code EC(errno, std::generic_category());
-    return errorCodeToError(EC);
-  }
+  if (close(FD) == -1)
+    return errorCodeToError(errnoAsErrorCode());
   FD = -1;
 
   return Error::success();
