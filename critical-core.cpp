@@ -224,8 +224,9 @@ void finishMeasurement() {
                 MPI_SUM, 0, MPI_COMM_WORLD);
     PMPI_Reduce(&num_threads, &total_threads, 1, MPI_INT, MPI_SUM, 0,
                 MPI_COMM_WORLD);
-    PMPI_Reduce(&proc_counts, &total_counts, sizeof(proc_counts) / sizeof(uint64_t),
-                MPI_UINT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
+    PMPI_Reduce(&proc_counts, &total_counts,
+                sizeof(proc_counts) / sizeof(uint64_t), MPI_UINT64_T, MPI_SUM,
+                0, MPI_COMM_WORLD);
     double localRuntimeReal = totalRuntimeReal;
     PMPI_Reduce(&localRuntimeReal, &totalRuntimeReal, 1, MPI_DOUBLE, MPI_MAX, 0,
                 MPI_COMM_WORLD);
