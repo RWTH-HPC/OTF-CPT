@@ -12,7 +12,7 @@ LLVM_SOURCE_DIR="$1"
 # The script's parent directory
 TARGET_DIR=$(dirname "$(readlink -f "$0")")
 # We use rsync here because it has a very handy exclude option.
-RSYNC="rsync -r --exclude=**/CMakeLists.txt"
+RSYNC="rsync -r"
 
 # FileCheck main file
 ${RSYNC} "${LLVM_SOURCE_DIR}/llvm/utils/FileCheck/FileCheck.cpp" "${TARGET_DIR}/"

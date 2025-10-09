@@ -38,28 +38,57 @@ public:
 /// This type defines the callback to add a file that is generated on the fly.
 ///
 /// Stream callbacks must be thread safe.
-using AddStreamFn =
-    std::function<Expected<std::unique_ptr<CachedFileStream>>(unsigned Task)>;
+using AddStreamFn = std::function<Expected<std::unique_ptr<CachedFileStream>>(
+    unsigned Task, const Twine &ModuleName)>;
 
-/// This is the type of a file cache. To request an item from the cache, pass a
-/// unique string as the Key. For hits, the cached file will be added to the
-/// link and this function will return AddStreamFn(). For misses, the cache will
-/// return a stream callback which must be called at most once to produce
-/// content for the stream. The file stream produced by the stream callback will
-/// add the file to the link after the stream is written to.
+/// This is a callable that manages file caching operations. It accepts a task
+/// ID \p Task, a unique key \p Key, and a module name \p ModuleName, and
+/// returns AddStreamFn(). This function determines whether a cache hit or miss
+/// occurs and handles the appropriate actions.
+using FileCacheFunction = std::function<Expected<AddStreamFn>(
+    unsigned Task, StringRef Key, const Twine &ModuleName)>;
+
+/// This type represents a file cache system that manages caching of files.
+/// It encapsulates a caching function and the directory path where the cache is
+/// stored. To request an item from the cache, pass a unique string as the Key.
+/// For hits, the cached file will be added to the link and this function will
+/// return AddStreamFn(). For misses, the cache will return a stream callback
+/// which must be called at most once to produce content for the stream. The
+/// file stream produced by the stream callback will add the file to the link
+/// after the stream is written to. ModuleName is the unique module identifier
+/// for the bitcode module the cache is being checked for.
 ///
 /// Clients generally look like this:
 ///
-/// if (AddStreamFn AddStream = Cache(Task, Key))
+/// if (AddStreamFn AddStream = Cache(Task, Key, ModuleName))
 ///   ProduceContent(AddStream);
-using FileCache =
-    std::function<Expected<AddStreamFn>(unsigned Task, StringRef Key)>;
+///
+/// CacheDirectoryPath stores the directory path where cached files are kept.
+struct FileCache {
+  FileCache(FileCacheFunction CacheFn, const std::string &DirectoryPath)
+      : CacheFunction(std::move(CacheFn)), CacheDirectoryPath(DirectoryPath) {}
+  FileCache() = default;
+
+  Expected<AddStreamFn> operator()(unsigned Task, StringRef Key,
+                                   const Twine &ModuleName) {
+    assert(isValid() && "Invalid cache function");
+    return CacheFunction(Task, Key, ModuleName);
+  }
+  const std::string &getCacheDirectoryPath() const {
+    return CacheDirectoryPath;
+  }
+  bool isValid() const { return static_cast<bool>(CacheFunction); }
+
+private:
+  FileCacheFunction CacheFunction = nullptr;
+  std::string CacheDirectoryPath;
+};
 
 /// This type defines the callback to add a pre-existing file (e.g. in a cache).
 ///
 /// Buffer callbacks must be thread safe.
-using AddBufferFn =
-    std::function<void(unsigned Task, std::unique_ptr<MemoryBuffer> MB)>;
+using AddBufferFn = std::function<void(unsigned Task, const Twine &ModuleName,
+                                       std::unique_ptr<MemoryBuffer> MB)>;
 
 /// Create a local file system cache which uses the given cache name, temporary
 /// file prefix, cache directory and file callback.  This function does not
@@ -68,9 +97,10 @@ using AddBufferFn =
 /// messages for errors during caching. The temporary file prefix is used in the
 /// temporary file naming scheme used when writing files atomically.
 Expected<FileCache> localCache(
-    Twine CacheNameRef, Twine TempFilePrefixRef, Twine CacheDirectoryPathRef,
-    AddBufferFn AddBuffer = [](size_t Task, std::unique_ptr<MemoryBuffer> MB) {
-    });
+    const Twine &CacheNameRef, const Twine &TempFilePrefixRef,
+    const Twine &CacheDirectoryPathRef,
+    AddBufferFn AddBuffer = [](size_t Task, const Twine &ModuleName,
+                               std::unique_ptr<MemoryBuffer> MB) {});
 } // namespace llvm
 
 #endif

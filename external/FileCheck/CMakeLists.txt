@@ -1,10 +1,10 @@
 
 cmake_minimum_required(VERSION 3.13.4...3.27.4)
 project(FileCheck
-        VERSION 15.0.6
+        VERSION 20.1.8
         DESCRIPTION "A standalone build of LLVM FileCheck")
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
@@ -13,7 +13,7 @@ add_executable(FileCheck_Standalone FileCheck.cpp)
 set_target_properties(FileCheck_Standalone
         PROPERTIES
         OUTPUT_NAME FileCheck
-        CXX_STANDARD 14
+        CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON)
 
 target_include_directories(FileCheck_Standalone PRIVATE include)

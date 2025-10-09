@@ -86,29 +86,50 @@ using namespace __otfcpt;
 
 // Abstract interface of the HandleFactor
 template <typename M, typename T, auto E> class AbstractHandleFactory {
+  using A =
+      M; // A is the application facing handle, M is the MPI facing handle.
 protected:
   CompactHashMap<M, T> predefHandles{};
-  virtual bool isPredefined(M handle) { return handle == T::nullHandle; }
-  virtual T *findPredefinedData(M handle) {
+  virtual bool isPredefined(A handle) { return handle == T::nullHandle; }
+  virtual T *findPredefinedData(A handle) {
     auto iter = predefHandles.Find(handle);
     if (iter == predefHandles.end())
       return nullptr;
     return &(iter->second);
   }
+#ifdef FORTRAN_SUPPORT
+  CompactHashMap<MPI_Fint, T *> predefFHandles{};
+  virtual bool isPredefinedF(MPI_Fint handle) {
+    return findPredefinedDataF(handle) != nullptr;
+  }
+  virtual T *findPredefinedDataF(MPI_Fint handle) {
+    auto iter = predefFHandles.Find(handle);
+    if (iter == predefFHandles.end())
+      return nullptr;
+    return iter->second;
+  }
+#endif
 
 public:
-  virtual M newHandle(M &handle) = 0;
-  virtual M newHandle(M &handle, T *data) = 0;
-  virtual M freeHandle(M handle) = 0;
-  virtual T *detachHandle(M handle) = 0;
-  virtual T *findData(M handle) = 0;
+  virtual A newHandle(M &handle) = 0;
+  virtual A newHandle(M &handle, T *data) = 0;
+  virtual A freeHandle(A handle) = 0;
+#ifdef FORTRAN_SUPPORT
+  virtual M f2c(MPI_Fint fhandle) = 0;
+  virtual MPI_Fint c2f(M handle) = 0;
+#endif
+  virtual T *detachHandle(A handle) = 0;
+  virtual T *findData(A handle) = 0;
   virtual T *newData() = 0;
-  virtual M &getHandle(M &handle) = 0;
-  virtual M &getHandleLocked(M &handle) = 0;
+  virtual M &getHandle(A &handle) = 0;
+  virtual M &getHandleLocked(A &handle) = 0;
   virtual std::shared_lock<std::shared_mutex> getSharedLock() = 0;
-  virtual ~AbstractHandleFactory(){};
   virtual void initPredefined() {
     predefHandles[T::nullHandle].init(T::nullHandle);
+#ifdef FORTRAN_SUPPORT
+    auto &nHandle = predefHandles[T::nullHandle];
+    predefFHandles[nHandle.fHandle] = &nHandle;
+#endif
   }
 };
 
@@ -116,16 +137,17 @@ public:
 class AbstractRequestFactory
     : public virtual AbstractHandleFactory<MPI_Request, RequestData,
                                            toolRequestData> {
+  using A = MPI_Request;
+  using M = MPI_Request;
+  using T = RequestData;
+
 public:
-  virtual MPI_Request newRequest(MPI_Request req, bool persistent = false) = 0;
-  virtual MPI_Request newRequest(MPI_Request req, RequestData *data,
-                                 bool persistent = false) = 0;
-  virtual MPI_Request completeRequest(MPI_Request req, MPI_Status *status) = 0;
-  virtual MPI_Request completeRequest(MPI_Request req, MPI_Request mpi_req,
-                                      MPI_Status *status) = 0;
-  virtual MPI_Request startRequest(MPI_Request req) = 0;
-  virtual MPI_Request cancelRequest(MPI_Request req) = 0;
-  virtual ~AbstractRequestFactory(){};
+  virtual A newRequest(M req, bool persistent = false) = 0;
+  virtual A newRequest(M req, RequestData *data, bool persistent = false) = 0;
+  virtual A completeRequest(A req, MPI_Status *status) = 0;
+  virtual A completeRequest(A req, MPI_Request mpi_req, MPI_Status *status) = 0;
+  virtual A startRequest(A req) = 0;
+  virtual A cancelRequest(A req) = 0;
 };
 
 #ifdef REAL_DATAPOOL
@@ -204,7 +226,46 @@ class HandleFactory<M, T, MI *, E>
 protected:
   mutable std::shared_mutex DummyMutex{};
 
+#ifdef FORTRAN_SUPPORT
+  mutable std::shared_mutex DTMutex{};
+  mutable std::shared_mutex AHMutex{};
+  Vector<T *> dataTable{};
+  Vector<MPI_Fint> availableHandles{};
+
+  void newAH() {
+    int ndatas = 4096 / 64;
+    size_t oldSize = dataTable.Size(), newSize = oldSize + ndatas;
+    {
+      // Only the resize actually modifies the vector and
+      // can lead to a reallocation of the elements
+      std::unique_lock<std::shared_mutex> lock(DTMutex);
+      dataTable.Resize(newSize);
+    }
+    // Getting the lock here is not necessary:
+    // unique_lock can only be taken while having unique AHMutex
+    // std::shared_lock<std::shared_mutex> lock(DTMutex);
+    for (size_t i = oldSize, j = 0; i < newSize; i++, j++) {
+      dataTable[i] = nullptr;
+      availableHandles.PushBack((MPI_Fint)(i));
+    }
+  }
+#endif
+
 public:
+#ifdef FORTRAN_SUPPORT
+  M f2c(MPI_Fint fhandle) {
+    auto fPredefData = this->findPredefinedDataF(fhandle);
+    if (fPredefData)
+      return (M)(uintptr_t)fPredefData->handle;
+    std::shared_lock<std::shared_mutex> lock(DTMutex);
+    return (M)(uintptr_t)dataTable[(size_t)(fhandle)];
+  }
+  MPI_Fint c2f(M handle) {
+    if (this->isPredefined(handle))
+      return this->findPredefinedData(handle)->fHandle;
+    return ((T *)(uintptr_t)(handle))->fHandle;
+  }
+#endif
   T *newData() { return this->getData(); }
   M newHandle(M &handle) {
     if (this->isPredefined(handle))
@@ -213,18 +274,48 @@ public:
     return newHandle(handle, ret);
   }
   M newHandle(M &handle, T *ret) {
+#ifdef FORTRAN_SUPPORT
+    MPI_Fint fId;
+    {
+      std::unique_lock<std::shared_mutex> lock(AHMutex);
+      if (availableHandles.Empty())
+        newAH();
+      fId = availableHandles.Back();
+      availableHandles.PopBack();
+      // Getting the lock here is not necessary:
+      // unique_lock can only be taken while having unique AHMutex
+      // std::shared_lock<std::shared_mutex> lock(DTMutex);
+      dataTable[(size_t)(fId)] = ret;
+    }
+    ret->init(handle, fId);
+#else
     ret->init(handle);
+#endif
     return (M)(uintptr_t)ret;
   }
   M freeHandle(M handle) {
     if (this->isPredefined(handle))
       return (M)T::nullHandle;
+#ifdef FORTRAN_SUPPORT
+    {
+      auto fId = ((T *)(uintptr_t)(handle))->fHandle;
+      std::unique_lock<std::shared_mutex> lock(AHMutex);
+      availableHandles.PushBack(fId);
+    }
+#endif
     ((T *)(uintptr_t)(handle))->fini();
     this->returnData((T *)(uintptr_t)(handle));
     return (M)T::nullHandle;
   }
   T *detachHandle(M handle) {
-    assert (!this->isPredefined(handle));
+    assert(!this->isPredefined(handle));
+#ifdef FORTRAN_SUPPORT
+    {
+      auto fId = ((T *)(uintptr_t)(handle))->fHandle;
+      std::unique_lock<std::shared_mutex> lock(AHMutex);
+      availableHandles.PushBack(fId);
+    }
+#endif
     return (T *)(uintptr_t)(handle);
   }
   T *findData(M handle) {
@@ -246,7 +337,6 @@ public:
   std::shared_lock<std::shared_mutex> getSharedLock() {
     return std::shared_lock<std::shared_mutex>{DummyMutex, std::defer_lock};
   }
-  virtual ~HandleFactory() {}
 };
 
 // Specialized template of RequestFactory for pointer-type handles
@@ -258,7 +348,23 @@ class RequestFactoryInst<MI *>
     if (req == MPI_REQUEST_NULL)
       return MPI_REQUEST_NULL;
     RequestData *ret = this->getData();
+#ifdef FORTRAN_SUPPORT
+    MPI_Fint fId;
+    {
+      std::unique_lock<std::shared_mutex> lock(this->AHMutex);
+      if (this->availableHandles.Empty())
+        this->newAH();
+      fId = this->availableHandles.Back();
+      this->availableHandles.PopBack();
+      // Getting the lock here is not necessary:
+      // unique_lock can only be taken while having unique AHMutex
+      // std::shared_lock<std::shared_mutex> lock(DTMutex);
+      this->dataTable[(size_t)(fId)] = ret;
+    }
+    ret->init(req, fId, persistent);
+#else
     ret->init(req, persistent);
+#endif
     return (MPI_Request)(uintptr_t)ret;
   }
 
@@ -269,7 +375,23 @@ public:
   }
 
   MPI_Request newRequest(MPI_Request req, RequestData *data, bool persistent) {
+#ifdef FORTRAN_SUPPORT
+    MPI_Fint fId;
+    {
+      std::unique_lock<std::shared_mutex> lock(this->AHMutex);
+      if (this->availableHandles.Empty())
+        this->newAH();
+      fId = this->availableHandles.Back();
+      this->availableHandles.PopBack();
+      // Getting the lock here is not necessary:
+      // unique_lock can only be taken while having unique AHMutex
+      // std::shared_lock<std::shared_mutex> lock(DTMutex);
+      this->dataTable[(size_t)(fId)] = data;
+    }
+    data->init(req, fId, persistent);
+#else
     data->init(req, persistent);
+#endif
     return (MPI_Request)(uintptr_t)data;
   }
 
@@ -285,6 +407,13 @@ public:
       ((RequestData *)(uintptr_t)(req))->complete(status);
       return req;
     }
+#ifdef FORTRAN_SUPPORT
+    {
+      auto fId = ((RequestData *)(uintptr_t)(req))->fHandle;
+      std::unique_lock<std::shared_mutex> lock(this->AHMutex);
+      this->availableHandles.PushBack(fId);
+    }
+#endif
     ((RequestData *)(uintptr_t)(req))->fini(status);
     this->returnData((RequestData *)(uintptr_t)(req));
     return MPI_REQUEST_NULL;
@@ -335,6 +464,10 @@ protected:
   }
 
 public:
+#ifdef FORTRAN_SUPPORT
+  MPI_Request f2c(MPI_Fint fhandle) { return (MPI_Request)(uintptr_t)fhandle; }
+  MPI_Fint c2f(MPI_Request handle) { return (MPI_Fint)(uintptr_t)handle; }
+#endif
   T *newData() { return this->getData(); }
   M newHandle(M &handle) {
     if (this->isPredefined(handle))
@@ -373,7 +506,7 @@ public:
     return T::nullHandle;
   }
   T *detachHandle(M handle) {
-    assert (!this->isPredefined(handle));
+    assert(!this->isPredefined(handle));
     T *ret;
     {
       std::unique_lock<std::shared_mutex> lock(AHMutex);
@@ -403,7 +536,6 @@ public:
   std::shared_lock<std::shared_mutex> getSharedLock() {
     return std::shared_lock<std::shared_mutex>{DTMutex};
   }
-  virtual ~HandleFactory() {}
 };
 
 // Specialized template of RequestFactory for int-type handles

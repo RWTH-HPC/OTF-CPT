@@ -194,9 +194,6 @@ void finishMeasurement() {
       uc_avg[0] += curr_uc;
       uc_avg[2] += curr_oot;
     }
-    uc_avg[0] = uc_avg[0];
-
-    uc_avg[2] = uc_avg[2];
     if (thread_counts)
       for (int i = 1; i < thread_counts->Size(); i++)
         (*thread_counts)[0]->add(*(*thread_counts)[i]);
@@ -205,6 +202,7 @@ void finishMeasurement() {
     uc_max[0] = uc_avg[0] =
         thread_local_clock->useful_computation_thread.load();
     uc_max[2] = uc_avg[2] = thread_local_clock->outsideomp_thread.load();
+    proc_counts.add(*thread_local_clock);
   }
   uc_max[1] = uc_avg[1] = thread_local_clock->outsidempi_proc.load();
   uc_max[3] = uc_avg[3] = thread_local_clock->useful_computation_proc.load();
@@ -223,8 +221,9 @@ void finishMeasurement() {
                 MPI_SUM, 0, MPI_COMM_WORLD);
     PMPI_Reduce(&num_threads, &total_threads, 1, MPI_INT, MPI_SUM, 0,
                 MPI_COMM_WORLD);
-    PMPI_Reduce(&proc_counts, &total_counts, sizeof(proc_counts) / sizeof(int),
-                MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    PMPI_Reduce(&proc_counts, &total_counts,
+                sizeof(proc_counts) / sizeof(uint64_t), MPI_UINT64_T, MPI_SUM,
+                0, MPI_COMM_WORLD);
     double localRuntimeReal = totalRuntimeReal;
     PMPI_Reduce(&localRuntimeReal, &totalRuntimeReal, 1, MPI_DOUBLE, MPI_MAX, 0,
                 MPI_COMM_WORLD);
@@ -243,10 +242,10 @@ void finishMeasurement() {
       maxComputation[i] = uc_max[i];
       avgComputation[i] = uc_avg[i];
     }
-    avgComputation[0]/=num_threads;
-    avgComputation[2]/=num_threads;
-    avgComputation[5]/=num_threads;
-    avgComputation[6]/=num_threads;
+    avgComputation[0] /= num_threads;
+    avgComputation[2] /= num_threads;
+    avgComputation[5] /= num_threads;
+    avgComputation[6] /= num_threads;
   }
   if (myProcId == 0) { // display results on master thread
                        // calculate pop metrics
@@ -316,48 +315,49 @@ void finishMeasurement() {
           avgComputation[0], maxComputation[0]);
       fprintf(of, "\n\n--------MPI stats:--------\n");
       if (total_counts.send)
-        fprintf(of, "MPI_*send: %i\n", total_counts.send);
+        fprintf(of, "MPI_*send: %lu\n", total_counts.send);
       if (total_counts.isend)
-        fprintf(of, "MPI_I*send: %i\n", total_counts.isend);
+        fprintf(of, "MPI_I*send: %lu\n", total_counts.isend);
       if (total_counts.probe)
-        fprintf(of, "MPI_*mprobe: %i\n", total_counts.probe);
+        fprintf(of, "MPI_*mprobe: %lu\n", total_counts.probe);
       if (total_counts.recv)
-        fprintf(of, "MPI_Recv: %i\n", total_counts.recv);
+        fprintf(of, "MPI_Recv: %lu\n", total_counts.recv);
       if (total_counts.irecv)
-        fprintf(of, "MPI_Irecv: %i\n", total_counts.irecv);
+        fprintf(of, "MPI_Irecv: %lu\n", total_counts.irecv);
       if (total_counts.coll)
-        fprintf(of, "MPI_*coll: %i\n", total_counts.coll);
+        fprintf(of, "MPI_*coll: %lu\n", total_counts.coll);
       if (total_counts.coll)
-        fprintf(of, "MPI_I*coll: %i\n", total_counts.coll);
+        fprintf(of, "MPI_I*coll: %lu\n", total_counts.coll);
       if (total_counts.test)
-        fprintf(of, "MPI_Test*: %i\n", total_counts.test);
+        fprintf(of, "MPI_Test*: %lu\n", total_counts.test);
       if (total_counts.wait)
-        fprintf(of, "MPI_Wait*: %i\n", total_counts.wait);
+        fprintf(of, "MPI_Wait*: %lu\n", total_counts.wait);
 
-      if(thread_counts){
+      if (thread_counts) {
         fprintf(of, "\n\n--------OMPT stats:--------\n");
         auto *tCounts = (*thread_counts)[0];
-        if(tCounts->taskCreate)
+        if (tCounts->taskCreate)
           fprintf(of, "taskCreate: %i\n", tCounts->taskCreate);
-        if(tCounts->taskSchedule)
+        if (tCounts->taskSchedule)
           fprintf(of, "taskSchedule: %i\n", tCounts->taskSchedule);
-        if(tCounts->implTaskBegin)
+        if (tCounts->implTaskBegin)
           fprintf(of, "implTaskBegin: %i\n", tCounts->implTaskBegin);
-        if(tCounts->implTaskEnd)
+        if (tCounts->implTaskEnd)
           fprintf(of, "implTaskEnd: %i\n", tCounts->implTaskEnd);
-        if(tCounts->syncRegionBegin)
+        if (tCounts->syncRegionBegin)
           fprintf(of, "syncRegionBegin: %i\n", tCounts->syncRegionBegin);
-        if(tCounts->syncRegionEnd)
+        if (tCounts->syncRegionEnd)
           fprintf(of, "syncRegionEnd: %i\n", tCounts->syncRegionEnd);
-        if(tCounts->mutexAcquire)
+        if (tCounts->mutexAcquire)
           fprintf(of, "mutexAcquire: %i\n", tCounts->mutexAcquire);
       }
+    }
 
-      fprintf(of, "\n\n--------CritPath Analysis Tool results:--------\n");
-      fprintf(of, "=> Number of processes:          %i\n", number_of_procs);
-      fprintf(of, "=> Number of threads:            %i\n", total_threads);
-      fprintf(of, "=> Average Computation (in s):   %6.3lf\n",
-              avgComputation[0]);
+    fprintf(of, "\n\n--------CritPath Analysis Tool results:--------\n");
+    fprintf(of, "=> Number of processes:          %i\n", number_of_procs);
+    fprintf(of, "=> Number of threads:            %i\n", total_threads);
+    fprintf(of, "=> Average Computation (in s):   %6.3lf\n", avgComputation[0]);
+    if (analysis_flags->verbose) {
       fprintf(of, "=> Maximum Computation (in s):   %6.3lf\n",
               maxComputation[0]);
       fprintf(of, "=> Max crit. computation (in s): %6.3lf\n",
@@ -386,9 +386,8 @@ void finishMeasurement() {
               totalOutsideOMPIdeal);
       fprintf(of, "=> Max crit. Outside OpenMP w/o o,%6.3lf\n",
               totalOutsideOMPIdealNoOffset);
-      fprintf(of, "=> Total runtime (in s):         %6.3lf\n",
-              totalRuntimeReal);
     }
+    fprintf(of, "=> Total runtime (in s):         %6.3lf\n", totalRuntimeReal);
 
     fprintf(of, "\n----------------POP metrics----------------\n");
     fprintf(of, "Parallel Efficiency:                %6.3lf\n",

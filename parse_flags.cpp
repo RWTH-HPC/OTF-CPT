@@ -10,7 +10,7 @@ class UnknownFlags {
 public:
   void Add(const char *name) {
     CHECK_LT(n_unknown_flags_, kMaxUnknownFlags);
-    unknown_flags_[n_unknown_flags_++] = name;
+    unknown_flags_[n_unknown_flags_++] = strdup(name);
   }
 
   void Report() {
@@ -98,6 +98,8 @@ void FlagParser::parse_flag(const char *env_option_name) {
   }
 
   bool res = run_handler(name, value);
+  free(name);
+  free(value);
   if (!res)
     fatal_error("Flag parsing failed.");
 }
@@ -153,6 +155,11 @@ void FlagParser::RegisterHandler(const char *name, FlagHandlerBase *handler,
 
 FlagParser::FlagParser() : n_flags_(0), buf_(nullptr), pos_(0) {
   flags_ = (Flag *)malloc(sizeof(Flag) * kMaxFlags);
+}
+FlagParser::~FlagParser() {
+  for (int i = 0; i < n_flags_; i++)
+    delete flags_[i].handler;
+  free(flags_);
 }
 
 OtfcptFlags *__otfcpt::otfcpt_flags_dont_use{nullptr};
@@ -219,8 +226,7 @@ void NORETURN __otfcpt::Die() {
 
 void NORETURN __otfcpt::CheckFailed(const char *file, int line,
                                     const char *cond, u64 v1, u64 v2) {
-  fprintf(get_otfcpt_flags()->output,
-          "Check failed in %s:%d %llu %s %llu\n",
+  fprintf(get_otfcpt_flags()->output, "Check failed in %s:%d %llu %s %llu\n",
           file, line, v1, cond, v2);
   Die();
 }

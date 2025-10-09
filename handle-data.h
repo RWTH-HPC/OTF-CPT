@@ -98,10 +98,42 @@ protected:
 public:
   static M nullHandle;
   M handle{nullHandle};
+#ifdef FORTRAN_SUPPORT
+  int fHandle{-1};
+#endif
   HandleData() {}
+  /*  HandleData(M group
+  #ifdef FORTRAN_SUPPORT
+               ,
+               MPI_Fint fGroup
+  #endif
+               )
+        : handle(group)
+  #ifdef FORTRAN_SUPPORT
+          ,
+          fHandle(fGroup)
+  #endif
+    {
+    }*/
   HandleData(const HandleData &o) { this->init(o.handle); }
   HandleData(HandleData &&o) noexcept { this->init(o.handle); }
-  virtual void init(M group) { handle = group; }
+  virtual void init(M group
+#ifdef FORTRAN_SUPPORT
+                    ,
+                    MPI_Fint fGroup
+#endif
+  ) {
+    handle = group;
+#ifdef FORTRAN_SUPPORT
+    fHandle = fGroup;
+#endif
+  }
+  /*virtual void init(const HandleData &o) {
+    handle = o.handle;
+#ifdef FORTRAN_SUPPORT
+    fHandle = o.fHandle;
+#endif
+  }*/
   virtual void fini() {}
 
   // define new/delete operator to avoid dependency to libstdc++
@@ -121,8 +153,22 @@ class alignas(64) CommData {
 public:
   static MPI_Comm nullHandle;
   MPI_Comm handle{nullHandle};
-  void init(MPI_Comm comm) {
+#ifdef FORTRAN_SUPPORT
+  int fHandle{-1};
+#endif
+  void init(MPI_Comm comm
+#ifdef FORTRAN_SUPPORT
+            ,
+            MPI_Fint fComm = -1
+#endif
+  ) {
     this->handle = comm;
+#ifdef FORTRAN_SUPPORT
+    if (fComm == -1)
+      fHandle = PMPI_Comm_c2f(comm);
+    else
+      fHandle = fComm;
+#endif
     if (comm == MPI_COMM_NULL)
       return;
     PMPI_Comm_dup(comm, &dupComm);
@@ -269,11 +315,17 @@ public:
   RequestData() {}
   ~RequestData() {}
   MPI_Request handle{MPI_REQUEST_NULL};
+#ifdef FORTRAN_SUPPORT
+  MPI_Fint fHandle{-1};
+#endif
 
   void init(MPI_Request request, KIND _kind, int _remote = -1, int _tag = -1,
             CommData *_comm = nullptr, int _root = -1,
             bool _persistent = false) {
     handle = request;
+#ifdef FORTRAN_SUPPORT
+    fHandle = -1;
+#endif
     kind = _kind;
     remote = _remote;
     tag = _tag;
@@ -284,9 +336,20 @@ public:
     cancelled = false;
   }
 
-  template <typename M> void init(M request, bool _persistent = false) {
+  template <typename M>
+  void init(M request,
+#ifdef FORTRAN_SUPPORT
+            MPI_Fint fRequest = -1,
+#endif
+            bool _persistent = false) {
     persistent = _persistent;
     handle = (MPI_Request)request;
+#ifdef FORTRAN_SUPPORT
+    if (fRequest == -1)
+      fHandle = PMPI_Request_c2f((MPI_Request)request);
+    else
+      fHandle = fRequest;
+#endif
     freed = false;
     cancelled = false;
   }
@@ -317,6 +380,9 @@ public:
   }
   void fini() {
     handle = MPI_REQUEST_NULL;
+#ifdef FORTRAN_SUPPORT
+    fHandle = -1;
+#endif
     pb_reqs[0] = MPI_REQUEST_NULL;
     pb_reqs[1] = MPI_REQUEST_NULL;
     completionCallback = nullptr;

@@ -1,3 +1,4 @@
+#include <mpi.h>
 #ifndef MPI_CRITICAL_H
 #define MPI_CRITICAL_H 1
 
@@ -460,11 +461,6 @@ struct mpiMprobePB {
     if (!*flag)
       return;
     auto rData = rf.newData();
-    *message = mf.newHandle(*message, rData);
-#if OnlyActivePB
-    if (!analysis_flags->running)
-      return;
-#endif
     cData = cf.findData(comm);
     rank = cData->getRank();
     uc = rData->uc_double;
@@ -473,6 +469,11 @@ struct mpiMprobePB {
       tag = pStatus->MPI_TAG;
     }
     rData->init(rData->handle, MPROBE, src, tag, cData);
+    *message = mf.newHandle(*message, rData);
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
     PMPI_Irecv(uc, 1, ipcData::ipcMpiType, src, tag, cData->getDupComm(),
                rData->pb_reqs);
   }
@@ -500,6 +501,7 @@ struct mpiRecvPB {
     mData->fini();
     mf.returnData(mData);
     src = rData.remote;
+    tag = rData.tag;
   }
 
   mpiRecvPB(int src, int tag, MPI_Comm comm, MPI_Status **status)
@@ -640,5 +642,97 @@ struct mpiRecvInitPB {
     assert(rData->isPersistent());
   }
 };
+
+#ifdef HAVE_ISRR
+
+struct mpiSendrecvPB {
+  double *uc{nullptr};
+  RequestData rData{};
+  CommData *cData;
+  MPI_Status tStatus;
+  MPI_Status *pStatus;
+  int dest;
+  int src;
+  int stag;
+  int rtag;
+  int rank;
+
+  mpiSendrecvPB(int dest, int stag, int src, int rtag, MPI_Comm comm,
+                MPI_Status **status)
+      : pStatus(*status), dest(dest), src(src), stag(stag), rtag(rtag) {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    if (src == MPI_PROC_NULL && dest == MPI_PROC_NULL)
+      return;
+    cData = cf.findData(comm);
+    rank = cData->getRank();
+    uc = loadThreadTimers(rData);
+    PMPI_Isendrecv_replace(uc, 1, ipcData::ipcMpiType, dest, stag, src, rtag,
+                           cData->getDupComm(), rData.pb_reqs);
+  }
+  ~mpiSendrecvPB() {
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    if (src == MPI_PROC_NULL && dest == MPI_PROC_NULL)
+      return;
+
+    PMPI_Waitall(2, rData.pb_reqs, MPI_STATUSES_IGNORE);
+    if (src != MPI_PROC_NULL)
+      MpiHappensAfter(rData, src);
+  }
+};
+
+struct mpiIsendrecvPB {
+  double *uc{nullptr};
+  RequestData *rData;
+  CommData *cData;
+  MPI_Request *send_req;
+  KIND kind{IRECV};
+  int dest;
+  int src;
+  int stag;
+  int rtag;
+  int rank;
+
+  mpiIsendrecvPB(int dest, int stag, int src, int rtag, MPI_Comm comm,
+                 MPI_Request *request)
+      : send_req(request), dest(dest), src(src), stag(stag), rtag(rtag) {
+    rData = rf.newData();
+    send_req = request;
+#if OnlyActivePB
+    if (!analysis_flags->running)
+      return;
+#endif
+    if (src == MPI_PROC_NULL && dest == MPI_PROC_NULL)
+      return;
+    cData = cf.findData(comm);
+    rank = cData->getRank();
+    uc = loadThreadTimers(rData);
+    PMPI_Isendrecv_replace(uc, 1, ipcData::ipcMpiType, dest, stag, src, rtag,
+                           cData->getDupComm(), rData->pb_reqs);
+  }
+  ~mpiIsendrecvPB() {
+#if OnlyActivePB
+    if (analysis_flags->running)
+#endif
+    {
+      rData->init(*send_req, kind, src);
+      rData->setCancelCallback(cancelPB);
+      if (src != MPI_PROC_NULL) {
+        rData->setCompletionCallback(completePBHB);
+      } else {
+        rData->setCompletionCallback(completePBnoHB);
+      }
+    }
+    *send_req = rf.newRequest(*send_req, rData, false);
+    assert(!rData->isPersistent());
+  }
+};
+
+#endif
 
 #endif

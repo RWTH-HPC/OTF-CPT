@@ -16,7 +16,6 @@
 
   if (analysis_flags->verbose)
      printf("MPI Init\n");
-
    {{ret_val}} = P{{fn_name}}({{args}});
 
 #ifdef USE_ERRHANDLER
@@ -63,7 +62,10 @@
  MPI_Scatter MPI_Scatter_c MPI_Scatterv MPI_Scatterv_c 
  MPI_Bsend MPI_Rsend MPI_Ssend MPI_Send MPI_Recv 
  MPI_Bsend_c MPI_Rsend_c MPI_Ssend_c MPI_Send_c MPI_Recv_c 
- MPI_Mrecv MPI_Mrecv_c MPI_Mprobe MPI_Improbe}}
+ MPI_Mrecv MPI_Mrecv_c MPI_Mprobe MPI_Improbe
+ MPI_Sendrecv MPI_Sendrecv_c MPI_Sendrecv_replace MPI_Sendrecv_replace_c
+ MPI_Isendrecv MPI_Isendrecv_c MPI_Isendrecv_replace MPI_Isendrecv_replace_c
+ }}
    mpiTimer mt{false, __func__};
    {{apply_to_type MPI_Comm preComm}} 
    {{ret_val}} = P{{fn_name}}({{args}});

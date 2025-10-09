@@ -8,6 +8,8 @@
 // RUN: env OMP_NUM_THREADS=4 %load_otfcpt_omp %otfcpt_options_dump_stopped \
 // RUN: %t | %FileCheck --check-prefixes=CHECK %metricfile
 
+// UNSUPPORTED: GNU
+
 #include <omp.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -19,7 +21,7 @@ int main(int argc, char **argv) {
   metrics m = {1000, 1000, 1000, 1000, 1000, 1000};
   printMetrics(m);
   omp_control_tool(omp_control_tool_start, 0, NULL);
-#pragma omp parallel for schedule(static, 1) reduction(+:sum)
+#pragma omp parallel for schedule(static, 1) reduction(+ : sum)
   for (int i = 0; i < 20; i++) {
     sum += i;
     usleep(WORK);

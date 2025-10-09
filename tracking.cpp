@@ -36,6 +36,65 @@ void registerErrHandler(MPI_Comm comm) {
 }
 #endif
 
+#ifdef FORTRAN_SUPPORT
+#ifdef HANDLE_OP
+template <> void OpData::init(MPI_Op op) {
+  handle = op;
+  fHandle = PMPI_Op_c2f(op);
+}
+#ifndef MPI_Op_c2f
+MPI_Fint MPI_Op_c2f(MPI_Op op) { return of.c2f(op); }
+MPI_Op MPI_Op_f2c(MPI_Fint op) { return of.f2c(op); }
+#endif
+#endif
+#ifdef HANDLE_WIN
+template <> void WinData::init(MPI_Win win) {
+  handle = win;
+  fHandle = PMPI_Win_c2f(win);
+}
+#ifndef MPI_Win_c2f
+MPI_Fint MPI_Win_c2f(MPI_Win win) { return wf.c2f(win); }
+MPI_Win MPI_Win_f2c(MPI_Fint win) { return wf.f2c(win); }
+#endif
+#endif
+#ifdef HANDLE_TYPE
+template <> void TypeData::init(MPI_Datatype type) {
+  handle = type;
+  fHandle = PMPI_Type_c2f(type);
+}
+#ifndef MPI_Type_c2f
+MPI_Fint MPI_Type_c2f(MPI_Datatype type) { return tf.c2f(type); }
+MPI_Datatype MPI_Type_f2c(MPI_Fint type) { return tf.f2c(type); }
+#endif
+#endif
+#ifdef HANDLE_FILE
+template <> void FileData::init(MPI_File file) {
+  handle = file;
+  fHandle = PMPI_File_c2f(file);
+}
+#ifndef MPI_File_c2f
+MPI_Fint MPI_File_c2f(MPI_File file) { return ff.c2f(file); }
+MPI_File MPI_File_f2c(MPI_Fint file) { return ff.f2c(file); }
+#endif
+#endif
+#ifdef HANDLE_COMM
+#ifndef MPI_Comm_c2f
+MPI_Fint MPI_Comm_c2f(MPI_Comm comm) { return cf.c2f(comm); }
+MPI_Comm MPI_Comm_f2c(MPI_Fint comm) { return cf.f2c(comm); }
+#endif
+#endif
+#ifdef HANDLE_GROUP
+template <> void GroupData::init(MPI_Group group) {
+  handle = group;
+  fHandle = PMPI_Group_c2f(group);
+}
+#ifndef MPI_Group_c2f
+MPI_Fint MPI_Group_c2f(MPI_Group group) { return gf.c2f(group); }
+MPI_Group MPI_Group_f2c(MPI_Fint group) { return gf.f2c(group); }
+#endif
+#endif
+#endif
+
 #ifdef HANDLE_WIN
 template <> MPI_Win WinData::nullHandle{MPI_WIN_NULL};
 WinFactory wf;
@@ -56,6 +115,14 @@ void AbstractHandleFactory<MPI_Comm, CommData, toolCommData>::initPredefined() {
   predefHandles[MPI_COMM_NULL].init(MPI_COMM_NULL);
   predefHandles[MPI_COMM_WORLD].init(MPI_COMM_WORLD);
   predefHandles[MPI_COMM_SELF].init(MPI_COMM_SELF);
+#ifdef FORTRAN_SUPPORT
+  predefFHandles[predefHandles[MPI_COMM_NULL].fHandle] =
+      &predefHandles[MPI_COMM_NULL];
+  predefFHandles[predefHandles[MPI_COMM_WORLD].fHandle] =
+      &predefHandles[MPI_COMM_WORLD];
+  predefFHandles[predefHandles[MPI_COMM_SELF].fHandle] =
+      &predefHandles[MPI_COMM_SELF];
+#endif
 }
 MPI_Comm CommData::nullHandle{MPI_COMM_NULL};
 CommFactory cf;

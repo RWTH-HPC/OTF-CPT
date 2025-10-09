@@ -1,0 +1,211 @@
+name: OTF-CPT CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+    formatting-check:
+        name: Formatting Check
+        runs-on: ubuntu-latest
+        steps:
+        - uses: actions/checkout@v4
+        - name: Run clang-format style check for C/C++/Protobuf programs.
+          uses: jidicula/clang-format-action@v4.15.0
+          with:
+            clang-format-version: '18'
+            exclude-regex: '^.*external\/.*'
+
+    build:
+        runs-on: ubuntu-latest
+        container: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ ubuntu:24.04 ]
+                mpi: [ mpich, openmpi, intelmpi ]
+                compiler: [ clang, gcc, oneapi ]
+                # The MPI Fortran interface is always built for a certain compiler, 
+                # only test for specific combinations
+                enable_fortran_tests: [ false ]
+                # Enable Fortran tests for the following combinations
+                include:
+                  - os: ubuntu:24.04
+                    mpi: mpich
+                    compiler: gcc
+                    enable_fortran_tests: true
+                  - os: ubuntu:24.04
+                    mpi: openmpi
+                    compiler: gcc
+                    enable_fortran_tests: true
+                  - os: ubuntu:24.04
+                    mpi: intelmpi
+                    compiler: oneapi
+                    enable_fortran_tests: true
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install common packages
+              run: |
+                apt-get update
+                apt-get install -y --no-install-recommends \
+                ca-certificates git cmake make python3 libxml2-dev wget gpg
+                update-ca-certificates
+
+            - name: Install GCC toolchain
+              if: matrix.compiler == 'gcc'
+              run: |
+                apt-get update
+                apt-get install -y --no-install-recommends \
+                  gcc g++ gfortran
+                echo "CC=gcc" >> $GITHUB_ENV
+                echo "CXX=g++" >> $GITHUB_ENV
+                echo "FC=gfortran" >> $GITHUB_ENV
+                echo "F90=gfortran" >> $GITHUB_ENV
+
+            - name: Install Clang toolchain
+              if: matrix.compiler == 'clang'
+              run: |
+                apt-get update
+                apt-get install -y --no-install-recommends \
+                  clang libomp-dev gfortran
+                echo "CC=clang" >> $GITHUB_ENV
+                echo "CXX=clang++" >> $GITHUB_ENV
+                echo "FC=gfortran" >> $GITHUB_ENV
+                echo "F90=gfortran" >> $GITHUB_ENV
+            
+            - name: Set up Intel package repository
+              if: matrix.compiler == 'oneapi' || matrix.mpi == 'intelmpi'
+              shell: bash
+              run: |
+                # download the key to system keyring
+                wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
+                | gpg --dearmor | tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
+
+                # add signed entry to apt sources and configure the APT client to use Intel repository:
+                echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | tee /etc/apt/sources.list.d/oneAPI.list
+            
+            - name: Install Intel oneAPI toolchain
+              if: matrix.compiler == 'oneapi'
+              shell: bash
+              run: |
+                apt-get update
+                apt-get install -y --no-install-recommends \
+                  intel-oneapi-compiler-dpcpp-cpp-2025.2 \
+                  intel-oneapi-compiler-fortran-2025.2 \
+                  intel-oneapi-openmp-2025.2
+
+                # if not Intel MPI, then source env here
+                if [[ "${{ matrix.mpi }}" != "intelmpi" ]]; then
+                  source /opt/intel/oneapi/setvars.sh
+                  printenv >> $GITHUB_ENV
+                fi
+
+                echo "CC=icx" >> $GITHUB_ENV
+                echo "CXX=icpx" >> $GITHUB_ENV
+                echo "FC=ifx" >> $GITHUB_ENV
+                echo "F90=ifx" >> $GITHUB_ENV
+
+            - name: Install MPICH
+              if: matrix.mpi == 'mpich'
+              shell: bash
+              run: |
+                apt-get update
+                apt-get install -y --no-install-recommends \
+                  libmpich-dev
+                echo "MPICC=mpicc.mpich" >> $GITHUB_ENV
+                echo "MPICXX=mpicxx.mpich" >> $GITHUB_ENV
+                echo "MPIFORT=mpifort.mpich" >> $GITHUB_ENV
+                echo "MPIF90=mpif90.mpich" >> $GITHUB_ENV
+                echo "MPICH_CC=$CC" >> $GITHUB_ENV
+                echo "MPICH_CXX=$CXX" >> $GITHUB_ENV
+                echo "MPICH_FC=$FC" >> $GITHUB_ENV
+                echo "MPICH_F90=$F90" >> $GITHUB_ENV
+                echo "FI_PROVIDER=shm" >> $GITHUB_ENV
+                echo "MPIR_CVAR_POLLS_BEFORE_YIELD=1" >> $GITHUB_ENV
+                if [[ "${{ matrix.os }}" == "ubuntu:24.04" ]]; then
+                  # Use Open MPI launcher with MPICH in Ubuntu 24.04
+                  apt-get install -y --no-install-recommends libopenmpi-dev
+                  echo "OMPI_ALLOW_RUN_AS_ROOT=1" >> $GITHUB_ENV
+                  echo "OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1" >> $GITHUB_ENV
+                  echo "OMPI_MCA_mpi_yield_when_idle=1" >> $GITHUB_ENV
+                  echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
+                  echo "PRTE_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
+                  echo "OMPI_MCA_btl=vader,self" >> $GITHUB_ENV
+                  echo "MPIEXEC=mpiexec.openmpi" >> $GITHUB_ENV
+                else
+                  echo "MPIEXEC=mpiexec.mpich" >> $GITHUB_ENV
+                fi
+
+            - name: Install Open MPI
+              if: matrix.mpi == 'openmpi'
+              run: |
+                apt-get update
+                apt-get install -y --no-install-recommends \
+                  libopenmpi-dev
+                echo "MPICC=mpicc.openmpi" >> $GITHUB_ENV
+                echo "MPICXX=mpicxx.openmpi" >> $GITHUB_ENV
+                echo "MPIFORT=mpifort.openmpi" >> $GITHUB_ENV
+                echo "MPIF90=mpif90.openmpi" >> $GITHUB_ENV
+                echo "OMPI_CC=$CC" >> $GITHUB_ENV
+                echo "OMPI_CXX=$CXX" >> $GITHUB_ENV
+                echo "OMPI_FC=$FC" >> $GITHUB_ENV
+                echo "OMPI_F90=$F90" >> $GITHUB_ENV
+                echo "OMPI_ALLOW_RUN_AS_ROOT=1" >> $GITHUB_ENV
+                echo "OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1" >> $GITHUB_ENV
+                echo "OMPI_MCA_mpi_yield_when_idle=1" >> $GITHUB_ENV
+                echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
+                echo "OMPI_MCA_rmaps_default_mapping_policy=:oversubscribe" >> $GITHUB_ENV
+                echo "PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> $GITHUB_ENV
+                echo "OMPI_MCA_btl=vader,self" >> $GITHUB_ENV
+                echo "MPIEXEC='mpiexec.openmpi --oversubscribe'" >> $GITHUB_ENV
+
+            - name: Install Intel MPI
+              if: matrix.mpi == 'intelmpi'
+              shell: bash
+              run: |
+                apt-get update
+                apt-get install -y --no-install-recommends \
+                  intel-oneapi-mpi-devel-2021.16
+
+                source /opt/intel/oneapi/setvars.sh
+                printenv >> $GITHUB_ENV
+
+                echo "MPICC=mpiicx" >> $GITHUB_ENV
+                echo "MPICXX=mpiicpx" >> $GITHUB_ENV
+                echo "MPIFORT=mpiifx" >> $GITHUB_ENV
+                echo "MPIF90=mpif90" >> $GITHUB_ENV
+                echo "I_MPI_CC=$CC" >> $GITHUB_ENV
+                echo "I_MPI_CXX=$CXX" >> $GITHUB_ENV
+                echo "I_MPI_FC=$FC" >> $GITHUB_ENV
+                echo "I_MPI_F90=$F90" >> $GITHUB_ENV
+                echo "MPIEXEC=mpiexec" >> $GITHUB_ENV
+            
+            - name: Build OTF-CPT
+              run: |
+                cmake -S ./ -B build \
+                    -DCMAKE_BUILD_TYPE=Debug \
+                    -DCMAKE_C_COMPILER=$MPICC \
+                    -DCMAKE_CXX_COMPILER=$MPICXX \
+                    -DCMAKE_Fortran_COMPILER=${{matrix.enable_fortran_tests && '$MPIFORT' || '""'}} \
+                    -DMPIEXEC_EXECUTABLE="${MPIEXEC}" \
+                    -DOTFCPT_TEST_LB=.8 \
+                    -DOTFCPT_TEST_UB=1.05 \
+                    -DOTFCPT_TEST_WORK=300000
+                cmake --build build
+
+            - name: Check for libstdc++ in library
+              run: |
+                if ldd build/libOTFCPT.so | grep -q "libstdc++"; then
+                  echo "Found libstdc++ dependency"
+                  exit 1
+                fi
+
+            - name: Install OTF-CPT
+              run: cmake --install build
+
+            - name: Run tests
+              run: cmake --build build -- check
