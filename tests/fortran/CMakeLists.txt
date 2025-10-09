@@ -6,7 +6,7 @@ if(NOT OTFCPT_ENABLE_FORTRAN_TESTS)
   return()
 endif()
 
-if(NOT OTFCPT_ENABLE_FORTRAN_SUPPORT)
+if(NOT OTFCPT_ENABLE_FORTRAN_WRAPPERS)
   enable_language(Fortran)
   find_package(MPI REQUIRED)
 endif()

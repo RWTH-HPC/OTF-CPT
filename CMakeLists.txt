@@ -30,37 +30,37 @@ set(MPI_CXX_SKIP_MPICXX TRUE)
 add_definitions(-DOMPI_SKIP_MPICXX)
 
 set(OTFCPT_HAVE_Fortran False)
-set(OTFCPT_USE_Fortran False)
+set(OTFCPT_USE_Fortran_WRAPPERS False)
 
 check_language(Fortran)
 if(CMAKE_Fortran_COMPILER)
   set(OTFCPT_HAVE_Fortran True)
   if("${TEST_MPI_FEATURES}" MATCHES "ompi")
-    set(OTFCPT_USE_Fortran True)
+    set(OTFCPT_USE_Fortran_WRAPPERS True)
     # We don't test for OpenMPI 4 with <4.1.6, because MPI_F_STATUS_IGNORE 
     # is broken with some of these versions
     if("${TEST_MPI_FEATURES}" MATCHES "ompi-4.0" OR 
        "${TEST_MPI_FEATURES}" MATCHES "ompi-4.1.[0-5]")
       set(OTFCPT_HAVE_Fortran False)
-      set(OTFCPT_USE_Fortran False)
+      set(OTFCPT_USE_Fortran_WRAPPERS False)
     endif()
   endif()
   if("${TEST_MPI_FEATURES}" MATCHES "\\[\\]")
     message(STATUS "Detection of MPI implementation failed, disabling Fortran support")
     set(OTFCPT_HAVE_Fortran False)
-    set(OTFCPT_USE_Fortran False)
+    set(OTFCPT_USE_Fortran_WRAPPERS False)
   endif()
 endif()
 
-option(OTFCPT_ENABLE_FORTRAN_SUPPORT "Build OTF-CPT with pmpi Fortran wrappers" ${OTFCPT_USE_Fortran})
+option(OTFCPT_ENABLE_FORTRAN_WRAPPERS "Build OTF-CPT with pmpi Fortran wrappers" ${OTFCPT_USE_Fortran_WRAPPERS})
 
-if(OTFCPT_ENABLE_FORTRAN_SUPPORT)
+if(OTFCPT_ENABLE_FORTRAN_WRAPPERS)
   if(NOT OTFCPT_HAVE_Fortran)
-    message(ERROR "No Fortran support available, but requested with OTFCPT_ENABLE_FORTRAN_SUPPORT")
+      message(ERROR "No Fortran support available, but requested with OTFCPT_ENABLE_FORTRAN_WRAPPERS")
   endif()
   enable_language(Fortran)
   find_package(MPI REQUIRED)
-elseif(OTFCPT_HAVE_Fortran AND NOT OTFCPT_USE_Fortran)
+elseif(OTFCPT_HAVE_Fortran AND NOT OTFCPT_USE_Fortran_WRAPPERS)
   message(STATUS "Assuming native Fortran support for MPICH-3 and IntelMPI")
 else()
   message(STATUS "No Fortran support")
@@ -134,7 +134,7 @@ set(OTFCPT_OMP_SOURCES
     parse_flags.cpp
 )
 
-if(OTFCPT_ENABLE_FORTRAN_SUPPORT)
+if(OTFCPT_ENABLE_FORTRAN_WRAPPERS)
     add_definitions(-DFORTRAN_SUPPORT)
     list(APPEND OTFCPT_SOURCES fort-wrappers.c)
 endif()
@@ -172,7 +172,7 @@ endif ()
 
 set(WRAP_FLAGS -s -n)
 
-if(OTFCPT_ENABLE_FORTRAN_SUPPORT)
+if(OTFCPT_ENABLE_FORTRAN_WRAPPERS)
   set(WRAP_FLAGS -n -f)
 endif()
 
