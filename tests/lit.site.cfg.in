@@ -6,6 +6,7 @@ config.mpiexec = "@MPIEXEC_EXECUTABLE@"
 config.mpiexec_numproc_flag = "@MPIEXEC_NUMPROC_FLAG@"
 config.testdir = "@CMAKE_CURRENT_BINARY_DIR@"
 config.testsrcdir = "@CMAKE_CURRENT_SOURCE_DIR@"
+config.project_src_dir = "@CMAKE_SOURCE_DIR@"
 
 config.otfcptlib = "@OTFCPT_LIB@"
 config.otfcptomplib = "@OTFCPT_OMP_LIB@"

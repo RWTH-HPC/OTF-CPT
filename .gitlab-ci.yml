@@ -24,8 +24,23 @@ stages:
   script:
     - git clang-format --verbose --diff ${CI_MERGE_REQUEST_DIFF_BASE_SHA}
 
+.setup-python-env:
+  script:
+    - python3 -m venv env
+    - source env/bin/activate
+    - pip install -r ${CI_PROJECT_DIR}/script/requirements.txt
+
+.artifacts-template:
+  artifacts:
+    reports:
+      junit: build/tests/check.xunit.xml
+    paths:
+      - build/tests/plot/Output
+    paths:
+      - build/tests/plot/Output
 
 .debian-based:
+  extends: .artifacts-template
   parallel:
     matrix:
        - MPI: [ mpich, openmpi ]
@@ -52,6 +67,7 @@ stages:
       libmpich-dev
       git
       python3
+      python3-venv
       libxml2-dev
       libomp-dev
       llvm-14-tools
@@ -78,13 +94,11 @@ stages:
                            -DOTFCPT_TEST_WORK=300000
     - cmake --build build
     - cmake --install build
+    - !reference [.setup-python-env, script]
     - EXIT_CODE=0
     - cmake --build build -- check || EXIT_CODE=$?
     - ldd build/libOTFCPT.so | grep -q "libstdc++" && echo -e "\e[1;31mFound libstdc++ dependency, failure\e[0m" && exit 1
     - exit $EXIT_CODE
-  artifacts:
-    reports:
-      junit: build/tests/check.xunit.xml
 
 ubuntu:
   stage: test
@@ -102,6 +116,7 @@ debian:
     MPIEXEC: mpiexec.${MPI} # TODO: Change to ${MPI} when Debian's mpich hydra launcher is fixed
 
 .cluster-template:
+    extends: .artifacts-template
     tags: 
       - "downscope-testing"
     variables:
@@ -114,6 +129,7 @@ debian:
     before_script:
       - module purge
       - module load "${TOOLCHAIN}/${VERSION}"
+      - module load Python
       - >-
         if [[ "${COMPILER}" == *"Clang"* ]]; then
           module load Clang
@@ -128,6 +144,10 @@ debian:
         if [[ "${USE_ONEAPI}" == "1" ]]; then
           export CC=icx CXX=icpx FC=ifx F90=ifx
           export I_MPI_CC=icx I_MPI_CXX=icpx I_MPI_FC=ifx  I_MPI_F90=ifx
+        fi
+      - >-
+        if [[ -n "$EBVERSIONIIMPI" ]] && [[ "$EBVERSIONIIMPI" < "2024a" ]]; then
+          export ADD_CMAKE_OPTIONS="-DLLVM_FILECHECK_PATH=/home/pj416018/sw/UTIL/FileCheck/bin/FileCheck"
         fi
       - export I_MPI_FABRICS=shm I_MPI_WAIT_MODE=1
       - export OMPI_MCA_btl=vader,self OMPI_MCA_mpi_yield_when_idle=1
@@ -156,7 +176,7 @@ debian:
     extends: .cluster-template
     script:
       - mkdir build
-      - cmake -S ./ -B build -DCMAKE_INSTALL_PREFIX=$PWD/install -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - cmake -S ./ -B build -DCMAKE_INSTALL_PREFIX=$PWD/install -DCMAKE_BUILD_TYPE=RelWithDebInfo ${ADD_CMAKE_OPTIONS}
       - cmake --build build --parallel ${SLURM_CPUS_PER_TASK} -v
       - cmake --install build
 
@@ -165,6 +185,7 @@ cluster:
     extends: .cluster-template
     script:
       - !reference [.cluster-build, script]
+      - !reference [.setup-python-env, script]
       - EXIT_CODE=0
       - cmake --build build -- check || EXIT_CODE=$?
       - ldd build/libOTFCPT.so
