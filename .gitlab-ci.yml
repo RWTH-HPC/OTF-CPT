@@ -145,6 +145,10 @@ debian:
           export CC=icx CXX=icpx FC=ifx F90=ifx
           export I_MPI_CC=icx I_MPI_CXX=icpx I_MPI_FC=ifx  I_MPI_F90=ifx
         fi
+      - >-
+        if [[ -n "$EBVERSIONIIMPI" ]] && [[ "$EBVERSIONIIMPI" < "2024a" ]]; then
+          export ADD_CMAKE_OPTIONS="-DLLVM_FILECHECK_PATH=/home/pj416018/sw/UTIL/FileCheck/bin/FileCheck"
+        fi
       - export I_MPI_FABRICS=shm I_MPI_WAIT_MODE=1
       - export OMPI_MCA_btl=vader,self OMPI_MCA_mpi_yield_when_idle=1
     parallel:
@@ -172,7 +176,7 @@ debian:
     extends: .cluster-template
     script:
       - mkdir build
-      - cmake -S ./ -B build -DCMAKE_INSTALL_PREFIX=$PWD/install -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - cmake -S ./ -B build -DCMAKE_INSTALL_PREFIX=$PWD/install -DCMAKE_BUILD_TYPE=RelWithDebInfo ${ADD_CMAKE_OPTIONS}
       - cmake --build build --parallel ${SLURM_CPUS_PER_TASK} -v
       - cmake --install build
 
