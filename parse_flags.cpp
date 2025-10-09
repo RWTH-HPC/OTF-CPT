@@ -99,7 +99,8 @@ void FlagParser::parse_flag(const char *env_option_name) {
 
   bool res = run_handler(name, value);
   free(name);
-  free(value);
+  // free(value);
+  pointers.PushBack(value);
   if (!res)
     fatal_error("Flag parsing failed.");
 }
@@ -160,6 +161,8 @@ FlagParser::~FlagParser() {
   for (int i = 0; i < n_flags_; i++)
     delete flags_[i].handler;
   free(flags_);
+  for (auto &ptr : pointers)
+    free(ptr);
 }
 
 OtfcptFlags *__otfcpt::otfcpt_flags_dont_use{nullptr};
@@ -193,7 +196,7 @@ void __otfcpt::InitializeOtfcptFlags() {
   OtfcptFlags *f = __otfcpt::otfcpt_flags_dont_use = new OtfcptFlags;
   f->SetDefaults();
 
-  FlagParser parser;
+  auto &parser = f->parser;
   RegisterOtfcptFlags(&parser, f);
 
   parser.ParseString(__otfcpt_default_options());
