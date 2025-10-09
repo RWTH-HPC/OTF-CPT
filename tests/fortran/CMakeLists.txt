@@ -1,8 +1,14 @@
 set(RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Output/)
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/Output/)
 
-if(NOT OTFCPT_ENABLE_FORTRAN_SUPPORT)
-    return()
+option(OTFCPT_ENABLE_FORTRAN_TESTS "Enable Fortran tests" ${OTFCPT_HAVE_Fortran})
+if(NOT OTFCPT_ENABLE_FORTRAN_TESTS)
+  return()
+endif()
+
+if(NOT OTFCPT_ENABLE_FORTRAN_WRAPPERS)
+  enable_language(Fortran)
+  find_package(MPI REQUIRED)
 endif()
 
 set(fortranTests
