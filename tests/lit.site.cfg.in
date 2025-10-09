@@ -13,7 +13,7 @@ config.otfcptomplib = "@OTFCPT_OMP_LIB@"
 # Booleans must not have quotes! ("False" is true!)
 config.openmp_found = @OpenMP_FOUND@
 config.forward_full_env = @LIT_FORWARD_FULL_ENV@
-config.have_fortran = @OTFCPT_HAVE_Fortran@ and @OTFCPT_ENABLE_FORTRAN_SUPPORT@
+config.have_fortran = @OTFCPT_HAVE_Fortran@
 
 # Let the main config do the real work.
 lit_config.load_config(config, "@CMAKE_CURRENT_SOURCE_DIR@/lit.cfg")
