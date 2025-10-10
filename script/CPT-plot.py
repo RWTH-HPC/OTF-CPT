@@ -84,9 +84,13 @@ basescale = next(iter(data))
 for scale in data.keys():
     uct_base = runtimes[basescale]['computation']*basescale[0]*basescale[1]
     uct_series = runtimes[scale]['computation']*scale[0]*scale[1]
-    data[scale]["Computational Scalability"] = uct_base / uct_series
-    if args.weak_scaling:
-        data[scale]["Computational Scalability"] *= (scale[0]*scale[1])/(basescale[0]*basescale[1])
+    if uct_base == 0.0 or uct_series == 0.0:
+        print("Detected 0.0s runtime: defaulting to Computational Scalability of 1")
+        data[scale]["Computational Scalability"] = 1.0
+    else:
+        data[scale]["Computational Scalability"] = uct_base / uct_series
+        if args.weak_scaling:
+            data[scale]["Computational Scalability"] *= (scale[0]*scale[1])/(basescale[0]*basescale[1])
     data[scale]["Global Efficiency"] = data[scale]["Parallel Efficiency"] * data[scale]["Computational Scalability"]
 
 def draw_table(mode):
