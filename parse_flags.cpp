@@ -99,7 +99,7 @@ void FlagParser::parse_flag(const char *env_option_name) {
 
   bool res = run_handler(name, value);
   free(name);
-  free(value);
+  pointers.PushBack(value);
   if (!res)
     fatal_error("Flag parsing failed.");
 }
@@ -160,9 +160,11 @@ FlagParser::~FlagParser() {
   for (int i = 0; i < n_flags_; i++)
     delete flags_[i].handler;
   free(flags_);
+  for (auto &ptr : pointers)
+    free(ptr);
 }
 
-OtfcptFlags __otfcpt::otfcpt_flags_dont_use;
+OtfcptFlags *__otfcpt::otfcpt_flags_dont_use{nullptr};
 const char *__otfcpt::SanitizerToolName = "OFTCPT";
 std::atomic<uint32_t> __otfcpt::current_verbosity{0};
 
@@ -188,14 +190,12 @@ SANITIZER_INTERFACE_WEAK_DEF(const char *, __otfcpt_default_options, void) {
 }
 
 void __otfcpt::InitializeOtfcptFlags() {
-  static bool initOnce{false};
-  if (initOnce)
+  if (__otfcpt::otfcpt_flags_dont_use)
     return;
-  initOnce = true;
-  OtfcptFlags *f = get_otfcpt_flags();
+  OtfcptFlags *f = __otfcpt::otfcpt_flags_dont_use = new OtfcptFlags;
   f->SetDefaults();
 
-  FlagParser parser;
+  auto &parser = f->parser;
   RegisterOtfcptFlags(&parser, f);
 
   parser.ParseString(__otfcpt_default_options());
