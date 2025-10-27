@@ -314,6 +314,7 @@ public:
   static MPI_Request nullHandle;
   RequestData() {}
   ~RequestData() {}
+  RequestData &operator=(const RequestData &rhs) = default;
   MPI_Request handle{MPI_REQUEST_NULL};
 #ifdef FORTRAN_SUPPORT
   MPI_Fint fHandle{-1};
