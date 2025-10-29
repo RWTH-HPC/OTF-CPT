@@ -221,6 +221,15 @@ public:
   static MPI_Datatype ipcMpiType;
   static void initIpcData();
   static void finiIpcData();
+  /* NOTE: See copy-assignment constructor of RequestData why this is explictly
+   * defined. */
+  ipcData &operator=(const ipcData &rhs) {
+    for (int i = 0; i < NUM_UC_DOUBLE; ++i)
+      uc_double[i] = rhs.uc_double[i];
+    for (int i = 0; i < NUM_UC_INT64; ++i)
+      uc_int64[i] = rhs.uc_int64[i];
+    return *this;
+  }
   void IBcast(int root, CommData *cData, MPI_Request *reqs) {
     PMPI_Ibcast(uc_double, 1, ipcData::ipcMpiType, root, cData->getDupComm(),
                 reqs);
@@ -314,6 +323,31 @@ public:
   static MPI_Request nullHandle;
   RequestData() {}
   ~RequestData() {}
+  /* NOTE: We explictly define this since implicit definition might use memcpy
+   * which causes a segfault when triggered in mpiRecvPB(MPI_Message...) because
+   * the memory might be registered with UCX. In this case, the generated memcpy
+   * operations do not adhere to UCX's memory restrictions and cause undefined
+   * behavior. Same holds for ipcData.
+   */
+  RequestData &operator=(const RequestData &rhs) {
+    if (this == &rhs)
+      return *this;
+    ipcData::operator=(rhs);
+    persistent = rhs.persistent;
+    startCallback = rhs.startCallback;
+    cancelCallback = rhs.cancelCallback;
+    completionCallback = rhs.completionCallback;
+    freed = rhs.freed;
+    cancelled = rhs.cancelled;
+    kind = rhs.kind;
+    pb_reqs[0] = rhs.pb_reqs[0];
+    pb_reqs[1] = rhs.pb_reqs[1];
+    remote = rhs.remote;
+    tag = rhs.tag;
+    root = rhs.root;
+    comm = rhs.comm;
+    return *this;
+  }
   MPI_Request handle{MPI_REQUEST_NULL};
 #ifdef FORTRAN_SUPPORT
   MPI_Fint fHandle{-1};
