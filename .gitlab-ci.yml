@@ -28,7 +28,8 @@ stages:
   script:
     - python3 -m venv env
     - source env/bin/activate
-    - pip install -r ${CI_PROJECT_DIR}/script/requirements.txt
+    - pip install --upgrade pip
+    - pip install --retries 5 --timeout 30 -r ${CI_PROJECT_DIR}/script/requirements.txt
 
 .artifacts-template:
   artifacts:
