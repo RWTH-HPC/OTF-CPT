@@ -6,7 +6,6 @@
 #endif
 
 #include <atomic>
-#include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <inttypes.h>
@@ -14,6 +13,7 @@
 #include <unistd.h>
 
 #include "containers.h"
+#include "debug.h"
 #include "parse_flags.h"
 
 #if (defined __APPLE__ && defined __MACH__)
@@ -176,7 +176,7 @@ struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
 
   void Stop(double time, ClockContext cc = CLOCK_OMP, const char *loc = NULL) {
 
-    assert(loc);
+    DCHECK(loc);
 #if DEBUG_CLOCKS
     Print("Stopping at ", loc);
 #endif
@@ -184,14 +184,14 @@ struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
       if (!analysis_flags->running)
         return;
       if (cc != CLOCK_MPI_ONLY) {
-        assert(!openmp_thread || stopped_clock == false);
+        DCHECK(!openmp_thread || stopped_clock == false);
         stopped_clock = true;
         atomic_add(useful_computation_critical, time);
         atomic_add(useful_computation_thread, time);
         atomic_add(useful_computation_proc, time);
       }
       if (cc != CLOCK_OMP) {
-        assert(stopped_mpi_clock == false);
+        DCHECK(stopped_mpi_clock == false);
         stopped_mpi_clock = true;
         atomic_add(outsidempi_proc, time);
         atomic_add(outsidempi_critical, time);
@@ -199,7 +199,7 @@ struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
       }
     }
     if (cc != CLOCK_MPI && cc != CLOCK_MPI_ONLY) {
-      assert(!openmp_thread || stopped_omp_clock == false);
+      DCHECK(!openmp_thread || stopped_omp_clock == false);
       stopped_omp_clock = true;
       atomic_add(outsideomp_thread, time);
       atomic_add(outsideomp_critical, time);
@@ -219,7 +219,7 @@ struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
 
   void Start(double time, ClockContext cc = CLOCK_OMP, const char *loc = NULL) {
 
-    assert(loc);
+    DCHECK(loc);
 #if DEBUG_CLOCKS
     Print("Starting at ", loc);
 #endif
@@ -227,14 +227,14 @@ struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
       if (!analysis_flags->running)
         return;
       if (cc != CLOCK_MPI_ONLY) {
-        assert(!openmp_thread || stopped_clock == true);
+        DCHECK(!openmp_thread || stopped_clock == true);
         stopped_clock = false;
         atomic_add(useful_computation_critical, time);
         atomic_add(useful_computation_thread, time);
         atomic_add(useful_computation_proc, time);
       }
       if (cc != CLOCK_OMP) {
-        assert(stopped_mpi_clock == true);
+        DCHECK(stopped_mpi_clock == true);
         stopped_mpi_clock = false;
         atomic_add(outsidempi_proc, time);
         atomic_add(outsidempi_critical, time);
@@ -242,7 +242,7 @@ struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
       }
     }
     if (cc != CLOCK_MPI && cc != CLOCK_MPI_ONLY) {
-      assert(!openmp_thread || stopped_omp_clock == true);
+      DCHECK(!openmp_thread || stopped_omp_clock == true);
       stopped_omp_clock = false;
       atomic_add(outsideomp_thread, time);
       atomic_add(outsideomp_critical, time);

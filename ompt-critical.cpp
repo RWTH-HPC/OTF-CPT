@@ -549,10 +549,10 @@ static void ompt_tsan_implicit_task(ompt_scope_endpoint_t endpoint,
     // end of the task, useful computation stop
     TaskData *Data = ToTaskData(task_data);
 #ifdef DEBUG
-    assert(Data->freed == 0 && "Implicit task end should only be called once!");
+    DCHECK(Data->freed == 0 && "Implicit task end should only be called once!");
     Data->freed = 1;
 #endif
-    assert(Data->RefCount == 1 &&
+    DCHECK(Data->RefCount == 1 &&
            "All tasks should have finished at the implicit barrier!");
     Data->Delete();
     if (type & ompt_task_initial) {
@@ -568,7 +568,7 @@ static void ompt_tsan_implicit_task(ompt_scope_endpoint_t endpoint,
       thread_local_clock->Stop(CLOCK_OMP, __func__);
     }
 
-    assert(thread_local_clock->stopped_clock == true);
+    DCHECK(thread_local_clock->stopped_clock);
 
     break;
   }
@@ -662,7 +662,7 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
     }
 
     case ompt_sync_region_taskgroup: {
-      assert(Data->TaskGroup != nullptr &&
+      DCHECK(Data->TaskGroup != nullptr &&
              "Should have at least one taskgroup!");
       ompTimer<> ot{"TaskGroup"};
 
@@ -740,7 +740,7 @@ static void ompt_tsan_task_create(
   if (analysis_flags->running)
     omptThreadCount->taskCreate++;
   TaskData *Data;
-  assert(new_task_data->ptr == NULL &&
+  DCHECK(new_task_data->ptr == NULL &&
          "Task data should be initialized to NULL");
   if (type & ompt_task_initial) {
     ompt_data_t *parallel_data;
@@ -894,7 +894,7 @@ static void ompt_tsan_task_schedule(ompt_data_t *first_task_data,
     // Task may be resumed at a later point in time.
     OmpHappensBefore(FromTask->GetTaskPtr());
     ToTask->ImplicitTask = FromTask->ImplicitTask;
-    assert(ToTask->ImplicitTask != NULL &&
+    DCHECK(ToTask->ImplicitTask != NULL &&
            "A task belongs to a team and has an implicit task on the stack");
   }
 
