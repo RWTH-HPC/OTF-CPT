@@ -1,4 +1,3 @@
-#include <cassert>
 #include <functional>
 #include <mpi.h>
 #include <stdlib.h>
@@ -186,12 +185,12 @@ public:
 private:
   void *operator new(size_t size) { // static_assert(false, "operator new must
                                     // never be called directly");
-    assert(false && "operator new must never be called directly");
+    DCHECK(false && "operator new must never be called directly");
     return malloc(size);
   }
   void operator delete(void *p) { // static_assert(false, "operator delete must
                                   // never be called directly");
-    assert(false && "operator delete must never be called directly");
+    DCHECK(false && "operator delete must never be called directly");
   }
 };
 
@@ -389,21 +388,21 @@ public:
   }
 
   void start() {
-    assert(!freed);
+    DCHECK(!freed);
     if (startCallback) {
       startCallback(this);
     }
   }
   void cancel() {
-    assert(!freed);
-    assert(!cancelled);
+    DCHECK(!freed);
+    DCHECK(!cancelled);
     cancelled = true;
     if (cancelCallback) {
       cancelCallback(this);
     }
   }
   void complete(MPI_Status *status) {
-    assert(!freed);
+    DCHECK(!freed);
     if (completionCallback) {
       completionCallback(this, status);
     }
@@ -431,7 +430,7 @@ public:
   }
   bool isFreed() { return freed; }
   bool isPersistent() {
-    assert(!freed);
+    DCHECK(!freed);
     return persistent;
   }
   bool isCancelled() {

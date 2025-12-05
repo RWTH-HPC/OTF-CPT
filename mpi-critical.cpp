@@ -16,8 +16,8 @@ void MpiHappensAfter(ipcData &uc, int remote) { MpiHappensAfter(&uc, remote); }
 void MpiHappensAfter(ipcData *uc, int remote) {
   if (!analysis_flags->running)
     return;
-  assert(thread_local_clock->stopped_mpi_clock == true);
-  assert(remote >= -1);
+  DCHECK(thread_local_clock->stopped_mpi_clock == true);
+  DCHECK(remote >= -1);
   double offset = 0;
 #ifdef DO_OFFSET
   if (remote != -1)
@@ -53,10 +53,10 @@ double *loadThreadTimers(ipcData *uc, int remote) {
 void completePBWC(RequestData *uc, MPI_Status *status) {
   if (uc->isCancelled())
     return;
-  assert(status->MPI_SOURCE >= 0);
-  assert(status->MPI_TAG == uc->tag || MPI_ANY_TAG == uc->tag);
-  assert(status->MPI_SOURCE == uc->remote || MPI_ANY_SOURCE == uc->remote);
-  assert(uc->comm->getDupComm() != MPI_COMM_NULL);
+  DCHECK(status->MPI_SOURCE >= 0);
+  DCHECK(status->MPI_TAG == uc->tag || MPI_ANY_TAG == uc->tag);
+  DCHECK(status->MPI_SOURCE == uc->remote || MPI_ANY_SOURCE == uc->remote);
+  DCHECK(uc->comm->getDupComm() != MPI_COMM_NULL);
   if (uc->remote == MPI_ANY_SOURCE)
     uc->remote = status->MPI_SOURCE;
   PMPI_Recv(uc->uc_double, 1, ipcData::ipcMpiType, status->MPI_SOURCE,
@@ -218,8 +218,8 @@ extern "C" {
 
 int MPI_Finalize(void) {
   mpiTimer mt{false, __func__};
-  assert(thread_local_clock->stopped_clock == true);
-  assert(thread_local_clock->stopped_mpi_clock == true);
+  DCHECK(thread_local_clock->stopped_clock == true);
+  DCHECK(thread_local_clock->stopped_mpi_clock == true);
   ipcData max_uc;
   loadThreadTimers(max_uc, REF_RANK);
   max_uc.Allreduce(cf.findData(MPI_COMM_WORLD));

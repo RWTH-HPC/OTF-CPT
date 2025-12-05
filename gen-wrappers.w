@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <mpi.h>
 #include <stdio.h>
 

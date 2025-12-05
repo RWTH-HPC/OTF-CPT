@@ -10,8 +10,6 @@
 
 namespace __otfcpt {
 
-extern std::atomic<uint32_t> current_verbosity;
-
 typedef unsigned long uptr;
 typedef signed long sptr;
 typedef unsigned char u8;
@@ -85,58 +83,6 @@ typedef signed long long s64;
 #define FALLTHROUGH
 #endif
 
-void NORETURN Die();
-
-void NORETURN CheckFailed(const char *file, int line, const char *cond, u64 v1,
-                          u64 v2);
-
-#define RAW_CHECK_MSG(expr, msg, ...)                                          \
-  do {                                                                         \
-    if (UNLIKELY(!(expr))) {                                                   \
-      const char *msgs[] = {msg, __VA_ARGS__};                                 \
-      for (const char *m : msgs)                                               \
-        RawWrite(m);                                                           \
-      Die();                                                                   \
-    }                                                                          \
-  } while (0)
-
-#define RAW_CHECK(expr) RAW_CHECK_MSG(expr, #expr "\n", )
-#define RAW_CHECK_VA(expr, ...) RAW_CHECK_MSG(expr, #expr "\n", __VA_ARGS__)
-
-#define CHECK_IMPL(c1, op, c2)                                                 \
-  do {                                                                         \
-    u64 v1 = (u64)(c1);                                                        \
-    u64 v2 = (u64)(c2);                                                        \
-    if (UNLIKELY(!(v1 op v2)))                                                 \
-      CheckFailed(__FILE__, __LINE__, "(" #c1 ") " #op " (" #c2 ")", v1, v2);  \
-  } while (false) /**/
-
-#define CHECK(a) CHECK_IMPL((a), !=, 0)
-#define CHECK_EQ(a, b) CHECK_IMPL((a), ==, (b))
-#define CHECK_NE(a, b) CHECK_IMPL((a), !=, (b))
-#define CHECK_LT(a, b) CHECK_IMPL((a), <, (b))
-#define CHECK_LE(a, b) CHECK_IMPL((a), <=, (b))
-#define CHECK_GT(a, b) CHECK_IMPL((a), >, (b))
-#define CHECK_GE(a, b) CHECK_IMPL((a), >=, (b))
-
-#if SANITIZER_DEBUG
-#define DCHECK(a) CHECK(a)
-#define DCHECK_EQ(a, b) CHECK_EQ(a, b)
-#define DCHECK_NE(a, b) CHECK_NE(a, b)
-#define DCHECK_LT(a, b) CHECK_LT(a, b)
-#define DCHECK_LE(a, b) CHECK_LE(a, b)
-#define DCHECK_GT(a, b) CHECK_GT(a, b)
-#define DCHECK_GE(a, b) CHECK_GE(a, b)
-#else
-#define DCHECK(a)
-#define DCHECK_EQ(a, b)
-#define DCHECK_NE(a, b)
-#define DCHECK_LT(a, b)
-#define DCHECK_LE(a, b)
-#define DCHECK_GT(a, b)
-#define DCHECK_GE(a, b)
-#endif
-
 #if SANITIZER_WINDOWS
 #if SANITIZER_IMPORT_INTERFACE
 #define SANITIZER_INTERFACE_ATTRIBUTE __declspec(dllimport)
@@ -162,12 +108,6 @@ void NORETURN CheckFailed(const char *file, int line, const char *cond, u64 v1,
 #define SANITIZER_INTERFACE_WEAK_DEF(ReturnType, Name, ...)                    \
   extern "C" SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE ReturnType \
   Name(__VA_ARGS__)
-
-#define VPrintf(level, ...)                                                    \
-  do {                                                                         \
-    if ((uptr)Verbosity() >= (level))                                          \
-      printf(__VA_ARGS__);                                                     \
-  } while (0)
 
 } // namespace __otfcpt
 #endif

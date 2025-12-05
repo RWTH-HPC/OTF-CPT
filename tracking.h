@@ -3,7 +3,7 @@
 
 #include "criticalPath.h"
 #include "errorhandler.h"
-#include <assert.h>
+
 #include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -158,7 +158,7 @@ private:
   Vector<T *> dataPointer{};
   Vector<void *> memory;
   virtual void newDatas() {
-    assert(sizeof(T) % 64 == 0);
+    DCHECK_EQ(sizeof(T) % 64, 0);
     int ndatas = 4096 / sizeof(T);
     char *datas = (char *)malloc(ndatas * sizeof(T));
     memory.PushBack(datas);
@@ -308,7 +308,7 @@ public:
     return (M)T::nullHandle;
   }
   T *detachHandle(M handle) {
-    assert(!this->isPredefined(handle));
+    DCHECK(!this->isPredefined(handle));
 #ifdef FORTRAN_SUPPORT
     {
       auto fId = ((T *)(uintptr_t)(handle))->fHandle;
@@ -422,7 +422,7 @@ public:
     if (req == MPI_REQUEST_NULL)
       return MPI_REQUEST_NULL;
     RequestData *ret = ((RequestData *)(uintptr_t)(req));
-    assert(ret->isPersistent());
+    DCHECK(ret->isPersistent());
     ret->start();
     return ret->handle;
   }
@@ -506,7 +506,7 @@ public:
     return T::nullHandle;
   }
   T *detachHandle(M handle) {
-    assert(!this->isPredefined(handle));
+    DCHECK(!this->isPredefined(handle));
     T *ret;
     {
       std::unique_lock<std::shared_mutex> lock(AHMutex);
@@ -632,7 +632,7 @@ public:
       std::shared_lock<std::shared_mutex> lock(DTMutex);
       ret = dataTable[(size_t)(req)];
     }
-    assert(ret->isPersistent());
+    DCHECK(ret->isPersistent());
     ret->start();
     return ret->handle;
   }

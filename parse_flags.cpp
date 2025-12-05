@@ -166,7 +166,6 @@ FlagParser::~FlagParser() {
 
 OtfcptFlags *__otfcpt::otfcpt_flags_dont_use{nullptr};
 const char *__otfcpt::SanitizerToolName = "OFTCPT";
-std::atomic<uint32_t> __otfcpt::current_verbosity{0};
 
 void OtfcptFlags::SetDefaults() {
 #define PARSE_FLAG(Type, Name, DefaultValue, Description) Name = DefaultValue;
@@ -218,17 +217,4 @@ void __otfcpt::InitializeOtfcptFlags() {
       free(tempath);
     }
   }
-}
-
-void NORETURN __otfcpt::Die() {
-  if (get_otfcpt_flags()->abort_on_error)
-    abort();
-  exit(get_otfcpt_flags()->exitcode);
-}
-
-void NORETURN __otfcpt::CheckFailed(const char *file, int line,
-                                    const char *cond, u64 v1, u64 v2) {
-  fprintf(get_otfcpt_flags()->output, "Check failed in %s:%d %llu %s %llu\n",
-          file, line, v1, cond, v2);
-  Die();
 }

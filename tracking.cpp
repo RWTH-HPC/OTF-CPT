@@ -164,7 +164,7 @@ void ipcData::initIpcData() {
     displs[0] = 0;
     rdispls[1] -= rdispls[0];
     rdispls[0] = 0;
-    assert(displs[1] == rdispls[1]);
+    DCHECK_EQ(displs[1], rdispls[1]);
     MPI_Datatype types[] = {MPI_DOUBLE, MPI_INT64_T};
     int blengths[] = {num_uc_double, num_uc_int64};
     PMPI_Type_create_struct(2, blengths, displs, types, &ipcMpiType);
