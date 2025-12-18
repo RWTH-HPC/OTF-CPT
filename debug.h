@@ -2,20 +2,32 @@
 #define DEBUG_H
 
 #include "typedefs.h"
+#include <initializer_list>
 #include <mutex>
+#ifdef USE_STL
+#include <iostream>
+#include <sstream>
 #ifdef USE_BACKWARD
 #define CALLSTACK_SIZE_PRETTY 32
-#define SKIP_FRAMES 3
+#define SKIP_FRAMES 5
 #include <external/backward-cpp/backward.hpp>
+#endif
 #endif
 
 // Fallback stack trace
 #define CALLSTACK_SIZE 20
+// Fallback buffer size
+#define FB_BUFFER_SIZE 4096
+
+// Possible options (enforced in CMake):
+// - A: USE_STL and USE_BACKWARD - pretty completely bufffered debug output
+// - B: USE_STL and !USE_BACKWARD - ugly completely buffered debug output
+// - C: !USE_STL and !USE_BACKWARD - ugly half buffered debug output
 
 using namespace __otfcpt;
 
 extern std::atomic<uint32_t> current_verbosity;
-inline std::mutex checkOutputMutex;
+inline std::mutex check_output_mutex;
 
 inline void SetVerbosity(int verbosity) {
   current_verbosity.store(verbosity, std::memory_order_relaxed);
@@ -25,11 +37,15 @@ inline int Verbosity() {
 }
 
 void print_stack();
-void pretty_print_stack();
+#ifdef USE_STL
+void print_stack(std::ostream &os);
+void pretty_print_stack(std::ostream &os);
+#endif
 
 void NORETURN Die();
 
-void CheckFailed(const char *file, int line, const char *cond, u64 v1, u64 v2);
+void CheckFailed(const char *file, int line, const char *cond, u64 v1, u64 v2,
+                 std::initializer_list<const char *> msgs = {});
 
 #define RAW_CHECK_MSG(expr, msg, ...)                                          \
   do {                                                                         \
@@ -49,7 +65,6 @@ void CheckFailed(const char *file, int line, const char *cond, u64 v1, u64 v2);
     u64 v1 = (u64)(c1);                                                        \
     u64 v2 = (u64)(c2);                                                        \
     if (UNLIKELY(!(v1 op v2))) {                                               \
-      std::lock_guard<std::mutex> guard(checkOutputMutex);                     \
       CheckFailed(__FILE__, __LINE__, "(" #c1 ") " #op " (" #c2 ")", v1, v2);  \
     }                                                                          \
   } while (false) /**/
@@ -59,15 +74,10 @@ void CheckFailed(const char *file, int line, const char *cond, u64 v1, u64 v2);
     u64 v1 = (u64)(c1);                                                        \
     u64 v2 = (u64)(c2);                                                        \
     if (UNLIKELY(!(v1 op v2))) {                                               \
-      std::lock_guard<std::mutex> guard(checkOutputMutex);                     \
-      const char *msgs[] = {__VA_ARGS__};                                      \
-      for (const char *m : msgs)                                               \
-        fprintf((get_otfcpt_flags()->output ? get_otfcpt_flags()->output       \
-                                            : stderr),                         \
-                "%s", m);                                                      \
-      CheckFailed(__FILE__, __LINE__, "(" #c1 ") " #op " (" #c2 ")", v1, v2);  \
+      CheckFailed(__FILE__, __LINE__, "(" #c1 ") " #op " (" #c2 ")", v1, v2,   \
+                  {__VA_ARGS__});                                              \
     }                                                                          \
-  } while (false) /**/
+  } while (false)
 
 #define VPrintf(level, ...)                                                    \
   do {                                                                         \
