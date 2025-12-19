@@ -42,7 +42,7 @@ struct mpiTimer {
     } else {
       thread_local_clock->Stop(CLOCK_MPI, loc);
     }
-    assert(thread_local_clock->stopped_mpi_clock == true);
+    DCHECK(thread_local_clock->stopped_mpi_clock);
   }
   ~mpiTimer() { thread_local_clock->Start(CLOCK_MPI, loc); }
 };
@@ -361,7 +361,7 @@ struct mpiIsendPB {
       }
     }
     *send_req = rf.newRequest(*send_req, rData, false);
-    assert(!rData->isPersistent());
+    DCHECK(!rData->isPersistent());
   }
 };
 
@@ -391,7 +391,7 @@ struct mpiSendInitPB {
       rData->init(*send_req, PSEND, dest);
     }
     *send_req = rf.newRequest(*send_req, rData, true);
-    assert(rData->isPersistent());
+    DCHECK(rData->isPersistent());
   }
 };
 
@@ -596,7 +596,7 @@ struct mpiIrecvPB {
       }
     }
     *send_req = rf.newRequest(*send_req, rData, false);
-    assert(!rData->isPersistent());
+    DCHECK(!rData->isPersistent());
   }
 };
 
@@ -639,7 +639,7 @@ struct mpiRecvInitPB {
       }
     }
     *send_req = rf.newRequest(*send_req, rData, true);
-    assert(rData->isPersistent());
+    DCHECK(rData->isPersistent());
   }
 };
 
@@ -729,7 +729,7 @@ struct mpiIsendrecvPB {
       }
     }
     *send_req = rf.newRequest(*send_req, rData, false);
-    assert(!rData->isPersistent());
+    CHECK_NOT(rData->isPersistent());
   }
 };
 

@@ -28,13 +28,13 @@ PARSE_FLAG(bool, colorize, true, "Colorize output.")
 
 PARSE_FLAG(bool, help, false, "Print the flag descriptions.")
 
-#ifdef USE_ERRHANDLER
 PARSE_FLAG(bool, stacktrace, false,
            "Print stacktraces in case of an error. "
            "Implies registering signal handlers and MPI error handlers.")
-#endif
 
 PARSE_FLAG(bool, abort_on_error, false, "Abort instead of exit on error.")
+
+PARSE_FLAG(bool, continue_on_error, true, "Continue after failing an assert.")
 
 PARSE_FLAG(int, metric_factor, 1, "Factor for metric output.")
 

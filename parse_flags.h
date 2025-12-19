@@ -4,6 +4,7 @@
 // NOLINTBEGIN
 
 #include "containers.h"
+#include "debug.h"
 #include "errorhandler.h"
 #include "typedefs.h"
 #include <atomic>
@@ -16,13 +17,6 @@
 #define ANALYSIS_FLAGS "OTFCPT_OPTIONS"
 
 namespace __otfcpt {
-
-inline void SetVerbosity(int verbosity) {
-  current_verbosity.store(verbosity, std::memory_order_relaxed);
-}
-inline int Verbosity() {
-  return current_verbosity.load(std::memory_order_relaxed);
-}
 
 enum HandleSignalMode {
   kHandleSignalNo,

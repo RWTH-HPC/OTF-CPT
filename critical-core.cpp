@@ -22,23 +22,14 @@
 #endif
 
 extern "C" void __cxa_pure_virtual() {
-  assert(false && "Pure virtual function must not be called");
+  DCHECK(false && "Pure virtual function must not be called");
   abort();
 }
 
 #ifdef USE_ERRHANDLER
-#include <execinfo.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-#define CALLSTACK_SIZE 20
-static void print_stack(void) {
-  int nptrs;
-  void *buf[CALLSTACK_SIZE + 1];
-  nptrs = backtrace(buf, CALLSTACK_SIZE);
-  backtrace_symbols_fd(buf, nptrs, STDOUT_FILENO);
-}
 
 static void set_signalhandlers(sighandler_t handler) {
   signal(SIGSEGV, handler);
@@ -124,7 +115,7 @@ void resetMpiClock(THREAD_CLOCK *thread_clock) {
     thread_clock->stopped_omp_clock = false;
     OmpClockReset(thread_clock);
   } else {
-    assert(thread_clock->stopped_mpi_clock == false);
+    DCHECK(!thread_clock->stopped_mpi_clock);
     thread_clock->stopped_mpi_clock = true;
     thread_clock->outsidempi_proc = 0;
     thread_clock->outsidempi_critical = 0;
@@ -181,8 +172,8 @@ void finishMeasurement() {
     for (int i = 0; i < num_threads; i++) {
       auto *tclock = (*thread_clocks)[i];
       proc_counts.add(*tclock);
-      assert(tclock->stopped_clock == true);
-      assert(tclock->stopped_omp_clock == true);
+      DCHECK(tclock->stopped_clock);
+      DCHECK(tclock->stopped_omp_clock);
       double curr_uc = tclock->useful_computation_thread.load();
       double curr_oot = tclock->outsideomp_thread.load();
       if (curr_uc > uc_max[0]) {
@@ -430,9 +421,9 @@ void finishMeasurement() {
 void SYNC_CLOCK::OmpHBefore() {
   if (!analysis_flags->running)
     return;
-  assert(thread_local_clock->stopped_clock == true);
-  assert(thread_local_clock->stopped_omp_clock == true);
-  assert(thread_local_clock->stopped_mpi_clock == false);
+  DCHECK(thread_local_clock->stopped_clock);
+  DCHECK(thread_local_clock->stopped_omp_clock);
+  DCHECK(!thread_local_clock->stopped_mpi_clock);
   update_maximum(useful_computation_critical,
                  thread_local_clock->useful_computation_critical.load());
   update_maximum(useful_computation_proc,
@@ -451,9 +442,9 @@ void SYNC_CLOCK::OmpHBefore() {
 void SYNC_CLOCK::OmpHAfter() {
   if (!analysis_flags->running)
     return;
-  assert(thread_local_clock->stopped_clock == true);
-  assert(thread_local_clock->stopped_omp_clock == true);
-  assert(thread_local_clock->stopped_mpi_clock == false);
+  DCHECK(thread_local_clock->stopped_clock);
+  DCHECK(thread_local_clock->stopped_omp_clock);
+  DCHECK(!thread_local_clock->stopped_mpi_clock);
   update_maximum((thread_local_clock->useful_computation_critical),
                  useful_computation_critical.load());
   update_maximum((thread_local_clock->useful_computation_proc),
@@ -497,20 +488,20 @@ void startTool(bool toolControl, ClockContext cc) {
   if (analysis_flags->stopped && !toolControl)
     return;
   if (!analysis_flags->running) {
-    assert(thread_local_clock->stopped_clock == true);
-    assert(thread_local_clock->stopped_omp_clock == true);
-    assert(thread_local_clock->stopped_mpi_clock == true);
+    DCHECK(thread_local_clock->stopped_clock);
+    DCHECK(thread_local_clock->stopped_omp_clock);
+    DCHECK(thread_local_clock->stopped_mpi_clock);
 
-    assert(thread_local_clock->useful_computation_thread == 0);
-    assert(thread_local_clock->useful_computation_proc == 0);
-    assert(thread_local_clock->useful_computation_critical == 0);
-    assert(thread_local_clock->outsidempi_proc == 0);
-    assert(thread_local_clock->outsidempi_thread == 0);
-    assert(thread_local_clock->outsidempi_critical == 0);
-    assert(thread_local_clock->outsideomp_thread == 0);
-    assert(thread_local_clock->outsideomp_critical == 0);
-    assert(thread_local_clock->outsideomp_critical_nooffset == 0);
-    assert(thread_local_clock->outsideomp_proc == 0);
+    DCHECK_EQ(thread_local_clock->useful_computation_thread, 0);
+    DCHECK_EQ(thread_local_clock->useful_computation_proc, 0);
+    DCHECK_EQ(thread_local_clock->useful_computation_critical, 0);
+    DCHECK_EQ(thread_local_clock->outsidempi_proc, 0);
+    DCHECK_EQ(thread_local_clock->outsidempi_thread, 0);
+    DCHECK_EQ(thread_local_clock->outsidempi_critical, 0);
+    DCHECK_EQ(thread_local_clock->outsideomp_thread, 0);
+    DCHECK_EQ(thread_local_clock->outsideomp_critical, 0);
+    DCHECK_EQ(thread_local_clock->outsideomp_critical_nooffset, 0);
+    DCHECK_EQ(thread_local_clock->outsideomp_proc, 0);
 
 #if 0 && defined(USE_MPI)
     if (useMpi) {
