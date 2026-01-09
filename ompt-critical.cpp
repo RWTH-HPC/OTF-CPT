@@ -460,7 +460,7 @@ static inline TaskData *ToTaskData(ompt_data_t *task_data) {
  */
 
 /// Store a mutex for each wait_id to resolve race condition with callbacks.
-CompactHashMap<ompt_wait_id_t, std::pair<std::mutex, ompt_tsan_clockid>> Locks;
+CompactHashMap<ompt_wait_id_t, Pair<std::mutex, ompt_tsan_clockid> *> Locks;
 std::mutex LocksMutex;
 std::mutex tcmutex;
 
@@ -956,11 +956,17 @@ static void ompt_tsan_mutex_acquired(ompt_mutex_t kind, ompt_wait_id_t wait_id,
   // 1. the previous release has finished.
   // 2. the next acquire doesn't start before we have finished our release.
   LocksMutex.lock();
-  auto &Lock = Locks[wait_id];
+  auto InsertPair =
+      Locks.Insert(Pair<ompt_wait_id_t, Pair<std::mutex, ompt_tsan_clockid> *>(
+          {wait_id, nullptr}));
+  if (InsertPair.second) { // true on successfull insertion
+    InsertPair.first->second = new Pair<std::mutex, ompt_tsan_clockid>();
+  }
+  // InsertPair iterator can get invalidated on rehash
+  auto LockIdPair = InsertPair.first->second;
   LocksMutex.unlock();
-
-  Lock.first.lock();
-  OmpHappensAfter(&Lock.second);
+  LockIdPair->first.lock();
+  OmpHappensAfter(&LockIdPair->second);
   thread_local_clock->Start(CLOCK_OMP, "MutexAcquired");
 }
 
@@ -970,9 +976,9 @@ static void ompt_tsan_mutex_released(ompt_mutex_t kind, ompt_wait_id_t wait_id,
   LocksMutex.lock();
   auto &Lock = Locks[wait_id];
   LocksMutex.unlock();
-  OmpHappensBefore(&Lock.second);
+  OmpHappensBefore(&Lock->second);
 
-  Lock.first.unlock();
+  Lock->first.unlock();
 }
 
 // callback , signature , variable to store result , required support level

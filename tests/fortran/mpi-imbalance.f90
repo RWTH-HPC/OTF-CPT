@@ -24,7 +24,7 @@ program hello
    end if
    call MPI_BARRIER(MPI_COMM_WORLD, ierror)
    call MPI_PCONTROL(1)
-   call usleep(WORK * (1 + 2 * rank))
+   call usleep(INT(WORK * (1 + 2 * rank)))
    call MPI_PCONTROL(0)
    call MPI_BARRIER(MPI_COMM_WORLD, ierror)
    

@@ -149,6 +149,7 @@ template <typename K, typename V> class Pair {
 public:
   K first;
   V second;
+  void *operator new(size_t size) { return malloc(size); }
 };
 
 template <typename K, typename V> class PairListItem : public Pair<K, V> {
