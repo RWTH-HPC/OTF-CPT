@@ -23,6 +23,7 @@ set(fortranTests
 add_library(m_time OBJECT m_time.f90)
 
 FOREACH(tests ${fortranTests})
+        set_source_files_properties(${tests}.f90 PROPERTIES Fortran_PREPROCESS ON)
         add_executable(${tests}.f90.tmp ${tests}.f90 ../expected-metrics.c)
         target_link_libraries(${tests}.f90.tmp PRIVATE OTFCPT)
         target_link_libraries(${tests}.f90.tmp PUBLIC MPI::MPI_Fortran)
