@@ -1,28 +1,20 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
+#include "containers.h"
 #include "typedefs.h"
 #include <initializer_list>
 #include <mutex>
-#ifdef USE_STL
-#include <iostream>
-#include <sstream>
+
 #ifdef USE_BACKWARD
-#define CALLSTACK_SIZE_PRETTY 32
 #define SKIP_FRAMES 5
 #include <external/backward-cpp/backward.hpp>
-#endif
+#include <ostream>
+#include <sstream>
 #endif
 
-// Fallback stack trace
-#define CALLSTACK_SIZE 20
-// Fallback buffer size
-#define FB_BUFFER_SIZE 4096
-
-// Possible options (enforced in CMake):
-// - A: USE_STL and USE_BACKWARD - pretty completely bufffered debug output
-// - B: USE_STL and !USE_BACKWARD - ugly completely buffered debug output
-// - C: !USE_STL and !USE_BACKWARD - ugly half buffered debug output
+#define CALLSTACK_SIZE 32
+#define DBG_BUFFER_SIZE 4096
 
 using namespace __otfcpt;
 
@@ -37,10 +29,6 @@ inline int Verbosity() {
 }
 
 void print_stack();
-#ifdef USE_STL
-void print_stack(std::ostream &os);
-void pretty_print_stack(std::ostream &os);
-#endif
 
 void NORETURN Die();
 
