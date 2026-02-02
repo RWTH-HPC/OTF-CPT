@@ -7,8 +7,8 @@ using namespace __otfcpt;
 
 std::atomic<uint32_t> current_verbosity{0};
 
+void print_stack(CptStreamBuffer &stream) {
 #ifdef USE_BACKWARD
-void pretty_print_stack(CptStreamBuffer &stream) {
   using namespace backward;
   StackTrace st;
   st.load_here(CALLSTACK_SIZE);
@@ -21,14 +21,7 @@ void pretty_print_stack(CptStreamBuffer &stream) {
   std::stringstream stringbuffer;
   p.print(st, stringbuffer);
   stream << stringbuffer.str().c_str() << "\n";
-}
-#endif
-
-void print_stack(CptStreamBuffer &stream) {
-#ifdef USE_BACKWARD
-  pretty_print_stack(stream);
-  return;
-#endif
+#else
   int nptrs;
   void *buf[CALLSTACK_SIZE + 1];
   nptrs = backtrace(buf, CALLSTACK_SIZE);
@@ -41,6 +34,7 @@ void print_stack(CptStreamBuffer &stream) {
     stream << symbols[i] << "\n";
   }
   free(symbols);
+#endif
 }
 
 void print_stack() {

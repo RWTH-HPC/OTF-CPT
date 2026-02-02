@@ -19,7 +19,6 @@
 using namespace __otfcpt;
 
 extern std::atomic<uint32_t> current_verbosity;
-inline std::mutex check_output_mutex;
 
 inline void SetVerbosity(int verbosity) {
   current_verbosity.store(verbosity, std::memory_order_relaxed);

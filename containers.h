@@ -150,6 +150,8 @@ public:
   K first;
   V second;
   void *operator new(size_t size) { return malloc(size); }
+
+  void operator delete(void *p) { free(p); }
 };
 
 template <typename K, typename V> class PairListItem : public Pair<K, V> {
