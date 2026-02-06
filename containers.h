@@ -149,6 +149,9 @@ template <typename K, typename V> class Pair {
 public:
   K first;
   V second;
+  void *operator new(size_t size) { return malloc(size); }
+
+  void operator delete(void *p) { free(p); }
 };
 
 template <typename K, typename V> class PairListItem : public Pair<K, V> {
@@ -287,6 +290,57 @@ private:
     end_ = begin_ + size;
     last_ = begin_ + cap;
     return true;
+  }
+};
+
+struct CptStreamBuffer {
+  char *buf;
+  size_t cap;
+  size_t pos = 0;
+
+  // this struct always needs a buffer
+  CptStreamBuffer() = delete;
+
+  CptStreamBuffer(char *_buf, size_t _capacity) : buf(_buf), cap(_capacity) {}
+
+  CptStreamBuffer &operator<<(const char *s) {
+    if (!s || pos > cap - 1 || !buf)
+      return *this;
+    pos += snprintf(buf + pos, cap - pos, "%s", s);
+    pos = (pos < cap - 1) ? pos : cap - 1;
+    return *this;
+  }
+
+  CptStreamBuffer &operator<<(unsigned long long n) {
+    if (pos > cap - 1 || !buf)
+      return *this;
+    pos += snprintf(buf + pos, cap - pos, "%llu", (unsigned long long)n);
+    pos = (pos < cap - 1) ? pos : cap - 1;
+    return *this;
+  }
+
+  CptStreamBuffer &operator<<(int n) {
+    if (pos > cap - 1 || !buf)
+      return *this;
+    pos += snprintf(buf + pos, cap - pos, "%d", (int)n);
+    pos = (pos < cap - 1) ? pos : cap - 1;
+    return *this;
+  }
+
+  CptStreamBuffer &fflush(FILE *out) {
+    if (pos > cap - 1 || !buf)
+      return *this;
+    fwrite(buf, sizeof(char), pos, out);
+    return *this;
+  }
+
+  CptStreamBuffer &reset() {
+    if (!buf)
+      return *this;
+
+    memset(buf, 0, cap);
+    pos = 0;
+    return *this;
   }
 };
 
