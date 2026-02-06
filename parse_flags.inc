@@ -19,6 +19,9 @@ PARSE_FLAG(bool, report_data_leak, false, "Report tool internal data leaks.")
 
 PARSE_FLAG(bool, stopped, false, "Delay start of measurement.")
 
+PARSE_FLAG(bool, start_with_library_constructor, false,
+           "Start measurement with library constructor.")
+
 PARSE_FLAG(bool, dump_on_stop, false, "Print output on stop.")
 
 PARSE_FLAG(bool, barrier, false,
@@ -39,6 +42,8 @@ PARSE_FLAG(bool, continue_on_error, true, "Continue after failing an assert.")
 PARSE_FLAG(int, metric_factor, 1, "Factor for metric output.")
 
 PARSE_FLAG(int, exitcode, 23, "Exit code for errors.")
+
+PARSE_FLAG(double, runtime, -1, "Real runtime from low overhead run.")
 
 PARSE_FLAG(const char *, log_path, "stdout",
            "Write logs to \"log_path.pid\". The special values are \"stdout\" "

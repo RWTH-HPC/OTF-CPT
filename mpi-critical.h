@@ -35,16 +35,11 @@ struct mpiTimer {
   mpiTimer(bool openmp_thread = false, const char *loc = NULL) : loc(loc) {
     if (thread_local_clock == nullptr) {
       thread_local_clock = new THREAD_CLOCK(my_next_id(), 0, openmp_thread);
-      if (thread_local_clock->stopped_mpi_clock == false)
-        resetMpiClock(thread_local_clock);
-      if (thread_local_clock->stopped_omp_clock == true)
-        thread_local_clock->Start(CLOCK_OMP_ONLY, __func__);
-    } else {
-      thread_local_clock->Stop(CLOCK_MPI, loc);
+      thread_local_clock->enterState(STATE_USEFUL, __func__);
     }
-    DCHECK(thread_local_clock->stopped_mpi_clock);
+    thread_local_clock->enterState(STATE_MPI, loc);
   }
-  ~mpiTimer() { thread_local_clock->Start(CLOCK_MPI, loc); }
+  ~mpiTimer() { thread_local_clock->exitState(STATE_MPI, STATE_USEFUL, loc); }
 };
 
 /*

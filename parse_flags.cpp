@@ -1,4 +1,5 @@
 #include "parse_flags.h"
+#include "criticalPath.h"
 
 using namespace __otfcpt;
 

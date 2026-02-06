@@ -1,6 +1,7 @@
 include(TestHelperMacros)
 
 OPTION(LIT_FORWARD_FULL_ENV "Lit should forward all environmental variables to test execution" FALSE)
+option(OTFCPT_DISABLE_Fortran_TESTS "Build OTF-CPT with pmpi Fortran wrappers" ${OTFCPT_HAVE_Fortran})
 
 set(shipped_lit_executable "${CMAKE_SOURCE_DIR}/external/llvm-lit/lit.py")
 if (EXISTS "${shipped_lit_executable}")

@@ -93,11 +93,11 @@ stages:
                            -DOTFCPT_TEST_LB=.8 \
                            -DOTFCPT_TEST_UB=1.05 \
                            -DOTFCPT_TEST_WORK=300000
-    - cmake --build build
+    - cmake --build build --verbose
     - cmake --install build
     - !reference [.setup-python-env, script]
     - EXIT_CODE=0
-    - cmake --build build -- check || EXIT_CODE=$?
+    - cmake --build build --verbose -- check || EXIT_CODE=$?
     - ldd build/libOTFCPT.so | grep -q "libstdc++" && echo -e "\e[1;31mFound libstdc++ dependency, failure\e[0m" && exit 1
     - exit $EXIT_CODE
 
@@ -188,7 +188,7 @@ cluster:
       - !reference [.cluster-build, script]
       - !reference [.setup-python-env, script]
       - EXIT_CODE=0
-      - cmake --build build -- check || EXIT_CODE=$?
+      - cmake --build build --verbose -- check || EXIT_CODE=$?
       - ldd build/libOTFCPT.so
       - ldd build/libOTFCPT.so | grep -q 'libstdc++' && echo "Error libstdc++ linked" && exit 1 || echo "Info No libstdc++ dependency found"
       - exit $EXIT_CODE
