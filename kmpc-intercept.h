@@ -1,8 +1,7 @@
 #define _GNU_SOURCE 1
 #include <dlfcn.h>
+#include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 typedef void (*kmp_redfun_t)(void *, void *);
 struct ompTimer {};
