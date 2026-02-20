@@ -89,7 +89,7 @@ enum nbFunction {
   nbf_MPI_Neighbor_scatterv_init
 };
 
-#define NUM_UC_DOUBLE 4
+#define NUM_UC_DOUBLE 3
 #define NUM_UC_INT64 0
 
 template <typename M, auto E> class alignas(64) HandleData {

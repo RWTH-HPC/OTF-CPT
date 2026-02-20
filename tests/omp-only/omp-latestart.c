@@ -22,6 +22,10 @@ int main(int argc, char **argv) {
   int sum = 0, nt = omp_get_max_threads();
   metrics m = {1000, 1000, 1000, 1000, 1000, 1000};
   printMetrics(m);
+#pragma omp parallel for schedule(static, 1) reduction(+ : sum)
+  for (int i = 0; i < 20; i++) {
+    sum += i;
+  }
   omp_control_tool(omp_control_tool_start, 0, NULL);
 #pragma omp parallel for schedule(static, 1) reduction(+ : sum)
   for (int i = 0; i < 20; i++) {

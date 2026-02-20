@@ -29,6 +29,10 @@ int main(int argc, char **argv) {
     usleep(WORK);
   }
   omp_control_tool(omp_control_tool_end, 0, NULL);
+#pragma omp parallel for schedule(static, 1) reduction(+ : sum)
+  for (int i = 0; i < 20; i++) {
+    sum += i;
+  }
 
   printf("sum = %i\n", sum);
 }

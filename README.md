@@ -69,7 +69,7 @@ or alternatively for OpenMP applications:
 ```
 omp_control_tool(omp_control_tool_start, 0, NULL); // start
 // region of interest
-omp_control_tool(omp_control_tool_stop, 0, NULL); // stop
+omp_control_tool(omp_control_tool_end, 0, NULL); // stop
 ```
 
 In both cases the runtime option `stopped=1` should be used, see below.

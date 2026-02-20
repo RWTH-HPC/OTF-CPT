@@ -16,6 +16,7 @@
 #include "criticalPath.h"
 #include "errorhandler.h"
 #include "parse_flags.h"
+#include <cstdio>
 #include <time.h>
 #ifdef USE_MPI
 #include <mpi.h>
@@ -75,14 +76,12 @@ void init_signalhandlers() {
 #endif
 
 double localTimeOffset{0};
+long long startTimeOffset{0};
 double getTime() {
   struct timespec curr;
   clock_gettime(CLOCK_REALTIME, &curr);
-  return curr.tv_sec + curr.tv_nsec * 1e-9 - localTimeOffset;
+  return curr.tv_sec - startTimeOffset + curr.tv_nsec * 1e-9 - localTimeOffset;
 }
-
-double getStopTimeNoOffset(double time) { return time + localTimeOffset; }
-double getStartTimeNoOffset(double time) { return time - localTimeOffset; }
 
 int myProcId = 0;
 bool useMpi = false;
@@ -103,32 +102,41 @@ Vector<THREAD_CLOCK *> *thread_clocks = nullptr;
 Vector<omptCounts *> *thread_counts = nullptr;
 thread_local THREAD_CLOCK *thread_local_clock = nullptr;
 
+const char *debug_clock_state_string[] = {
+    "STATE_UNINIT", "STATE_INIT", "STATE_NONE", "STATE_USEFUL",
+    "STATE_MPI",    "STATE_OMP",  "STATE_GPU",  "STATE_LAST"};
+
+#ifdef DEBUG_CLOCKS
+DebugClocksRAII::DebugClocksRAII(THREAD_CLOCK *_tc, const char *_loc,
+                                 const char *_func)
+    : tc(_tc), loc(_loc), func(_func) {
+  std::lock_guard<std::mutex> guard(debugClockMutex);
+  fprintf(analysis_flags->output, "\n");
+  tc->Print(func, loc, " (before)");
+  tc->printStateStack(loc, " (before)");
+  fflush(analysis_flags->output);
+}
+DebugClocksRAII::~DebugClocksRAII() {
+  std::lock_guard<std::mutex> guard(debugClockMutex);
+  tc->Print(func, loc, " (after)");
+  tc->printStateStack(loc, " (after)");
+  fprintf(analysis_flags->output, "\n");
+  fflush(analysis_flags->output);
+}
+#endif
+
 void resetMpiClock(THREAD_CLOCK *thread_clock) {
-  if (!analysis_flags->running) {
-    thread_clock->stopped_mpi_clock = true;
-    thread_clock->outsidempi_proc = 0;
-    thread_clock->outsidempi_critical = 0;
-    thread_clock->outsidempi_thread = 0;
-  } else if (!thread_clock->openmp_thread) {
-    thread_clock->stopped_mpi_clock = true;
-    thread_clock->stopped_clock = true;
-    thread_clock->stopped_omp_clock = false;
-    OmpClockReset(thread_clock);
-  } else {
-    DCHECK(!thread_clock->stopped_mpi_clock);
-    thread_clock->stopped_mpi_clock = true;
-    thread_clock->outsidempi_proc = 0;
-    thread_clock->outsidempi_critical = 0;
-    thread_clock->outsidempi_thread = 0;
-    if (thread_clock->stopped_clock == false) {
-      thread_clock->stopped_clock = true;
-      thread_clock->useful_computation_proc = 0;
-      thread_clock->useful_computation_critical = 0;
-      thread_clock->useful_computation_thread = 0;
-    }
-    if (thread_local_clock->stopped_omp_clock == true)
-      thread_local_clock->Start(CLOCK_OMP_ONLY, __func__);
-  }
+  // Make sure MPI clock is not started
+  DCHECK_OR(thread_clock->getState() == STATE_MPI,
+            thread_clock->getState() == STATE_INIT);
+  thread_clock->clocks[CLOCK_OMPI].Reset(0);
+}
+
+void enterOpenMP(const char *loc) {
+  thread_local_clock->enterState(STATE_OMP, loc);
+}
+void exitOpenMP(const char *loc) {
+  thread_local_clock->exitState(STATE_OMP, STATE_USEFUL, loc);
 }
 
 void startMeasurement(double time) {
@@ -158,24 +166,30 @@ void finishMeasurement() {
   double maxComputation[NUM_SHARED_METRICS] = {0};
   double uc_avg[NUM_SHARED_METRICS] = {0};
   double uc_max[NUM_SHARED_METRICS] = {0};
+
+  // STATE_INIT to stop clock
+  thread_local_clock->setState(endProgrammTime, STATE_INIT, __func__);
+
   if (analysis_flags->running) {
     endProgrammTime = getTime();
     analysis_flags->running = false;
   }
-  if (thread_local_clock->stopped_omp_clock == false)
-    thread_local_clock->Stop(endProgrammTime, CLOCK_OMP_ONLY, __func__);
 
   double totalRuntimeReal = endProgrammTime - startProgrammTime;
+  printf("runtime flag: %lf, %lf\n", totalRuntimeReal, analysis_flags->runtime);
+  if (analysis_flags->runtime > 0)
+    totalRuntimeReal = analysis_flags->runtime;
   // get max and avg Computation accross all threads
   MPI_COUNTS proc_counts, total_counts;
   if (num_threads > 0) {
     for (int i = 0; i < num_threads; i++) {
       auto *tclock = (*thread_clocks)[i];
+      // STATE_INIT to stop all clocks
+      if (tclock->getState() != STATE_INIT)
+        tclock->setState(endProgrammTime, STATE_INIT, __func__);
       proc_counts.add(*tclock);
-      DCHECK(tclock->stopped_clock);
-      DCHECK(tclock->stopped_omp_clock);
-      double curr_uc = tclock->useful_computation_thread.load();
-      double curr_oot = tclock->outsideomp_thread.load();
+      double curr_uc = tclock->clocks[CLOCK_USEFUL].thread.load();
+      double curr_oot = tclock->clocks[CLOCK_OOMP].thread.load();
       if (curr_uc > uc_max[0]) {
         uc_max[0] = curr_uc;
       }
@@ -191,13 +205,14 @@ void finishMeasurement() {
   } else {
     num_threads = 1;
     uc_max[0] = uc_avg[0] =
-        thread_local_clock->useful_computation_thread.load();
-    uc_max[2] = uc_avg[2] = thread_local_clock->outsideomp_thread.load();
+        thread_local_clock->clocks[CLOCK_USEFUL].thread.load();
+    uc_max[2] = uc_avg[2] =
+        thread_local_clock->clocks[CLOCK_OOMP].thread.load();
     proc_counts.add(*thread_local_clock);
   }
-  uc_max[1] = uc_avg[1] = thread_local_clock->outsidempi_proc.load();
-  uc_max[3] = uc_avg[3] = thread_local_clock->useful_computation_proc.load();
-  uc_max[4] = uc_avg[4] = thread_local_clock->outsideomp_proc.load();
+  uc_max[1] = uc_avg[1] = thread_local_clock->clocks[CLOCK_OMPI].proc.load();
+  uc_max[3] = uc_avg[3] = thread_local_clock->clocks[CLOCK_USEFUL].proc.load();
+  uc_max[4] = uc_avg[4] = thread_local_clock->clocks[CLOCK_OOMP].proc.load();
   uc_max[5] = uc_avg[5] = uc_avg[3] - uc_avg[4];
   uc_avg[5] = uc_avg[5] * num_threads;
   uc_max[6] = uc_max[0];
@@ -241,13 +256,11 @@ void finishMeasurement() {
   if (myProcId == 0) { // display results on master thread
                        // calculate pop metrics
     double totalRuntimeIdeal =
-        thread_local_clock->useful_computation_critical.load();
+        thread_local_clock->clocks[CLOCK_USEFUL].critical.load();
     double totalOutsideMPIIdeal =
-        thread_local_clock->outsidempi_critical.load();
+        thread_local_clock->clocks[CLOCK_OMPI].critical.load();
     double totalOutsideOMPIdeal =
-        thread_local_clock->outsideomp_critical.load();
-    double totalOutsideOMPIdealNoOffset =
-        thread_local_clock->outsideomp_critical_nooffset.load();
+        thread_local_clock->clocks[CLOCK_OOMP].critical.load();
 
     avgComputation[5] = avgComputation[5] + totalRuntimeReal;
     maxComputation[5] = maxComputation[5] + totalRuntimeReal;
@@ -261,7 +274,7 @@ void finishMeasurement() {
     double mpiLB = avgComputation[6] / maxComputation[0];
     double ompLB = LB / mpiLB;
 
-    double ompTE = totalOutsideOMPIdealNoOffset / totalRuntimeReal;
+    double ompTE = totalOutsideOMPIdeal / totalRuntimeReal;
     double mpiTE = TE / ompTE;
 
     double mpiSerE = maxComputation[3] / totalRuntimeIdeal;
@@ -375,10 +388,9 @@ void finishMeasurement() {
               maxComputation[2]);
       fprintf(of, "=> Max crit. Outside OpenMP (in s): %6.3lf\n",
               totalOutsideOMPIdeal);
-      fprintf(of, "=> Max crit. Outside OpenMP w/o o,%6.3lf\n",
-              totalOutsideOMPIdealNoOffset);
+      fprintf(of, "=> Total runtime (in s):         %6.3lf\n",
+              totalRuntimeReal);
     }
-    fprintf(of, "=> Total runtime (in s):         %6.3lf\n", totalRuntimeReal);
 
     fprintf(of, "\n----------------POP metrics----------------\n");
     fprintf(of, "Parallel Efficiency:                %6.3lf\n",
@@ -418,45 +430,70 @@ void finishMeasurement() {
   }
 }
 
-void SYNC_CLOCK::OmpHBefore() {
-  if (!analysis_flags->running)
-    return;
-  DCHECK(thread_local_clock->stopped_clock);
-  DCHECK(thread_local_clock->stopped_omp_clock);
-  DCHECK(!thread_local_clock->stopped_mpi_clock);
-  update_maximum(useful_computation_critical,
-                 thread_local_clock->useful_computation_critical.load());
-  update_maximum(useful_computation_proc,
-                 thread_local_clock->useful_computation_proc.load());
-
-  update_maximum(outsidempi_critical,
-                 thread_local_clock->outsidempi_critical.load());
-  update_maximum(outsideomp_critical,
-                 thread_local_clock->outsideomp_critical.load());
-  update_maximum(outsideomp_critical_nooffset,
-                 thread_local_clock->outsideomp_critical_nooffset.load());
-  update_maximum(outsideomp_proc, thread_local_clock->outsideomp_proc.load());
-  update_maximum(outsidempi_proc, thread_local_clock->outsidempi_proc.load());
+inline int my_get_tid() {
+  return thread_local_clock ? thread_local_clock->thread_id : 0;
 }
 
-void SYNC_CLOCK::OmpHAfter() {
+void SYNC_CLOCK::CheckArc(const char *loc, THREAD_CLOCK *tc_arg) {
+  CheckArc(loc, "", tc_arg);
+}
+
+void SYNC_CLOCK::CheckArc(const char *loc, const char *fileline,
+                          THREAD_CLOCK *tc_arg) {
+  if (sync_state == STATE_INIT) {
+    sync_state = tc_arg->getState();
+    init_loc = loc;
+    init_fileline = fileline;
+  } else {
+    DCHECK_EQ_VA(tc_arg->getState(), sync_state, "\nInit location: ", init_loc,
+                 "@", init_fileline, "\nCurrent location: ", loc, "@", fileline,
+                 "\n");
+  }
+}
+
+void SYNC_CLOCK::OmpHBefore(const char *loc, THREAD_CLOCK *tc_arg) {
+  OmpHBefore(loc, 0, tc_arg);
+}
+
+void SYNC_CLOCK::OmpHBefore(const char *loc, const char *fileline,
+                            THREAD_CLOCK *tc_arg) {
   if (!analysis_flags->running)
     return;
-  DCHECK(thread_local_clock->stopped_clock);
-  DCHECK(thread_local_clock->stopped_omp_clock);
-  DCHECK(!thread_local_clock->stopped_mpi_clock);
-  update_maximum((thread_local_clock->useful_computation_critical),
-                 useful_computation_critical.load());
-  update_maximum((thread_local_clock->useful_computation_proc),
-                 useful_computation_proc.load());
-  update_maximum((thread_local_clock->outsidempi_critical),
-                 outsidempi_critical.load());
-  update_maximum((thread_local_clock->outsideomp_critical),
-                 outsideomp_critical.load());
-  update_maximum((thread_local_clock->outsideomp_critical_nooffset),
-                 outsideomp_critical_nooffset.load());
-  update_maximum((thread_local_clock->outsideomp_proc), outsideomp_proc.load());
-  update_maximum((thread_local_clock->outsidempi_proc), outsidempi_proc.load());
+#ifdef DEBUG_HB
+  printf("%s @%s: %p <- %p\n", __PRETTY_FUNCTION__, loc, this, tc_arg);
+#endif
+  this->CheckArc(loc, fileline, tc_arg);
+  clocks[CLOCK_USEFUL].OmpHBefore(tc_arg->clocks[CLOCK_USEFUL]);
+  clocks[CLOCK_OOMP].OmpHBefore(tc_arg->clocks[CLOCK_OOMP]);
+  clocks[CLOCK_OMPI].OmpHBefore(tc_arg->clocks[CLOCK_OMPI]);
+}
+
+void SYNC_CLOCK::OmpHAfter(const char *loc, THREAD_CLOCK *tc_arg) {
+  OmpHAfter(loc, "", tc_arg);
+}
+
+void SYNC_CLOCK::OmpHAfter(const char *loc, const char *fileline,
+                           THREAD_CLOCK *tc_arg) {
+  if (!analysis_flags->running)
+    return;
+#ifdef DEBUG_HB
+  printf("%s @%s: %p -> %p\n", __PRETTY_FUNCTION__, loc, this, tc_arg);
+#endif
+  this->CheckArc(loc, fileline, tc_arg);
+  clocks[CLOCK_USEFUL].OmpHAfter(tc_arg->clocks[CLOCK_USEFUL]);
+  clocks[CLOCK_OOMP].OmpHAfter(tc_arg->clocks[CLOCK_OOMP]);
+  clocks[CLOCK_OMPI].OmpHAfter(tc_arg->clocks[CLOCK_OMPI]);
+}
+
+// Copy constructor for THREAD_CLOCK
+// assigns unique id and copies atomic values correctly
+THREAD_CLOCK::THREAD_CLOCK(const THREAD_CLOCK &other)
+    : THREAD_CLOCK(my_next_id(), 0) {
+  if (other.getState() != STATE_INIT)
+    clock_state_stack.PushBack(other.getState());
+  clocks[CLOCK_USEFUL] = other.clocks[CLOCK_USEFUL];
+  clocks[CLOCK_OMPI] = other.clocks[CLOCK_OMPI];
+  clocks[CLOCK_OOMP] = other.clocks[CLOCK_OOMP];
 }
 
 void OmpClockReset(THREAD_CLOCK *cv) {
@@ -469,39 +506,29 @@ void OmpClockReset(SYNC_CLOCK *cv) {
   if (!analysis_flags->running)
     return;
   if (cv == nullptr)
-    fprintf(stderr, "%s: unexpected NULL arg\n", __PRETTY_FUNCTION__);
+    DCHECK_VA(0, "Unexpected NULL arg");
   else {
-    cv->useful_computation_thread = -1e50;
-    cv->useful_computation_proc = -1e50;
-    cv->useful_computation_critical = -1e50;
-    cv->outsidempi_proc = -1e50;
-    cv->outsidempi_thread = -1e50;
-    cv->outsidempi_critical = -1e50;
-    cv->outsideomp_thread = -1e50;
-    cv->outsideomp_critical = -1e50;
-    cv->outsideomp_critical_nooffset = -1e50;
-    cv->outsideomp_proc = -1e50;
+    cv->clocks[CLOCK_USEFUL].Reset(-1e50);
+    cv->clocks[CLOCK_OMPI].Reset(-1e50);
+    cv->clocks[CLOCK_OOMP].Reset(-1e50);
+    cv->sync_state = STATE_INIT;
   }
 }
 
-void startTool(bool toolControl, ClockContext cc) {
+void startTool(bool toolControl, ClockState cs) {
   if (analysis_flags->stopped && !toolControl)
     return;
   if (!analysis_flags->running) {
-    DCHECK(thread_local_clock->stopped_clock);
-    DCHECK(thread_local_clock->stopped_omp_clock);
-    DCHECK(thread_local_clock->stopped_mpi_clock);
-
-    DCHECK_EQ(thread_local_clock->useful_computation_thread, 0);
-    DCHECK_EQ(thread_local_clock->useful_computation_proc, 0);
-    DCHECK_EQ(thread_local_clock->useful_computation_critical, 0);
-    DCHECK_EQ(thread_local_clock->outsidempi_proc, 0);
-    DCHECK_EQ(thread_local_clock->outsidempi_thread, 0);
-    DCHECK_EQ(thread_local_clock->outsidempi_critical, 0);
-    DCHECK_EQ(thread_local_clock->outsideomp_thread, 0);
-    DCHECK_EQ(thread_local_clock->outsideomp_critical, 0);
-    DCHECK_EQ(thread_local_clock->outsideomp_critical_nooffset, 0);
-    DCHECK_EQ(thread_local_clock->outsideomp_proc, 0);
+    DCHECK_EQ(thread_local_clock->getState(), STATE_INIT);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_USEFUL].thread, 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_USEFUL].proc, 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_USEFUL].critical, 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OMPI].proc, 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OMPI].thread, 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OMPI].critical, 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OOMP].thread, 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OOMP].critical, 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OOMP].proc, 0);
 
 #if 0 && defined(USE_MPI)
     if (useMpi) {
@@ -515,7 +542,10 @@ void startTool(bool toolControl, ClockContext cc) {
     double time = getTime();
     analysis_flags->running = true;
     startMeasurement(time);
-    thread_local_clock->Start(-time, cc, __func__);
+    // For MPI initialization
+    if (cs == STATE_MPI && thread_local_clock->getState() == STATE_INIT)
+      thread_local_clock->enterState(time, STATE_USEFUL, __func__);
+    thread_local_clock->enterState(time, cs, __func__);
   }
 }
 
@@ -531,11 +561,62 @@ void stopTool() {
     if (analysis_flags->verbose)
       fprintf(analysis_flags->output, "ending tool\n");
     double time = getTime();
-    thread_local_clock->Stop(time, CLOCK_ALL, __func__);
+    thread_local_clock->setState(STATE_INIT, __func__);
     analysis_flags->running = false;
     stopMeasurement(time);
   }
   if (analysis_flags->dump_on_stop) {
     finishMeasurement();
+  }
+}
+
+#ifdef ATEXIT_MITIGATION
+__attribute__((destructor))
+#endif
+void exitHandler() {
+  if (analysis_flags->start_with_library_constructor) {
+    if (analysis_flags->verbose)
+      fprintf(analysis_flags->output, "Exiting library\n");
+    finishMeasurement();
+  }
+}
+
+__attribute__((constructor)) void onLibraryLoad() {
+  InitializeOtfcptFlags();
+  startTimeOffset = (long long)startProgrammTime;
+  startProgrammTime -= startTimeOffset;
+
+  // Initialize library with the constructor if requested
+  if (analysis_flags->start_with_library_constructor) {
+    if (!analysis_flags->enabled) {
+      if (analysis_flags->verbose)
+        fprintf(stderr, "Tool disabled, stopping operation\n");
+      return;
+    }
+
+    if (analysis_flags->verbose)
+      fprintf(analysis_flags->output,
+              "Starting OTF-CPT in library constructor\n");
+
+    // pagesize = getpagesize();
+
+    // Init with thread clocks
+    if (!thread_clocks)
+      thread_clocks = new Vector<THREAD_CLOCK *>{};
+
+    // Create a dummy thread clock
+    if (!thread_local_clock)
+      thread_local_clock = new THREAD_CLOCK(my_next_id(), 0);
+    thread_clocks->PushBack(thread_local_clock);
+
+#ifdef USE_ERRHANDLER
+    init_signalhandlers();
+#endif
+    startMeasurement();
+    thread_local_clock->enterState(startProgrammTime, STATE_USEFUL, __func__);
+    // Register an exit handler to finish and print measurements later
+#ifndef ATEXIT_MITIGATION
+    atexit(exitHandler);
+#endif
   }
 }

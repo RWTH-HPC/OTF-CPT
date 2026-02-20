@@ -14,13 +14,15 @@ typedef struct metrics {
 #endif
 
 #define printC(m)                                                              \
-  printf("Expected %i < " #m " < %i\n", (int)(m * LB_FAK), (int)(m * UB_FAK)); \
-  printf("Expected %i < " #m " < %i\n", (int)(m * LB_FAK), (int)(m * UB_FAK))
+  printf("Expected %i < " #m " < %i\n", (int)(m * LB_FAK),                     \
+         (int)(m * UB_FAK + 0.5));                                             \
+  printf("Expected %i < " #m " < %i\n", (int)(m * LB_FAK),                     \
+         (int)(m * UB_FAK + 0.5))
 #define printM(M)                                                              \
   printf("Expected %i < " #M " < %i\n", (int)(m.M * LB_FAK),                   \
-         (int)(m.M * UB_FAK));                                                 \
+         (int)(m.M * UB_FAK + 0.5));                                           \
   printf("Expected %i < " #M " < %i\n", (int)(m.M * LB_FAK),                   \
-         (int)(m.M * UB_FAK))
+         (int)(m.M * UB_FAK + 0.5))
 
 // The printMetrics function prints expected value ranges according to the
 // values expected for a test. Each metric is printed twice to allow the

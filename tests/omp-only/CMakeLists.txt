@@ -12,6 +12,8 @@ set(ompOnlyTests
     omp-balanced
     omp-imbalance
     omp-group
+    omp-latestart
+    omp-earlystart
 )
 
 FOREACH(tests ${ompOnlyTests})
