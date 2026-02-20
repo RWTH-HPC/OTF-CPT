@@ -27,7 +27,6 @@ int main(int argc, char **argv) {
   for (int i = 0; i < 20; i++) {
     sum += i;
     usleep(WORK);
-    // usleep(1000000);
   }
   omp_control_tool(omp_control_tool_end, 0, NULL);
 

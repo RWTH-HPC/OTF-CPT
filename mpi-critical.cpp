@@ -191,7 +191,6 @@ void init_processes(mpiTimer &mt) {
   init_timer_offsets();
   if (!analysis_flags->running) {
     startTool(false, STATE_MPI);
-    // resetMpiClock(thread_local_clock);
   }
 }
 
