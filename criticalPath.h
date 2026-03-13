@@ -67,14 +67,6 @@ enum ClockType {
   CLOCK_LAST = 4
 };
 
-enum ClockContext {
-  CLOCK_OMP,
-  CLOCK_OMP_ONLY,
-  CLOCK_MPI,
-  CLOCK_MPI_ONLY,
-  CLOCK_ALL
-};
-
 extern const char *debug_clock_state_string[];
 
 #define STRING_CLOCK_STATE(a) debug_clock_state_string[((int)(a) + 1)]
@@ -214,6 +206,8 @@ using CP_CLOCKS = cpClocks<BaseMetric>;
 
 typedef SYNC_CLOCK ompt_tsan_clockid;
 
+int my_get_tid();
+
 extern thread_local THREAD_CLOCK *thread_local_clock;
 
 #ifdef DEBUG_CLOCKS
@@ -292,6 +286,7 @@ public:
     clocks[CLOCK_OMPI].critical = _mpi_start_time;
   }
   syncClock() {}
+  ClockState GetState() { return sync_state; }
   void CheckArc(const char *loc, THREAD_CLOCK *tc = thread_local_clock);
   void CheckArc(const char *loc, const char *fileline,
                 THREAD_CLOCK *tc = thread_local_clock);
@@ -388,8 +383,8 @@ template <class T> struct threadClock : public syncClock<T>, MPI_COUNTS {
   }
   threadClock() {}
   threadClock(const threadClock &other) : threadClock(my_next_id(), 0) {
-    if (other.getState() != STATE_INIT)
-      clock_state_stack.PushBack(other.getState());
+    if (other.GetState() != STATE_INIT)
+      clock_state_stack.PushBack(other.GetState());
     clocks[CLOCK_USEFUL] = other.clocks[CLOCK_USEFUL];
     clocks[CLOCK_OMPI] = other.clocks[CLOCK_OMPI];
     clocks[CLOCK_OOMP] = other.clocks[CLOCK_OOMP];
@@ -484,7 +479,7 @@ template <class T> struct threadClock : public syncClock<T>, MPI_COUNTS {
     return clock_state_stack.getBack() == cs;
   }
 
-  ClockState getState() const { return clock_state_stack.getBack(); }
+  ClockState GetState() const { return clock_state_stack.getBack(); }
 
   void *operator new(size_t size) { return malloc(size); }
 
@@ -520,12 +515,12 @@ template <class T>
 void syncClock<T>::CheckArc(const char *loc, const char *fileline,
                             THREAD_CLOCK *tc_arg) {
   if (sync_state == STATE_INIT) {
-    sync_state = tc_arg->getState();
+    sync_state = tc_arg->GetState();
     init_loc = loc;
     init_fileline = fileline;
   } else {
-    DCHECK_EQ_VA(tc_arg->getState(), sync_state, "\nInit location: ", init_loc,
-                 "@", init_fileline, "\nCurrent location: ", loc, "@", fileline,
+    DCHECK_EQ_VA(tc_arg->GetState(), sync_state, "\nInit location (",STRING_CLOCK_STATE(sync_state),"): ", init_loc,
+                 "@", init_fileline, "\nCurrent location (",STRING_CLOCK_STATE(tc_arg->GetState()),"): ", loc, "@", fileline,
                  "\n");
   }
 }
@@ -543,11 +538,17 @@ void syncClock<T>::OmpHBefore(const char *loc, const char *fileline,
 #ifdef DEBUG_HB
   printf("%s @%s: %p <- %p\n", __PRETTY_FUNCTION__, loc, this, tc_arg);
 #endif
+  if (!thread_local_clock->openmp_thread) {
+    thread_local_clock->enterState(STATE_OMP, "OmpHBeforeNonOmpThreadEnter");
+  }
   UniqLock<T> lock(scMutex);
   this->CheckArc(loc, fileline, tc_arg);
   clocks[CLOCK_USEFUL].OmpHBefore(tc_arg->clocks[CLOCK_USEFUL]);
   clocks[CLOCK_OOMP].OmpHBefore(tc_arg->clocks[CLOCK_OOMP]);
   clocks[CLOCK_OMPI].OmpHBefore(tc_arg->clocks[CLOCK_OMPI]);
+  if (!thread_local_clock->openmp_thread) {
+    thread_local_clock->exitState("OmpHBeforeNonOmpThreadExit");
+  }
 }
 
 template <class T>
@@ -563,11 +564,17 @@ void syncClock<T>::OmpHAfter(const char *loc, const char *fileline,
 #ifdef DEBUG_HB
   printf("%s @%s: %p -> %p\n", __PRETTY_FUNCTION__, loc, this, tc_arg);
 #endif
+  if (!thread_local_clock->openmp_thread) {
+    thread_local_clock->enterState(STATE_OMP, "OmpHBeforeNonOmpThreadEnter");
+  }
   UniqLock<T> lock(scMutex);
   this->CheckArc(loc, fileline, tc_arg);
   clocks[CLOCK_USEFUL].OmpHAfter(tc_arg->clocks[CLOCK_USEFUL]);
   clocks[CLOCK_OOMP].OmpHAfter(tc_arg->clocks[CLOCK_OOMP]);
   clocks[CLOCK_OMPI].OmpHAfter(tc_arg->clocks[CLOCK_OMPI]);
+  if (!thread_local_clock->openmp_thread) {
+    thread_local_clock->exitState("OmpHBeforeNonOmpThreadExit");
+  }
 }
 
 template <class T> void syncClock<T>::OmpCReset() {

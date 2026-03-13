@@ -1,4 +1,5 @@
 // clang-format off
+// RUN: %compile_mpi_c
 // ALLOW_RETRIES: 1
 // RUN: %mpirunnp 2 %load_otfcpt OTFCPT_OPTIONS="barrier=1 metric_factor=1000" %t | %FileCheck \
 // RUN: --check-prefixes=CHECK %metricfile

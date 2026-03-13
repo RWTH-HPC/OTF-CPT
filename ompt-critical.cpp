@@ -303,6 +303,8 @@ struct TaskData;
 typedef DataPool<TaskData> TaskDataPool;
 template <> __thread TaskDataPool *TaskDataPool::ThreadDataPool = nullptr;
 
+enum OtfCptTaskFlag { OtfCptTaskFulfilled = 0x00010000 };
+
 /// Data structure to store additional information for tasks.
 struct TaskData final : DataPoolEntry<TaskData> {
   /// Its address is used for relationships of this task.
@@ -371,6 +373,9 @@ struct TaskData final : DataPoolEntry<TaskData> {
   bool isImplicit() { return TaskType & ompt_task_implicit; }
   bool isInitial() { return TaskType & ompt_task_initial; }
   bool isTarget() { return TaskType & ompt_task_target; }
+
+  bool isFulfilled() { return TaskType & OtfCptTaskFulfilled; }
+  void setFulfilled() { TaskType |= OtfCptTaskFulfilled; }
 
   ompt_tsan_clockid *GetTaskPtr() { return &Task; }
 
@@ -529,7 +534,7 @@ static void ompt_tsan_implicit_task(ompt_scope_endpoint_t endpoint,
     } else {
       // In case of reusing OMP threads from a parallel region
       // created when the tool was not yet running
-      if (thread_local_clock->getState() == STATE_INIT) {
+      if (thread_local_clock->GetState() == STATE_INIT) {
         thread_local_clock->enterState(STATE_OMP, "ImplicitTaskBegin");
       }
       OmpHappensAfter(ToParallelData(parallel_data)->GetParallelPtr());
@@ -586,9 +591,9 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
       Data->InBarrier = true;
       thread_local_clock->enterState(STATE_OMP, "SyncRegionBegin");
       char BarrierIndex = Data->BarrierIndex;
+      OmpHappensBefore(Data->Team->GetBarrierPtr(BarrierIndex));
       if (Data->ThreadNum == 0)
         OmpClockReset(Data->Team->GetBarrierPtr((BarrierIndex + 1) % 3));
-      OmpHappensBefore(Data->Team->GetBarrierPtr(BarrierIndex));
       break;
     }
 
@@ -647,7 +652,7 @@ static void ompt_tsan_sync_region(ompt_sync_region_t kind,
     case ompt_sync_region_taskgroup: {
       DCHECK(Data->TaskGroup != nullptr &&
              "Should have at least one taskgroup!");
-      ompTimer ot{"TaskGroup"};
+      ompTimer ot{"TaskGroupSync"};
 
       OmpHappensAfter(Data->TaskGroup->GetPtr());
 
@@ -791,11 +796,91 @@ static void acquireDependencies(TaskData *task) {
   }
 }
 
+static void completeTask(TaskData *FromTask) {
+  if (!FromTask)
+    return;
+  // Task-end happens after a possible omp_fulfill_event call
+  if (FromTask->isFulfilled())
+    OmpHappensAfter(FromTask->GetTaskPtr());
+  // Included tasks are executed sequentially, no need to track
+  // synchronization
+  if (!FromTask->isIncluded()) {
+    // Task will finish before a barrier in the surrounding parallel region
+    // ...
+    ParallelData *PData = FromTask->Team;
+    OmpHappensBefore(PData->GetBarrierPtr(FromTask->BarrierIndex));
+
+    // ... and before an eventual taskwait by the parent thread.
+    OmpHappensBefore(FromTask->Parent->GetTaskwaitPtr());
+
+    if (FromTask->TaskGroup != nullptr) {
+      // This task is part of a taskgroup, so it will finish before the
+      // corresponding taskgroup_end.
+      OmpHappensBefore(FromTask->TaskGroup->GetPtr());
+    }
+  } else {
+    OmpHappensBefore(FromTask->Parent->GetTaskPtr());
+  }
+  // release dependencies
+  releaseDependencies(FromTask);
+}
+
+static void suspendTask(TaskData *FromTask, TaskData *ToTask) {
+  if (!FromTask)
+    return;
+  // Task may be resumed at a later point in time.
+  if (FromTask->isUntied()){
+    thread_local_clock->exitState("UntiedSuspend", FromTask->isRunning);
+    OmpHappensBefore(FromTask->GetTaskPtr());
+  } else {
+    thread_local_clock->enterState(STATE_OMP,"TiedSuspend");
+  }
+  ToTask->ImplicitTask = FromTask->ImplicitTask;
+    DCHECK(ToTask->ImplicitTask != NULL &&
+           "A task belongs to a team and has an implicit task on the stack");
+}
+
+static void suspendTaskEnd(TaskData *FromTask, TaskData *ToTask) {
+  if (!FromTask)
+    return;
+  // Task may be resumed at a later point in time.
+  thread_local_clock->exitState(STATE_USEFUL, STATE_OMP, "TaskEnd",FromTask->isRunning);
+}
+
+static void switchTasks(TaskData *FromTask, TaskData *ToTask) {
+}
+
+static void startTask(TaskData *ToTask) {
+  if (!ToTask)
+    return;
+  // Handle dependencies on first execution of the task
+  bool startingTask = false;
+  if (ToTask->execution == 0) {
+    startingTask = true;
+    ToTask->execution++;
+    acquireDependencies(ToTask);
+  }
+  // 1. Task will begin execution after it has been created.
+  // 2. Task will resume after it has been switched away.
+  if (startingTask) {
+    OmpHappensAfter(ToTask->GetTaskPtr());
+    thread_local_clock->enterState(STATE_USEFUL, "TaskBegin");
+  } else if (ToTask->isUntied()){
+    OmpHappensAfter(ToTask->GetTaskPtr());
+    thread_local_clock->enterState(STATE_USEFUL, "TaskContinueUntied");
+  } else {
+    if(ToTask->InBarrier)
+      thread_local_clock->exitState(STATE_OMP, STATE_OMP, "TaskContinue", ToTask->isRunning);
+    else
+      thread_local_clock->exitState(STATE_OMP, STATE_USEFUL, "TaskContinue", ToTask->isRunning);
+  }
+}
+
 static void ompt_tsan_task_schedule(ompt_data_t *first_task_data,
                                     ompt_task_status_t prior_task_status,
                                     ompt_data_t *second_task_data) {
 
-  if (analysis_flags->running)
+  if (analysis_flags->running && omptThreadCount)
     omptThreadCount->taskSchedule++;
   //
   //  The necessary action depends on prior_task_status:
@@ -810,89 +895,70 @@ static void ompt_tsan_task_schedule(ompt_data_t *first_task_data,
   //    ompt_task_cancel        = 3,
   //     -> first completed, first freed, second starts
   //
+  //    ompt_taskwait_complete = 8,
+  //     -> first starts, first completes, first freed, second ignored
+  //
   //    ompt_task_detach        = 4,
   //    ompt_task_yield         = 2,
   //    ompt_task_switch        = 7
   //     -> first suspended, second starts
   //
 
-  if (prior_task_status == ompt_task_early_fulfill)
-    return;
+  TaskData *FromTask = first_task_data ? ToTaskData(first_task_data) : nullptr;
+  TaskData *ToTask = second_task_data ? ToTaskData(second_task_data) : nullptr;
 
-  TaskData *FromTask = ToTaskData(first_task_data);
-
-  if (thread_local_clock == nullptr)
-    thread_local_clock = new THREAD_CLOCK(my_next_id(), 0);
-
-  // Legacy handling for missing reduction callback
-  if (!FromTask->InBarrier) {
-    thread_local_clock->exitState("TaskEnd", FromTask->isRunning);
-  }
-
-  // The late fulfill happens after the detached task finished execution
-  if (prior_task_status == ompt_task_late_fulfill)
-    OmpHappensAfter(FromTask->GetTaskPtr());
-
-  // task completed execution
-  if (prior_task_status == ompt_task_complete ||
-      prior_task_status == ompt_task_cancel ||
-      prior_task_status == ompt_task_late_fulfill) {
-    // Included tasks are executed sequentially, no need to track
-    // synchronization
-    if (!FromTask->isIncluded()) {
-      // Task will finish before a barrier in the surrounding parallel region
-      // ...
-      ParallelData *PData = FromTask->Team;
-      OmpHappensBefore(
-          PData->GetBarrierPtr(FromTask->ImplicitTask->BarrierIndex));
-
-      // ... and before an eventual taskwait by the parent thread.
-      OmpHappensBefore(FromTask->Parent->GetTaskwaitPtr());
-
-      if (FromTask->TaskGroup != nullptr) {
-        // This task is part of a taskgroup, so it will finish before the
-        // corresponding taskgroup_end.
-        OmpHappensBefore(FromTask->TaskGroup->GetPtr());
-      }
-    }
-
-    // release dependencies
-    releaseDependencies(FromTask);
-    // free the previously running task
-    freeTask(FromTask);
-  }
-
-  // For late fulfill of detached task, there is no task to schedule to
-  if (prior_task_status == ompt_task_late_fulfill) {
-    if (!thread_local_clock->openmp_thread)
-      OmpClockReset(thread_local_clock);
-    return;
-  }
-
-  TaskData *ToTask = ToTaskData(second_task_data);
-
-  // task suspended
-  if (prior_task_status == ompt_task_switch ||
-      prior_task_status == ompt_task_yield ||
-      prior_task_status == ompt_task_detach) {
-    // Task may be resumed at a later point in time.
+  switch (prior_task_status) {
+  case ompt_task_early_fulfill:
+  {
+    ompTimer ot{"EarlyFulfill"};
     OmpHappensBefore(FromTask->GetTaskPtr());
-    ToTask->ImplicitTask = FromTask->ImplicitTask;
-    DCHECK(ToTask->ImplicitTask != NULL &&
-           "A task belongs to a team and has an implicit task on the stack");
+    FromTask->setFulfilled();
+    return;
   }
-
-  // Handle dependencies on first execution of the task
-  if (ToTask->execution == 0) {
-    ToTask->execution++;
-    acquireDependencies(ToTask);
+  case ompt_task_late_fulfill:
+  {
+    ompTimer ot{"LateFulfill"};
+    OmpHappensAfter(FromTask->GetTaskPtr());
+    completeTask(FromTask);
+    freeTask(FromTask);
+    return;
   }
-  // 1. Task will begin execution after it has been created.
-  // 2. Task will resume after it has been switched away.
-  OmpHappensAfter(ToTask->GetTaskPtr());
-  // only start the clock if the next task is not in a barrier
-  if (!ToTask->InBarrier) {
-    thread_local_clock->enterState(STATE_USEFUL, "TaskBegin");
+  case ompt_taskwait_complete:
+  {
+    ompTimer ot{"TaskwaitNowaitDepend"};
+    acquireDependencies(FromTask);
+    freeTask(FromTask);
+    return;
+  }
+  case ompt_task_complete:
+    suspendTaskEnd(FromTask, ToTask);
+    completeTask(FromTask);
+    switchTasks(FromTask, ToTask);
+    freeTask(FromTask);
+    startTask(ToTask);
+    return;
+  case ompt_task_cancel:
+    suspendTaskEnd(FromTask, ToTask);
+    completeTask(FromTask);
+    switchTasks(FromTask, ToTask);
+    freeTask(FromTask);
+    startTask(ToTask);
+    return;
+  case ompt_task_detach:
+    suspendTaskEnd(FromTask, ToTask);
+    switchTasks(FromTask, ToTask);
+    startTask(ToTask);
+    return;
+  case ompt_task_yield:
+    suspendTask(FromTask, ToTask);
+    switchTasks(FromTask, ToTask);
+    startTask(ToTask);
+    return;
+  case ompt_task_switch:
+    suspendTask(FromTask, ToTask);
+    switchTasks(FromTask, ToTask);
+    startTask(ToTask);
+    return;
   }
 }
 

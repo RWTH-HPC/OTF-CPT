@@ -132,8 +132,8 @@ DebugClocksRAII::~DebugClocksRAII() {
 
 void resetMpiClock(THREAD_CLOCK *thread_clock) {
   // Make sure MPI clock is not started
-  DCHECK_OR(thread_clock->getState() == STATE_MPI,
-            thread_clock->getState() == STATE_INIT);
+  DCHECK_OR(thread_clock->GetState() == STATE_MPI,
+            thread_clock->GetState() == STATE_INIT);
   thread_clock->clocks[CLOCK_OMPI].Reset(0);
 }
 
@@ -201,7 +201,7 @@ void finishMeasurement() {
     for (int i = 0; i < num_threads; i++) {
       auto *tclock = (*thread_clocks)[i];
       // STATE_INIT to stop all clocks
-      if (tclock->getState() != STATE_INIT)
+      if (tclock->GetState() != STATE_INIT)
         tclock->setState(endProgrammTime, STATE_INIT, __func__);
       proc_counts.add(*tclock);
       double curr_uc = tclock->clocks[CLOCK_USEFUL].thread.getTime();
@@ -455,7 +455,7 @@ void startTool(bool toolControl, ClockState cs) {
   if (analysis_flags->stopped && !toolControl)
     return;
   if (!analysis_flags->running) {
-    DCHECK_EQ(thread_local_clock->getState(), STATE_INIT);
+    DCHECK_EQ(thread_local_clock->GetState(), STATE_INIT);
     DCHECK_EQ(thread_local_clock->clocks[CLOCK_USEFUL].thread.getTime(), 0);
     DCHECK_EQ(thread_local_clock->clocks[CLOCK_USEFUL].proc.getTime(), 0);
     DCHECK_EQ(thread_local_clock->clocks[CLOCK_USEFUL].critical.getTime(), 0);
@@ -479,7 +479,7 @@ void startTool(bool toolControl, ClockState cs) {
     analysis_flags->running = true;
     startMeasurement(time);
     // For MPI initialization
-    if (cs == STATE_MPI && thread_local_clock->getState() == STATE_INIT)
+    if (cs == STATE_MPI && thread_local_clock->GetState() == STATE_INIT)
       thread_local_clock->enterState(time, STATE_USEFUL, __func__);
     thread_local_clock->enterState(time, cs, __func__);
   }
