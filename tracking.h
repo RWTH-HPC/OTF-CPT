@@ -89,13 +89,13 @@ template <typename M, typename T, auto E> class AbstractHandleFactory {
   using A =
       M; // A is the application facing handle, M is the MPI facing handle.
 protected:
-  CompactHashMap<M, T> predefHandles{};
+  CompactHashMap<M, T *> predefHandles{};
   virtual bool isPredefined(A handle) { return handle == T::nullHandle; }
   virtual T *findPredefinedData(A handle) {
     auto iter = predefHandles.Find(handle);
     if (iter == predefHandles.end())
       return nullptr;
-    return &(iter->second);
+    return (iter->second);
   }
 #ifdef FORTRAN_SUPPORT
   CompactHashMap<MPI_Fint, T *> predefFHandles{};
@@ -125,10 +125,10 @@ public:
   virtual M &getHandleLocked(A &handle) = 0;
   virtual std::shared_lock<std::shared_mutex> getSharedLock() = 0;
   virtual void initPredefined() {
-    predefHandles[T::nullHandle].init(T::nullHandle);
+    T *nHandle = newData()->init(T::nullHandle);
+    predefHandles[T::nullHandle] = nHandle;
 #ifdef FORTRAN_SUPPORT
-    auto &nHandle = predefHandles[T::nullHandle];
-    predefFHandles[nHandle.fHandle] = &nHandle;
+    predefFHandles[nHandle->fHandle] = nHandle;
 #endif
   }
 };

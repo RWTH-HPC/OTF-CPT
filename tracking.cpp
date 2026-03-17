@@ -112,16 +112,16 @@ bool AbstractHandleFactory<MPI_Comm, CommData, toolCommData>::isPredefined(
 }
 template <>
 void AbstractHandleFactory<MPI_Comm, CommData, toolCommData>::initPredefined() {
-  predefHandles[MPI_COMM_NULL].init(MPI_COMM_NULL);
-  predefHandles[MPI_COMM_WORLD].init(MPI_COMM_WORLD);
-  predefHandles[MPI_COMM_SELF].init(MPI_COMM_SELF);
+  predefHandles[MPI_COMM_NULL] = newData()->init(MPI_COMM_NULL);
+  predefHandles[MPI_COMM_WORLD] = newData()->init(MPI_COMM_WORLD);
+  predefHandles[MPI_COMM_SELF] = newData()->init(MPI_COMM_SELF);
 #ifdef FORTRAN_SUPPORT
-  predefFHandles[predefHandles[MPI_COMM_NULL].fHandle] =
-      &predefHandles[MPI_COMM_NULL];
-  predefFHandles[predefHandles[MPI_COMM_WORLD].fHandle] =
-      &predefHandles[MPI_COMM_WORLD];
-  predefFHandles[predefHandles[MPI_COMM_SELF].fHandle] =
-      &predefHandles[MPI_COMM_SELF];
+  predefFHandles[predefHandles[MPI_COMM_NULL]->fHandle] =
+      predefHandles[MPI_COMM_NULL];
+  predefFHandles[predefHandles[MPI_COMM_WORLD]->fHandle] =
+      predefHandles[MPI_COMM_WORLD];
+  predefFHandles[predefHandles[MPI_COMM_SELF]->fHandle] =
+      predefHandles[MPI_COMM_SELF];
 #endif
 }
 MPI_Comm CommData::nullHandle{MPI_COMM_NULL};

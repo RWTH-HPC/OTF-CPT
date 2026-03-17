@@ -103,6 +103,8 @@ template <typename T> struct DataPool final {
       DataPointer.PushBack(new (datas + i * paddedSize) T(this));
     }
     total += ndatas;
+    printf("%s, %li, %li, %i\n", __PRETTY_FUNCTION__, elemSize, paddedSize,
+           ndatas);
   }
 
   // get data from the pool
