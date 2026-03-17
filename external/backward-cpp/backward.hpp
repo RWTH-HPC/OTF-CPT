@@ -4336,8 +4336,7 @@ private:
 #ifdef __GNUC__
   __attribute__((noreturn))
 #endif
-  static void
-  sig_handler(int signo, siginfo_t *info, void *_ctx) {
+  static void sig_handler(int signo, siginfo_t *info, void *_ctx) {
     handleSignal(signo, info, _ctx);
 
     // try to forward the signal.
@@ -4462,11 +4461,9 @@ private:
     abort();
   }
 
-  static inline void __cdecl invalid_parameter_handler(const wchar_t *,
-                                                       const wchar_t *,
-                                                       const wchar_t *,
-                                                       unsigned int,
-                                                       uintptr_t) {
+  static inline void __cdecl
+  invalid_parameter_handler(const wchar_t *, const wchar_t *, const wchar_t *,
+                            unsigned int, uintptr_t) {
     crash_handler(signal_skip_recs);
     abort();
   }

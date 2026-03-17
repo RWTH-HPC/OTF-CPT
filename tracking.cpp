@@ -150,31 +150,48 @@ SessionFactory sf;
 int ipcData::num_uc_double{NUM_UC_DOUBLE};
 int ipcData::num_uc_int64{NUM_UC_INT64};
 MPI_Datatype ipcData::ipcMpiType{MPI_DATATYPE_NULL};
+MPI_Op ipcData::ipcMpiOp{MPI_OP_NULL};
+
+void maxloc(depMetric *, depMetric *, int *, MPI_Datatype *);
+
+void maxloc(depMetric *invec, depMetric *inoutvec, int *len,
+            MPI_Datatype *dtype) {
+  DCHECK_EQ(ipcData::ipcMpiType, *dtype);
+  for (int i = 0; i < *len; i++) {
+    if (inoutvec[i].fvalues[0] < invec[i].fvalues[0]) {
+      for (int j = 0; j < ipcData::num_uc_double; j++)
+        inoutvec[i].fvalues[j] = invec[i].fvalues[j];
+      for (int j = 0; j < ipcData::num_uc_int64; j++)
+        inoutvec[i].ivalues[j] = invec[i].ivalues[j];
+    }
+  }
+}
 
 void ipcData::initIpcData() {
   if (num_uc_int64 > 0) {
-    ipcData tempData{};
-    RequestData tempRData{};
-    MPI_Aint displs[2], rdispls[2];
-    PMPI_Get_address(tempData.uc_double, displs);
-    PMPI_Get_address(tempData.uc_int64, displs + 1);
-    PMPI_Get_address(tempRData.uc_double, rdispls);
-    PMPI_Get_address(tempRData.uc_int64, rdispls + 1);
+    depMetric tempData{};
+    MPI_Aint displs[2];
+    PMPI_Get_address(tempData.fvalues, displs);
+    PMPI_Get_address(tempData.ivalues, displs + 1);
+    MPI_Datatype struType = MPI_DATATYPE_NULL;
     displs[1] -= displs[0];
     displs[0] = 0;
-    rdispls[1] -= rdispls[0];
-    rdispls[0] = 0;
-    DCHECK_EQ(displs[1], rdispls[1]);
     MPI_Datatype types[] = {MPI_DOUBLE, MPI_INT64_T};
     int blengths[] = {num_uc_double, num_uc_int64};
-    PMPI_Type_create_struct(2, blengths, displs, types, &ipcMpiType);
+    PMPI_Type_create_struct(2, blengths, displs, types, &struType);
+    PMPI_Type_create_resized(struType, 0, sizeof(depMetric), &ipcMpiType);
+    PMPI_Type_commit(&ipcMpiType);
+    PMPI_Type_free(&struType);
+    PMPI_Op_create((MPI_User_function *)maxloc, 1, &ipcMpiOp);
   } else {
-    PMPI_Type_contiguous(num_uc_double, MPI_DOUBLE, &ipcMpiType);
+    ipcMpiType = MPI_DOUBLE;
+    ipcMpiOp = MPI_MAX;
   }
-  PMPI_Type_commit(&ipcMpiType);
 }
 void ipcData::finiIpcData() {
-  if (ipcMpiType != MPI_DATATYPE_NULL)
+  if (ipcMpiType != MPI_DATATYPE_NULL && ipcMpiType != MPI_DOUBLE)
     PMPI_Type_free(&ipcMpiType);
+  if (ipcMpiOp != MPI_MAX)
+    PMPI_Op_free(&ipcMpiOp);
 }
 #endif // USE_MPI

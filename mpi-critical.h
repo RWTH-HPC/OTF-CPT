@@ -1,4 +1,6 @@
 #include <mpi.h>
+
+#include "ipc-data.h"
 #ifndef MPI_CRITICAL_H
 #define MPI_CRITICAL_H 1
 
@@ -10,8 +12,8 @@
 
 void MpiHappensAfter(ipcData *uc, int remote = 0);
 void MpiHappensAfter(ipcData &uc, int remote = 0);
-double *loadThreadTimers(ipcData *uc, int remote = -1);
-double *loadThreadTimers(ipcData &uc, int remote = -1);
+ipcMetric *MpiHappensBefore(ipcData *uc, int remote = -1);
+ipcMetric *MpiHappensBefore(ipcData &uc, int remote = -1);
 
 void completePBWC(RequestData *uc, MPI_Status *status);
 void completePBHB(RequestData *uc, MPI_Status *status);
@@ -63,7 +65,7 @@ struct mpiIcollBcastPBImpl {
     rank = cData->getRank();
 
     if (root == rank)
-      loadThreadTimers(rData, REF_RANK);
+      MpiHappensBefore(rData, REF_RANK);
     rData->IBcast(root, cData, rData->pb_reqs);
   }
   ~mpiIcollBcastPBImpl() {
@@ -116,7 +118,7 @@ struct mpiCollBcastPBImpl {
     auto cData = cf.findData(comm);
     rank = cData->getRank();
     if (root == rank)
-      loadThreadTimers(rData, REF_RANK);
+      MpiHappensBefore(rData, REF_RANK);
     rData.IBcast(root, cData, rData.pb_reqs);
   }
   ~mpiCollBcastPBImpl() {
@@ -143,7 +145,7 @@ struct mpiIcollAllreducePBImpl {
 #endif
     auto cData = cf.findData(comm);
     rank = cData->getRank();
-    loadThreadTimers(rData, REF_RANK);
+    MpiHappensBefore(rData, REF_RANK);
     rData->IAllreduce(cData, rData->pb_reqs);
   }
   ~mpiIcollAllreducePBImpl() {
@@ -192,7 +194,7 @@ struct mpiCollAllreducePBImpl {
 #endif
     auto cData = cf.findData(comm);
     rank = cData->getRank();
-    loadThreadTimers(rData, REF_RANK);
+    MpiHappensBefore(rData, REF_RANK);
     rData.IAllreduce(cData, rData.pb_reqs);
   }
   ~mpiCollAllreducePBImpl() {
@@ -221,7 +223,7 @@ struct mpiIcollReducePBImpl {
 #endif
     auto cData = cf.findData(comm);
     rank = cData->getRank();
-    loadThreadTimers(rData, REF_RANK);
+    MpiHappensBefore(rData, REF_RANK);
     rData->IReduce(root, cData, rData->pb_reqs);
     if (root == rank) {
       rData->setCompletionCallback(completePBHB);
@@ -279,7 +281,7 @@ struct mpiCollReducePBImpl {
 #endif
     auto cData = cf.findData(comm);
     rank = cData->getRank();
-    loadThreadTimers(rData, REF_RANK);
+    MpiHappensBefore(rData, REF_RANK);
     rData.IReduce(root, cData, rData.pb_reqs);
   }
   ~mpiCollReducePBImpl() {
@@ -323,7 +325,7 @@ typedef mpiCollBcastInitPBImpl mpiCollBcastInitPB;
 #endif
 
 struct mpiIsendPB {
-  double *uc{nullptr};
+  ipcMetric *uc{nullptr};
   RequestData *rData;
   MPI_Request *send_req;
   int dest;
@@ -341,9 +343,9 @@ struct mpiIsendPB {
       return;
     auto cData = cf.findData(comm);
     rank = cData->getRank();
-    uc = loadThreadTimers(rData);
-    PMPI_Isend(uc, 1, ipcData::ipcMpiType, dest, tag, cData->getDupComm(),
-               rData->pb_reqs);
+    uc = MpiHappensBefore(rData);
+    PMPI_Isend(uc, NUM_UC_VALUES, ipcData::ipcMpiType, dest, tag,
+               cData->getDupComm(), rData->pb_reqs);
   }
   ~mpiIsendPB() {
 #if OnlyActivePB
@@ -361,7 +363,7 @@ struct mpiIsendPB {
 };
 
 struct mpiSendInitPB {
-  double *uc{nullptr};
+  ipcMetric *uc{nullptr};
   RequestData *rData;
   MPI_Request *send_req;
   int dest;
@@ -374,12 +376,12 @@ struct mpiSendInitPB {
     if (dest == MPI_PROC_NULL)
       return;
     auto cData = cf.findData(comm);
-    uc = rData->uc_double;
+    uc = rData->values;
     rank = cData->getRank();
     rData->setStartCallback(startPersPBHB);
     rData->setCompletionCallback(completePersPBnoHB);
-    PMPI_Send_init(uc, 1, ipcData::ipcMpiType, dest, tag, cData->getDupComm(),
-                   rData->pb_reqs);
+    PMPI_Send_init(uc, NUM_UC_VALUES, ipcData::ipcMpiType, dest, tag,
+                   cData->getDupComm(), rData->pb_reqs);
   }
   ~mpiSendInitPB() {
     if (dest != MPI_PROC_NULL) {
@@ -391,7 +393,7 @@ struct mpiSendInitPB {
 };
 
 struct mpiSendPB {
-  double *uc{nullptr};
+  ipcMetric *uc{nullptr};
   RequestData rData{};
   int dest;
   int rank;
@@ -405,9 +407,9 @@ struct mpiSendPB {
       return;
     auto cData = cf.findData(comm);
     rank = cData->getRank();
-    uc = loadThreadTimers(rData);
-    PMPI_Isend(uc, 1, ipcData::ipcMpiType, dest, tag, cData->getDupComm(),
-               rData.pb_reqs);
+    uc = MpiHappensBefore(rData);
+    PMPI_Isend(uc, NUM_UC_VALUES, ipcData::ipcMpiType, dest, tag,
+               cData->getDupComm(), rData.pb_reqs);
   }
   ~mpiSendPB() {
 #if OnlyActivePB
@@ -421,7 +423,7 @@ struct mpiSendPB {
 };
 
 struct mpiMprobePB {
-  double *uc{nullptr};
+  ipcMetric *uc{nullptr};
   MPI_Comm comm;
   MPI_Message *message;
   CommData *cData;
@@ -458,7 +460,7 @@ struct mpiMprobePB {
     auto rData = rf.newData();
     cData = cf.findData(comm);
     rank = cData->getRank();
-    uc = rData->uc_double;
+    uc = rData->values;
     if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
       src = pStatus->MPI_SOURCE;
       tag = pStatus->MPI_TAG;
@@ -469,13 +471,13 @@ struct mpiMprobePB {
     if (!analysis_flags->running)
       return;
 #endif
-    PMPI_Irecv(uc, 1, ipcData::ipcMpiType, src, tag, cData->getDupComm(),
-               rData->pb_reqs);
+    PMPI_Irecv(uc, NUM_UC_VALUES, ipcData::ipcMpiType, src, tag,
+               cData->getDupComm(), rData->pb_reqs);
   }
 };
 
 struct mpiRecvPB {
-  double *uc{nullptr};
+  ipcMetric *uc{nullptr};
   RequestData rData;
   CommData *cData;
   MPI_Status tStatus;
@@ -509,10 +511,10 @@ struct mpiRecvPB {
       return;
     cData = cf.findData(comm);
     rank = cData->getRank();
-    uc = rData.uc_double;
+    uc = rData.values;
     if (src != MPI_ANY_SOURCE && tag != MPI_ANY_TAG) {
-      PMPI_Irecv(uc, 1, ipcData::ipcMpiType, src, tag, cData->getDupComm(),
-                 rData.pb_reqs);
+      PMPI_Irecv(uc, NUM_UC_VALUES, ipcData::ipcMpiType, src, tag,
+                 cData->getDupComm(), rData.pb_reqs);
     } else {
       if (*status == MPI_STATUS_IGNORE) {
         pStatus = *status = &tStatus;
@@ -529,8 +531,8 @@ struct mpiRecvPB {
     if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
       src = pStatus->MPI_SOURCE;
       tag = pStatus->MPI_TAG;
-      PMPI_Recv(uc, 1, ipcData::ipcMpiType, src, tag, cData->getDupComm(),
-                MPI_STATUS_IGNORE);
+      PMPI_Recv(uc, NUM_UC_VALUES, ipcData::ipcMpiType, src, tag,
+                cData->getDupComm(), MPI_STATUS_IGNORE);
     } else {
       PMPI_Waitall(2, rData.pb_reqs, MPI_STATUSES_IGNORE);
     }
@@ -539,7 +541,7 @@ struct mpiRecvPB {
 };
 
 struct mpiIrecvPB {
-  double *uc{nullptr};
+  ipcMetric *uc{nullptr};
   RequestData *rData;
   CommData *cData;
   MPI_Request *send_req;
@@ -567,10 +569,10 @@ struct mpiIrecvPB {
       return;
     cData = cf.findData(comm);
     rank = cData->getRank();
-    uc = rData->uc_double;
+    uc = rData->values;
     if (src != MPI_ANY_SOURCE && tag != MPI_ANY_TAG) {
-      PMPI_Irecv(uc, 1, ipcData::ipcMpiType, src, tag, cData->getDupComm(),
-                 rData->pb_reqs);
+      PMPI_Irecv(uc, NUM_UC_VALUES, ipcData::ipcMpiType, src, tag,
+                 cData->getDupComm(), rData->pb_reqs);
     }
   }
   ~mpiIrecvPB() {
@@ -596,7 +598,7 @@ struct mpiIrecvPB {
 };
 
 struct mpiRecvInitPB {
-  double *uc{nullptr};
+  ipcMetric *uc{nullptr};
   RequestData *rData;
   CommData *cData;
   MPI_Request *send_req;
@@ -612,17 +614,15 @@ struct mpiRecvInitPB {
       return;
     cData = cf.findData(comm);
     rank = cData->getRank();
-    uc = rData->uc_double;
+    uc = rData->values;
     if (src == MPI_ANY_SOURCE || tag == MPI_ANY_TAG) {
       rData->setCompletionCallback(completePBWC);
     } else {
       rData->setStartCallback(startPersPBnoHB);
       rData->setCompletionCallback(completePersPBHB);
       rData->setCancelCallback(cancelPB);
-      PMPI_Recv_init(uc, 1, ipcData::ipcMpiType, src, tag, cData->getDupComm(),
-                     rData->pb_reqs);
-    }
-    if (src != MPI_ANY_SOURCE && tag != MPI_ANY_TAG) {
+      PMPI_Recv_init(uc, NUM_UC_VALUES, ipcData::ipcMpiType, src, tag,
+                     cData->getDupComm(), rData->pb_reqs);
     }
   }
   ~mpiRecvInitPB() {
@@ -641,7 +641,7 @@ struct mpiRecvInitPB {
 #ifdef HAVE_ISRR
 
 struct mpiSendrecvPB {
-  double *uc{nullptr};
+  ipcMetric *uc{nullptr};
   RequestData rData{};
   CommData *cData;
   MPI_Status tStatus;
@@ -663,9 +663,9 @@ struct mpiSendrecvPB {
       return;
     cData = cf.findData(comm);
     rank = cData->getRank();
-    uc = loadThreadTimers(rData);
-    PMPI_Isendrecv_replace(uc, 1, ipcData::ipcMpiType, dest, stag, src, rtag,
-                           cData->getDupComm(), rData.pb_reqs);
+    uc = MpiHappensBefore(rData);
+    PMPI_Isendrecv_replace(uc, NUM_UC_VALUES, ipcData::ipcMpiType, dest, stag,
+                           src, rtag, cData->getDupComm(), rData.pb_reqs);
   }
   ~mpiSendrecvPB() {
 #if OnlyActivePB
@@ -682,7 +682,7 @@ struct mpiSendrecvPB {
 };
 
 struct mpiIsendrecvPB {
-  double *uc{nullptr};
+  ipcMetric *uc{nullptr};
   RequestData *rData;
   CommData *cData;
   MPI_Request *send_req;
@@ -706,9 +706,9 @@ struct mpiIsendrecvPB {
       return;
     cData = cf.findData(comm);
     rank = cData->getRank();
-    uc = loadThreadTimers(rData);
-    PMPI_Isendrecv_replace(uc, 1, ipcData::ipcMpiType, dest, stag, src, rtag,
-                           cData->getDupComm(), rData->pb_reqs);
+    uc = MpiHappensBefore(rData);
+    PMPI_Isendrecv_replace(uc, NUM_UC_VALUES, ipcData::ipcMpiType, dest, stag,
+                           src, rtag, cData->getDupComm(), rData->pb_reqs);
   }
   ~mpiIsendrecvPB() {
 #if OnlyActivePB

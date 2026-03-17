@@ -1,6 +1,12 @@
+#ifndef HANDLE_DATA_H
+#define HANDLE_DATA_H 1
+
+#include <cassert>
 #include <functional>
 #include <mpi.h>
 #include <stdlib.h>
+
+#include "ipc-data.h"
 
 enum nbFunction {
   nbf_unknown = -1,
@@ -88,9 +94,6 @@ enum nbFunction {
   nbf_MPI_Neighbor_scatter_init,
   nbf_MPI_Neighbor_scatterv_init
 };
-
-#define NUM_UC_DOUBLE 3
-#define NUM_UC_INT64 0
 
 template <typename M, auto E> class alignas(64) HandleData {
 protected:
@@ -213,90 +216,58 @@ typedef enum {
 
 class ipcData {
 public:
-  double uc_double[NUM_UC_DOUBLE];
-  int64_t uc_int64[NUM_UC_INT64];
+  ipcMetric values[NUM_UC_VALUES];
   static int num_uc_double;
   static int num_uc_int64;
   static MPI_Datatype ipcMpiType;
+  static MPI_Op ipcMpiOp;
   static void initIpcData();
   static void finiIpcData();
   /* NOTE: See copy-assignment constructor of RequestData why this is explictly
    * defined. */
   ipcData &operator=(const ipcData &rhs) {
-    for (int i = 0; i < NUM_UC_DOUBLE; ++i)
-      uc_double[i] = rhs.uc_double[i];
-    for (int i = 0; i < NUM_UC_INT64; ++i)
-      uc_int64[i] = rhs.uc_int64[i];
+    for (int i = 0; i < NUM_UC_VALUES; ++i)
+      values[i] = rhs.values[i];
     return *this;
   }
   void IBcast(int root, CommData *cData, MPI_Request *reqs) {
-    PMPI_Ibcast(uc_double, 1, ipcData::ipcMpiType, root, cData->getDupComm(),
+    PMPI_Ibcast(values, NUM_UC_VALUES, ipcMpiType, root, cData->getDupComm(),
                 reqs);
   }
   void IAllreduce(CommData *cData, MPI_Request *reqs) {
-    if (num_uc_double > 0)
-      PMPI_Iallreduce(MPI_IN_PLACE, uc_double, num_uc_double, MPI_DOUBLE,
-                      MPI_MAX, cData->getDupComm(), reqs);
-    if (num_uc_int64 > 0)
-      PMPI_Iallreduce(MPI_IN_PLACE, uc_int64, num_uc_int64, MPI_INT64_T,
-                      MPI_MAX, cData->getDupComm(), reqs + 1);
+    PMPI_Iallreduce(MPI_IN_PLACE, values, NUM_UC_VALUES, ipcMpiType, ipcMpiOp,
+                    cData->getDupComm(), reqs);
   }
   void Allreduce(CommData *cData) {
-    if (num_uc_double > 0)
-      PMPI_Allreduce(MPI_IN_PLACE, uc_double, num_uc_double, MPI_DOUBLE,
-                     MPI_MAX, cData->getDupComm());
-    if (num_uc_int64 > 0)
-      PMPI_Allreduce(MPI_IN_PLACE, uc_int64, num_uc_int64, MPI_INT64_T, MPI_MAX,
-                     cData->getDupComm());
+    PMPI_Allreduce(MPI_IN_PLACE, values, NUM_UC_VALUES, ipcMpiType, ipcMpiOp,
+                   cData->getDupComm());
   }
   void IReduce(int root, CommData *cData, MPI_Request *reqs) {
     if (root == cData->getRank()) {
-      if (num_uc_double > 0)
-        PMPI_Ireduce(MPI_IN_PLACE, uc_double, num_uc_double, MPI_DOUBLE,
-                     MPI_MAX, root, cData->getDupComm(), reqs);
-      if (num_uc_int64 > 0)
-        PMPI_Ireduce(MPI_IN_PLACE, uc_int64, num_uc_int64, MPI_INT64_T, MPI_MAX,
-                     root, cData->getDupComm(), reqs + 1);
+      PMPI_Ireduce(MPI_IN_PLACE, values, NUM_UC_VALUES, ipcMpiType, ipcMpiOp,
+                   root, cData->getDupComm(), reqs);
     } else {
-      if (num_uc_double > 0)
-        PMPI_Ireduce(uc_double, NULL, num_uc_double, MPI_DOUBLE, MPI_MAX, root,
-                     cData->getDupComm(), reqs);
-      if (num_uc_int64 > 0)
-        PMPI_Ireduce(uc_int64, NULL, num_uc_int64, MPI_INT64_T, MPI_MAX, root,
-                     cData->getDupComm(), reqs + 1);
+      PMPI_Ireduce(values, NULL, NUM_UC_VALUES, ipcMpiType, ipcMpiOp, root,
+                   cData->getDupComm(), reqs);
     }
   }
 #ifdef HAVE_PCOLL
   void BcastInit(int root, CommData *cData, MPI_Request *reqs) {
-    PMPI_Bcast_init(uc_double, 1, ipcData::ipcMpiType, root,
+    PMPI_Bcast_init(values, NUM_UC_VALUES, ipcMpiType, root,
                     cData->getDupComm(), MPI_INFO_NULL, reqs);
   }
   void AllreduceInit(CommData *cData, MPI_Request *reqs) {
-    if (num_uc_double > 0)
-      PMPI_Allreduce_init(MPI_IN_PLACE, uc_double, num_uc_double, MPI_DOUBLE,
-                          MPI_MAX, cData->getDupComm(), MPI_INFO_NULL, reqs);
-    if (num_uc_int64 > 0)
-      PMPI_Allreduce_init(MPI_IN_PLACE, uc_int64, num_uc_int64, MPI_INT64_T,
-                          MPI_MAX, cData->getDupComm(), MPI_INFO_NULL,
-                          reqs + 1);
+    PMPI_Allreduce_init(MPI_IN_PLACE, values, NUM_UC_VALUES, ipcMpiType,
+                        ipcMpiOp, cData->getDupComm(), MPI_INFO_NULL, reqs);
   }
   void ReduceInit(int root, CommData *cData, MPI_Request *reqs) {
     if (root == cData->getRank()) {
-      if (num_uc_double > 0)
-        PMPI_Reduce_init(MPI_IN_PLACE, uc_double, num_uc_double, MPI_DOUBLE,
-                         MPI_MAX, root, cData->getDupComm(), MPI_INFO_NULL,
-                         reqs);
-      if (num_uc_int64 > 0)
-        PMPI_Reduce_init(MPI_IN_PLACE, uc_int64, num_uc_int64, MPI_INT64_T,
-                         MPI_MAX, root, cData->getDupComm(), MPI_INFO_NULL,
-                         reqs + 1);
+      PMPI_Reduce_init(MPI_IN_PLACE, values, NUM_UC_VALUES, ipcMpiType,
+                       ipcMpiOp, root, cData->getDupComm(), MPI_INFO_NULL,
+                       reqs);
     } else {
-      if (num_uc_double > 0)
-        PMPI_Reduce_init(uc_double, NULL, num_uc_double, MPI_DOUBLE, MPI_MAX,
-                         root, cData->getDupComm(), MPI_INFO_NULL, reqs);
-      if (num_uc_int64 > 0)
-        PMPI_Reduce_init(uc_int64, NULL, num_uc_int64, MPI_INT64_T, MPI_MAX,
-                         root, cData->getDupComm(), MPI_INFO_NULL, reqs + 1);
+      PMPI_Reduce_init(values, NULL, NUM_UC_VALUES, ipcMpiType, ipcMpiOp, root,
+                       cData->getDupComm(), MPI_INFO_NULL, reqs);
     }
   }
 #endif
@@ -450,3 +421,5 @@ public:
     completionCallback = cc;
   }
 };
+
+#endif
