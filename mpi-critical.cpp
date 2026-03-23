@@ -8,6 +8,8 @@
 #include <execinfo.h>
 #include <mpi.h>
 
+#include "handle-data.h"
+#include "ipc-data.h"
 #include "mpi-critical.h"
 
 Vector<double> timeOffsets;
@@ -17,23 +19,24 @@ void MpiHappensAfter(ipcData *uc, int remote) {
   if (!analysis_flags->running)
     return;
   DCHECK_EQ(thread_local_clock->getState(), STATE_MPI);
-  update_maximum(thread_local_clock->clocks[CLOCK_USEFUL].critical,
-                 uc->uc_double[0]);
-  update_maximum(thread_local_clock->clocks[CLOCK_OMPI].critical,
-                 uc->uc_double[1]);
-  update_maximum(thread_local_clock->clocks[CLOCK_OOMP].critical,
-                 uc->uc_double[2]);
+  DCHECK(remote >= -1);
+  thread_local_clock->clocks[CLOCK_USEFUL].critical.maxUpdate(
+      BaseMetric{uc->values[0]});
+  thread_local_clock->clocks[CLOCK_OMPI].critical.maxUpdate(
+      BaseMetric{uc->values[1]});
+  thread_local_clock->clocks[CLOCK_OOMP].critical.maxUpdate(
+      BaseMetric{uc->values[2]});
 }
 
-double *loadThreadTimers(ipcData &uc, int remote) {
-  return loadThreadTimers(&uc, remote);
+ipcMetric *MpiHappensBefore(ipcData &uc, int remote) {
+  return MpiHappensBefore(&uc, remote);
 }
 
-double *loadThreadTimers(ipcData *uc, int remote) {
-  uc->uc_double[0] = thread_local_clock->clocks[CLOCK_USEFUL].critical.load();
-  uc->uc_double[1] = thread_local_clock->clocks[CLOCK_OMPI].critical.load();
-  uc->uc_double[2] = thread_local_clock->clocks[CLOCK_OOMP].critical.load();
-  return uc->uc_double;
+ipcMetric *MpiHappensBefore(ipcData *uc, int remote) {
+  thread_local_clock->clocks[CLOCK_USEFUL].critical.loadValues(uc->values[0]);
+  thread_local_clock->clocks[CLOCK_OMPI].critical.loadValues(uc->values[1]);
+  thread_local_clock->clocks[CLOCK_OOMP].critical.loadValues(uc->values[2]);
+  return uc->values;
 }
 
 // completion callback function for wild-card recv
@@ -46,7 +49,7 @@ void completePBWC(RequestData *uc, MPI_Status *status) {
   DCHECK(uc->comm->getDupComm() != MPI_COMM_NULL);
   if (uc->remote == MPI_ANY_SOURCE)
     uc->remote = status->MPI_SOURCE;
-  PMPI_Recv(uc->uc_double, 1, ipcData::ipcMpiType, status->MPI_SOURCE,
+  PMPI_Recv(uc->values, NUM_UC_VALUES, ipcData::ipcMpiType, status->MPI_SOURCE,
             status->MPI_TAG, uc->comm->getDupComm(), MPI_STATUS_IGNORE);
   MpiHappensAfter(uc, uc->remote);
 }
@@ -111,7 +114,7 @@ void startPersPBHB(RequestData *uc) {
   if (!analysis_flags->running)
     return;
 #endif
-  loadThreadTimers(uc);
+  MpiHappensBefore(uc);
   if (uc->pb_reqs[1] == MPI_REQUEST_NULL)
     PMPI_Start(uc->pb_reqs);
   else
@@ -209,9 +212,14 @@ int MPI_Finalize(void) {
   else
     DCHECK_EQ(thread_local_clock->getState(), STATE_INIT);
   ipcData max_uc;
-  loadThreadTimers(max_uc, REF_RANK);
+  MpiHappensBefore(max_uc, REF_RANK);
   max_uc.Allreduce(cf.findData(MPI_COMM_WORLD));
-  MpiHappensAfter(max_uc, 0);
+  thread_local_clock->clocks[CLOCK_USEFUL].critical.maxUpdate(
+      BaseMetric{max_uc.values[0]});
+  thread_local_clock->clocks[CLOCK_OMPI].critical.maxUpdate(
+      BaseMetric{max_uc.values[1]});
+  thread_local_clock->clocks[CLOCK_OOMP].critical.maxUpdate(
+      BaseMetric{max_uc.values[2]});
 
   finishMeasurement();
   analysis_flags->running = false;

@@ -700,7 +700,6 @@ static void ompt_tsan_sync_region_wait(ompt_sync_region_t kind,
 static int ompt_tsan_control_tool(uint64_t command, uint64_t modifier,
                                   void *arg, const void *codeptr_ra) {
   if (command == omp_control_tool_start) {
-    // TODO start with no arguments = USEFUL
     startTool();
   } else if (command == omp_control_tool_pause) {
     return 1;
@@ -865,7 +864,8 @@ static void ompt_tsan_task_schedule(ompt_data_t *first_task_data,
 
   // For late fulfill of detached task, there is no task to schedule to
   if (prior_task_status == ompt_task_late_fulfill) {
-    OmpClockReset(thread_local_clock);
+    if (!thread_local_clock->openmp_thread)
+      OmpClockReset(thread_local_clock);
     return;
   }
 

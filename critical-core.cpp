@@ -94,6 +94,11 @@ uint64_t my_next_id() {
   return ret;
 }
 
+// Specializations that determine whether a metric class needs locking in
+// SyncClock
+template <> UniqLock<DependentMetric>::UniqLock(std::mutex &m) : u(m) {}
+template <> UniqLock<TimeMetric>::UniqLock(std::mutex &m) : u() {}
+
 double totalProgrammTime = 0;
 double startProgrammTime = getTime(), endProgrammTime;
 double crit_path_useful_time = 0;
@@ -149,6 +154,17 @@ void startMeasurement(double time) {
 
 void stopMeasurement(double time) { endProgrammTime = time; }
 
+template <>
+double atomic_add<double>(std::atomic<double> &operand, double value_to_add) {
+  double old = operand.load(std::memory_order_consume);
+  double desired = old + value_to_add;
+  while (!operand.compare_exchange_weak(old, desired, std::memory_order_release,
+                                        std::memory_order_consume))
+    desired = old + value_to_add;
+
+  return desired;
+}
+
 #define NUM_SHARED_METRICS 7
 
 void finishMeasurement() {
@@ -188,8 +204,8 @@ void finishMeasurement() {
       if (tclock->getState() != STATE_INIT)
         tclock->setState(endProgrammTime, STATE_INIT, __func__);
       proc_counts.add(*tclock);
-      double curr_uc = tclock->clocks[CLOCK_USEFUL].thread.load();
-      double curr_oot = tclock->clocks[CLOCK_OOMP].thread.load();
+      double curr_uc = tclock->clocks[CLOCK_USEFUL].thread.getTime();
+      double curr_oot = tclock->clocks[CLOCK_OOMP].thread.getTime();
       if (curr_uc > uc_max[0]) {
         uc_max[0] = curr_uc;
       }
@@ -205,14 +221,15 @@ void finishMeasurement() {
   } else {
     num_threads = 1;
     uc_max[0] = uc_avg[0] =
-        thread_local_clock->clocks[CLOCK_USEFUL].thread.load();
+        thread_local_clock->clocks[CLOCK_USEFUL].thread.getTime();
     uc_max[2] = uc_avg[2] =
-        thread_local_clock->clocks[CLOCK_OOMP].thread.load();
+        thread_local_clock->clocks[CLOCK_OOMP].thread.getTime();
     proc_counts.add(*thread_local_clock);
   }
-  uc_max[1] = uc_avg[1] = thread_local_clock->clocks[CLOCK_OMPI].proc.load();
-  uc_max[3] = uc_avg[3] = thread_local_clock->clocks[CLOCK_USEFUL].proc.load();
-  uc_max[4] = uc_avg[4] = thread_local_clock->clocks[CLOCK_OOMP].proc.load();
+  uc_max[1] = uc_avg[1] = thread_local_clock->clocks[CLOCK_OMPI].proc.getTime();
+  uc_max[3] = uc_avg[3] =
+      thread_local_clock->clocks[CLOCK_USEFUL].proc.getTime();
+  uc_max[4] = uc_avg[4] = thread_local_clock->clocks[CLOCK_OOMP].proc.getTime();
   uc_max[5] = uc_avg[5] = uc_avg[3] - uc_avg[4];
   uc_avg[5] = uc_avg[5] * num_threads;
   uc_max[6] = uc_max[0];
@@ -256,11 +273,11 @@ void finishMeasurement() {
   if (myProcId == 0) { // display results on master thread
                        // calculate pop metrics
     double totalRuntimeIdeal =
-        thread_local_clock->clocks[CLOCK_USEFUL].critical.load();
+        thread_local_clock->clocks[CLOCK_USEFUL].critical.getTime();
     double totalOutsideMPIIdeal =
-        thread_local_clock->clocks[CLOCK_OMPI].critical.load();
+        thread_local_clock->clocks[CLOCK_OMPI].critical.getTime();
     double totalOutsideOMPIdeal =
-        thread_local_clock->clocks[CLOCK_OOMP].critical.load();
+        thread_local_clock->clocks[CLOCK_OOMP].critical.getTime();
 
     avgComputation[5] = avgComputation[5] + totalRuntimeReal;
     maxComputation[5] = maxComputation[5] + totalRuntimeReal;
@@ -434,101 +451,20 @@ inline int my_get_tid() {
   return thread_local_clock ? thread_local_clock->thread_id : 0;
 }
 
-void SYNC_CLOCK::CheckArc(const char *loc, THREAD_CLOCK *tc_arg) {
-  CheckArc(loc, "", tc_arg);
-}
-
-void SYNC_CLOCK::CheckArc(const char *loc, const char *fileline,
-                          THREAD_CLOCK *tc_arg) {
-  if (sync_state == STATE_INIT) {
-    sync_state = tc_arg->getState();
-    init_loc = loc;
-    init_fileline = fileline;
-  } else {
-    DCHECK_EQ_VA(tc_arg->getState(), sync_state, "\nInit location: ", init_loc,
-                 "@", init_fileline, "\nCurrent location: ", loc, "@", fileline,
-                 "\n");
-  }
-}
-
-void SYNC_CLOCK::OmpHBefore(const char *loc, THREAD_CLOCK *tc_arg) {
-  OmpHBefore(loc, 0, tc_arg);
-}
-
-void SYNC_CLOCK::OmpHBefore(const char *loc, const char *fileline,
-                            THREAD_CLOCK *tc_arg) {
-  if (!analysis_flags->running)
-    return;
-#ifdef DEBUG_HB
-  printf("%s @%s: %p <- %p\n", __PRETTY_FUNCTION__, loc, this, tc_arg);
-#endif
-  this->CheckArc(loc, fileline, tc_arg);
-  clocks[CLOCK_USEFUL].OmpHBefore(tc_arg->clocks[CLOCK_USEFUL]);
-  clocks[CLOCK_OOMP].OmpHBefore(tc_arg->clocks[CLOCK_OOMP]);
-  clocks[CLOCK_OMPI].OmpHBefore(tc_arg->clocks[CLOCK_OMPI]);
-}
-
-void SYNC_CLOCK::OmpHAfter(const char *loc, THREAD_CLOCK *tc_arg) {
-  OmpHAfter(loc, "", tc_arg);
-}
-
-void SYNC_CLOCK::OmpHAfter(const char *loc, const char *fileline,
-                           THREAD_CLOCK *tc_arg) {
-  if (!analysis_flags->running)
-    return;
-#ifdef DEBUG_HB
-  printf("%s @%s: %p -> %p\n", __PRETTY_FUNCTION__, loc, this, tc_arg);
-#endif
-  this->CheckArc(loc, fileline, tc_arg);
-  clocks[CLOCK_USEFUL].OmpHAfter(tc_arg->clocks[CLOCK_USEFUL]);
-  clocks[CLOCK_OOMP].OmpHAfter(tc_arg->clocks[CLOCK_OOMP]);
-  clocks[CLOCK_OMPI].OmpHAfter(tc_arg->clocks[CLOCK_OMPI]);
-}
-
-// Copy constructor for THREAD_CLOCK
-// assigns unique id and copies atomic values correctly
-THREAD_CLOCK::THREAD_CLOCK(const THREAD_CLOCK &other)
-    : THREAD_CLOCK(my_next_id(), 0) {
-  if (other.getState() != STATE_INIT)
-    clock_state_stack.PushBack(other.getState());
-  clocks[CLOCK_USEFUL] = other.clocks[CLOCK_USEFUL];
-  clocks[CLOCK_OMPI] = other.clocks[CLOCK_OMPI];
-  clocks[CLOCK_OOMP] = other.clocks[CLOCK_OOMP];
-}
-
-void OmpClockReset(THREAD_CLOCK *cv) {
-  if (!cv || cv->openmp_thread)
-    return;
-  OmpClockReset(static_cast<SYNC_CLOCK *>(cv));
-}
-
-void OmpClockReset(SYNC_CLOCK *cv) {
-  if (!analysis_flags->running)
-    return;
-  if (cv == nullptr)
-    DCHECK_VA(0, "Unexpected NULL arg");
-  else {
-    cv->clocks[CLOCK_USEFUL].Reset(-1e50);
-    cv->clocks[CLOCK_OMPI].Reset(-1e50);
-    cv->clocks[CLOCK_OOMP].Reset(-1e50);
-    cv->sync_state = STATE_INIT;
-  }
-}
-
 void startTool(bool toolControl, ClockState cs) {
   if (analysis_flags->stopped && !toolControl)
     return;
   if (!analysis_flags->running) {
     DCHECK_EQ(thread_local_clock->getState(), STATE_INIT);
-    DCHECK_EQ(thread_local_clock->clocks[CLOCK_USEFUL].thread, 0);
-    DCHECK_EQ(thread_local_clock->clocks[CLOCK_USEFUL].proc, 0);
-    DCHECK_EQ(thread_local_clock->clocks[CLOCK_USEFUL].critical, 0);
-    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OMPI].proc, 0);
-    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OMPI].thread, 0);
-    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OMPI].critical, 0);
-    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OOMP].thread, 0);
-    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OOMP].critical, 0);
-    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OOMP].proc, 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_USEFUL].thread.getTime(), 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_USEFUL].proc.getTime(), 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_USEFUL].critical.getTime(), 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OMPI].proc.getTime(), 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OMPI].thread.getTime(), 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OMPI].critical.getTime(), 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OOMP].thread.getTime(), 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OOMP].critical.getTime(), 0);
+    DCHECK_EQ(thread_local_clock->clocks[CLOCK_OOMP].proc.getTime(), 0);
 
 #if 0 && defined(USE_MPI)
     if (useMpi) {

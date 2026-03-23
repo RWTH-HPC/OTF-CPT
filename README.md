@@ -64,7 +64,6 @@ MPI_Pcontrol(1); // start
 // region of interest
 MPI_Pcontrol(0); // stop
 ```
-
 or alternatively for OpenMP applications:
 ```
 omp_control_tool(omp_control_tool_start, 0, NULL); // start

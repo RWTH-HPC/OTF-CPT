@@ -74,3 +74,17 @@ void CheckFailed(const char *file, int line, const char *cond, u64 v1, u64 v2,
     Die();
   }
 }
+
+// std::atomic needs this function in debug config
+#ifndef USE_STL
+namespace std {
+extern "C++" _GLIBCXX_NORETURN __attribute__((__cold__)) void
+    __glibcxx_assert_fail /* Called when a precondition violation is detected.
+                           */
+    (const char *__file, int __line, const char *__function,
+     const char *__condition) _GLIBCXX_NOEXCEPT {
+  CheckFailed(__file, __line, __condition, 0, 0, {__function});
+  abort(); // this function should be noreturn
+}
+} // namespace std
+#endif

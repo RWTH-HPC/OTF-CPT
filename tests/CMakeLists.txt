@@ -57,7 +57,10 @@ add_custom_target(build-tests)
 add_custom_target(build-mpi-only-tests)
 add_custom_target(build-omp-only-tests)
 add_custom_target(build-hybrid-tests)
-add_dependencies(build-tests build-mpi-only-tests build-omp-only-tests build-hybrid-tests OTFCPT OTFCPT_omp)
+add_dependencies(build-omp-only-tests OTFCPT OTFCPT_omp)
+add_dependencies(build-mpi-only-tests OTFCPT OTFCPT_omp)
+add_dependencies(build-hybrid-tests OTFCPT OTFCPT_omp)
+add_dependencies(build-tests build-mpi-only-tests build-omp-only-tests build-hybrid-tests)
 if (TARGET FileCheck_Standalone AND BUILD_FILECHECK)
     add_dependencies(build-tests FileCheck_Standalone)
 endif()
@@ -101,10 +104,7 @@ file(GENERATE
      INPUT "${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.configured"
 )
 
-if (TARGET FileCheck_Standalone AND MUST_BUILD_FILECHECK)
-    add_dependencies(build-test FileCheck_Standalone)
-endif()
-
 
 add_check_target(NAME check SUITES . COMMENT "Run all OTF-CPT tests" DEPENDS build-tests)
+add_check_target(NAME check-omp SUITES omp-only COMMENT "Run omp-tests tests" DEPENDS build-omp-only-tests)
 

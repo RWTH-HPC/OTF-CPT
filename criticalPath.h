@@ -9,24 +9,31 @@
 #include <cstdlib>
 #include <cstring>
 #include <inttypes.h>
+#include <mutex>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/resource.h>
 #include <unistd.h>
-
-#include "containers.h"
-#include "debug.h"
-#include "parse_flags.h"
 
 #if (defined __APPLE__ && defined __MACH__)
 #include <dlfcn.h>
 #endif
 
-using namespace __otfcpt;
-
-#include <stdio.h>
-#include <stdlib.h>
-
 #include <omp-tools.h>
 #include <omp.h>
+
+#include "containers.h"
+#include "debug.h"
+#include "handle-data.h"
+#include "parse_flags.h"
+
+using namespace __otfcpt;
+
+#ifdef DEBUG_CLOCKS
+#define BUILD_DEBUG_CLOCKS(c) c
+#else
+#define BUILD_DEBUG_CLOCKS(c)
+#endif
 
 #define LINESTR1(file, line) file ":" #line
 #define LINESTR(file, line) LINESTR1(file, line)
@@ -40,44 +47,6 @@ using namespace __otfcpt;
 #define ATEXIT_MITIGATION
 #endif
 #endif
-
-#ifdef DEBUG_CLOCKS
-inline std::mutex debugClockMutex;
-#endif
-
-extern int myProcId;
-extern bool useMpi;
-extern double localTimeOffset;
-extern long long startTimeOffset;
-
-double getTime();
-
-struct THREAD_CLOCK;
-extern thread_local THREAD_CLOCK *thread_local_clock;
-extern ompt_finalize_tool_t critical_ompt_finalize_tool;
-
-int my_get_tid();
-
-template <typename T>
-static void update_maximum(std::atomic<T> &maximum_value,
-                           T const &value) noexcept {
-  T prev_value = maximum_value;
-  while (prev_value < value &&
-         !maximum_value.compare_exchange_weak(prev_value, value)) {
-  }
-}
-
-template <typename value_type>
-value_type atomic_add(std::atomic<value_type> &operand,
-                      value_type value_to_add) {
-  value_type old = operand.load(std::memory_order_consume);
-  value_type desired = old + value_to_add;
-  while (!operand.compare_exchange_weak(old, desired, std::memory_order_release,
-                                        std::memory_order_consume))
-    desired = old + value_to_add;
-
-  return desired;
-}
 
 enum ClockState {
   STATE_UNINIT = -1,
@@ -98,12 +67,159 @@ enum ClockType {
   CLOCK_LAST = 4
 };
 
+enum ClockContext {
+  CLOCK_OMP,
+  CLOCK_OMP_ONLY,
+  CLOCK_MPI,
+  CLOCK_MPI_ONLY,
+  CLOCK_ALL
+};
+
 extern const char *debug_clock_state_string[];
 
 #define STRING_CLOCK_STATE(a) debug_clock_state_string[((int)(a) + 1)]
 
+static const bool State[STATE_LAST][CLOCK_LAST] = {
+    {false, false, false, false}, // INIT
+    {false, true, true, true},    // NONE
+    {true, true, true, true},     // USEFUL
+    {false, false, true, true},   // MPI
+    {false, true, false, true},   // OMP
+    {false, true, true, false}    // GPU
+}; // USEFUL, OMPI, OOMP, OGPU
+
+extern int myProcId;
+extern bool useMpi;
+extern double localTimeOffset;
+extern long long startTimeOffset;
+extern double startProgrammTime;
+extern double crit_path_useful_time;
+
+double getTime();
+uint64_t my_next_id();
+int my_get_tid();
+
+template <typename T>
+static void update_maximum(std::atomic<T> &maximum_value,
+                           T const &value) noexcept {
+  T prev_value = maximum_value;
+  while (prev_value < value &&
+         !maximum_value.compare_exchange_weak(prev_value, value)) {
+  }
+}
+
+template <typename value_type>
+value_type atomic_add(std::atomic<value_type> &operand,
+                      value_type value_to_add);
+
+template <>
+double atomic_add<double>(std::atomic<double> &operand, double value_to_add);
+
+template <typename value_type>
+value_type atomic_add(std::atomic<value_type> &operand,
+                      value_type value_to_add) {
+  return operand += value_to_add;
+}
+
+template <class T> class UniqLock {
+  std::unique_lock<std::mutex> u;
+
+public:
+  UniqLock(std::mutex &m);
+  ~UniqLock() {}
+};
+
+class TimeMetric {
+protected:
+  std::atomic<double> value{0};
+
+public:
+  void maxUpdate(const TimeMetric &other) {
+    update_maximum(value, other.value.load());
+  }
+  void add(double time) { atomic_add(value, time); }
+  void Reset(double t = 0) { value.store(t); }
+  TimeMetric(double t) : value(t) {}
+  TimeMetric() {}
+  TimeMetric(int index, const double *values) : value(values[index]) {}
+  TimeMetric(int index, const depMetric *values)
+      : value(values[index].fvalues[0]) {}
+  TimeMetric &operator=(const TimeMetric &other) {
+    if (this != &other) {
+      value.store(other.value.load());
+    }
+    return *this;
+  }
+  TimeMetric &operator=(double time) {
+    value.store(time);
+    return *this;
+  }
+  void loadValues(double &values) { values = value.load(); }
+  void loadValues(depMetric &values) { values.fvalues[0] = value.load(); }
+  double getTime() { return value.load(); }
+};
+
+class DependentMetric {
+protected:
+  double refValue{0};   // time?
+  uint64_t depValue{0}; // energy?
+
+public:
+  void maxUpdate(const DependentMetric &other) {
+    if (refValue < other.refValue) {
+      refValue = other.refValue;
+      depValue = other.depValue;
+    }
+  }
+  void add(const DependentMetric &ref) {
+    refValue += ref.refValue;
+    depValue += ref.depValue;
+  }
+  void Reset(double t = 0) {
+    refValue = t;
+    depValue = 0;
+  }
+  DependentMetric() {}
+  DependentMetric(double t) : refValue(t) {}
+  DependentMetric(const depMetric &values)
+      : refValue(values.fvalues[0]), depValue(values.ivalues[0]) {}
+  DependentMetric &operator=(const DependentMetric &other) {
+    if (this != &other) {
+      refValue = other.refValue;
+      depValue = other.depValue;
+    }
+    return *this;
+  }
+  void loadValues(depMetric &values) {
+    values.fvalues[0] = refValue;
+    values.ivalues[0] = depValue;
+  }
+  double getTime() { return refValue; }
+};
+
+#if NUM_UC_INT64 > 0
+using BaseMetric = DependentMetric;
+#else
+using BaseMetric = TimeMetric;
+#endif
+
+template <class T> struct syncClock;
+using SYNC_CLOCK = syncClock<BaseMetric>;
+
+template <class T> struct threadClock;
+using THREAD_CLOCK = threadClock<BaseMetric>;
+
+template <class T> struct cpClocks;
+using CP_CLOCKS = cpClocks<BaseMetric>;
+
+typedef SYNC_CLOCK ompt_tsan_clockid;
+
+extern thread_local THREAD_CLOCK *thread_local_clock;
+
 #ifdef DEBUG_CLOCKS
 #define CLOCK_DEBUG(a, b, c) DebugClocksRAII dcr = DebugClocksRAII(a, b, c)
+inline std::mutex debugClockMutex;
+
 class DebugClocksRAII {
   THREAD_CLOCK *tc;
   const char *loc;
@@ -117,57 +233,65 @@ public:
 #define CLOCK_DEBUG(a, b, c)
 #endif
 
-struct CP_CLOCKS {
-  std::atomic<double> thread{0};
-  std::atomic<double> proc{0};
-  std::atomic<double> critical{0};
+template <class T> struct cpClocks {
+  T thread{0};
+  T proc{0};
+  T critical{0};
 
-  CP_CLOCKS &operator=(const CP_CLOCKS &other) {
+  cpClocks() : thread(0), proc(0), critical(0) {}
+
+  cpClocks(double time) : thread(time), proc(time), critical(time) {}
+
+  cpClocks &operator=(const cpClocks &other) {
     if (this != &other) {
-      thread.store(other.thread.load());
-      proc.store(other.proc.load());
-      critical.store(other.critical.load());
+      thread = other.thread;
+      proc = other.proc;
+      critical = other.critical;
     }
     return *this;
   }
 
   void Reset(double time) {
-    thread = time;
-    proc = time;
-    critical = time;
+    thread.Reset(time);
+    proc.Reset(time);
+    critical.Reset(time);
   }
 
   void AddAll(double time) {
-    atomic_add(critical, time);
-    atomic_add(thread, time);
-    atomic_add(proc, time);
+    thread.add(time);
+    proc.add(time);
+    critical.add(time);
   }
 
-  void OmpHBefore(CP_CLOCKS &cc) {
-    update_maximum(proc, cc.proc.load());
-    update_maximum(critical, cc.critical.load());
+  void OmpHBefore(cpClocks &cc) {
+    proc.maxUpdate(cc.proc);
+    critical.maxUpdate(cc.critical);
   }
-  void OmpHAfter(CP_CLOCKS &cc) {
-    update_maximum(cc.proc, proc.load());
-    update_maximum(cc.critical, critical.load());
+  void OmpHAfter(cpClocks &cc) {
+    cc.proc.maxUpdate(proc);
+    cc.critical.maxUpdate(critical);
   }
 };
 
-struct SYNC_CLOCK {
-  CP_CLOCKS clocks[CLOCK_LAST]{};
+template <class T> struct syncClock {
+protected:
+  cpClocks<T> clocks[CLOCK_LAST]{};
   ClockState sync_state{STATE_INIT};
   const char *init_loc{nullptr};
   const char *init_fileline{nullptr};
-  SYNC_CLOCK(double _useful_computation) {
+  std::mutex scMutex;
+
+public:
+  syncClock(double _useful_computation) {
     clocks[CLOCK_USEFUL].critical = _useful_computation;
   }
-  SYNC_CLOCK(double _useful_computation, double _mpi_start_time) {
+  syncClock(double _useful_computation, double _mpi_start_time) {
     clocks[CLOCK_USEFUL].critical = _useful_computation;
     clocks[CLOCK_OMPI].proc = _mpi_start_time;
     clocks[CLOCK_OMPI].thread = _mpi_start_time;
     clocks[CLOCK_OMPI].critical = _mpi_start_time;
   }
-  SYNC_CLOCK() {}
+  syncClock() {}
   void CheckArc(const char *loc, THREAD_CLOCK *tc = thread_local_clock);
   void CheckArc(const char *loc, const char *fileline,
                 THREAD_CLOCK *tc = thread_local_clock);
@@ -177,6 +301,7 @@ struct SYNC_CLOCK {
   void OmpHAfter(const char *loc, THREAD_CLOCK *tc = thread_local_clock);
   void OmpHAfter(const char *loc, const char *fileline,
                  THREAD_CLOCK *tc = thread_local_clock);
+  void OmpCReset();
   void Print(const char *prefix1, const char *prefix2 = "",
              const char *prefix3 = "") {
     fprintf(
@@ -187,34 +312,22 @@ struct SYNC_CLOCK {
         "omt=%lf, omp=%lf, omc=%lf, "
         "oot=%lf, oop=%lf, ooc=%lf\n",
         my_get_tid(), prefix1, this, prefix2, prefix3,
-        clocks[CLOCK_USEFUL].thread.load(), clocks[CLOCK_USEFUL].proc.load(),
-        clocks[CLOCK_USEFUL].critical.load(), clocks[CLOCK_OMPI].thread.load(),
-        clocks[CLOCK_OMPI].proc.load(), clocks[CLOCK_OMPI].critical.load(),
-        clocks[CLOCK_OOMP].thread.load(), clocks[CLOCK_OOMP].proc.load(),
-        clocks[CLOCK_OOMP].critical.load());
+        clocks[CLOCK_USEFUL].thread.getTime(),
+        clocks[CLOCK_USEFUL].proc.getTime(),
+        clocks[CLOCK_USEFUL].critical.getTime(),
+        clocks[CLOCK_OMPI].thread.getTime(), clocks[CLOCK_OMPI].proc.getTime(),
+        clocks[CLOCK_OMPI].critical.getTime(),
+        clocks[CLOCK_OOMP].thread.getTime(), clocks[CLOCK_OOMP].proc.getTime(),
+        clocks[CLOCK_OOMP].critical.getTime());
   }
-
   void *operator new(size_t size) { return malloc(size); }
-
   void operator delete(void *p) { free(p); }
+  friend void MpiHappensAfter(ipcData *uc, int remote);
+  friend void MpiHappensAfter(ipcData &uc, int remote);
+  friend ipcMetric *MpiHappensBefore(ipcData *uc, int remote);
+  friend ipcMetric *MpiHappensBefore(ipcData &uc, int remote);
+  friend void finishMeasurement();
 };
-
-enum ClockContext {
-  CLOCK_OMP,
-  CLOCK_OMP_ONLY,
-  CLOCK_MPI,
-  CLOCK_MPI_ONLY,
-  CLOCK_ALL
-};
-
-static const bool State[STATE_LAST][CLOCK_LAST] = {
-    {false, false, false, false}, // INIT
-    {false, true, true, true},    // NONE
-    {true, true, true, true},     // USEFUL
-    {false, false, true, true},   // MPI
-    {false, true, false, true},   // OMP
-    {false, true, true, false}    // GPU
-}; // USEFUL, OMPI, OOMP, OGPU
 
 struct MPI_COUNTS {
   uint64_t send{0}, recv{0}, isend{0}, irecv{0}, coll{0}, icoll{0}, test{0},
@@ -260,20 +373,27 @@ struct omptCounts {
   void operator delete(void *p) { free(p); }
 };
 
-struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
+template <class T> struct threadClock : public syncClock<T>, MPI_COUNTS {
   int thread_id{-1};
   bool openmp_thread{false};
   Vector<ClockState> clock_state_stack;
+  using syncClock<T>::clocks;
 
-  THREAD_CLOCK(int threadid, double _useful_computation,
-               bool _openmp_thread = false)
+  threadClock(int threadid, double _useful_computation,
+              bool _openmp_thread = false)
       : SYNC_CLOCK(_useful_computation,
                    (!analysis_flags->running) ? 0 : -getTime()),
         thread_id(threadid), openmp_thread(_openmp_thread) {
     clock_state_stack.PushBack(STATE_INIT);
   }
-  THREAD_CLOCK() {}
-  THREAD_CLOCK(const THREAD_CLOCK &other);
+  threadClock() {}
+  threadClock(const threadClock &other) : threadClock(my_next_id(), 0) {
+    if (other.getState() != STATE_INIT)
+      clock_state_stack.PushBack(other.getState());
+    clocks[CLOCK_USEFUL] = other.clocks[CLOCK_USEFUL];
+    clocks[CLOCK_OMPI] = other.clocks[CLOCK_OMPI];
+    clocks[CLOCK_OOMP] = other.clocks[CLOCK_OOMP];
+  }
 
   void SwitchState(ClockState old_cs, ClockState new_cs, double time = 0,
                    const char *loc = NULL) {
@@ -296,8 +416,7 @@ struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
 #ifdef DEBUG_CLOCKS
   void inline printStateStack(const char *loc = "", const char *prefix = "") {
     fprintf(analysis_flags->output,
-            "Thread %i: Clock State Stack at %s%s: ", my_get_tid(), loc,
-            prefix);
+            "Thread %i: Clock State Stack at %s%s: ", thread_id, loc, prefix);
     for (auto elem : clock_state_stack) {
       fprintf(analysis_flags->output, "%s ", STRING_CLOCK_STATE(elem));
     }
@@ -372,14 +491,9 @@ struct THREAD_CLOCK : public SYNC_CLOCK, MPI_COUNTS {
   void operator delete(void *p) { free(p); }
 };
 
-typedef SYNC_CLOCK ompt_tsan_clockid;
-extern thread_local THREAD_CLOCK *thread_local_clock;
 extern Vector<THREAD_CLOCK *> *thread_clocks;
 extern Vector<omptCounts *> *thread_counts;
-extern double startProgrammTime;
-extern double crit_path_useful_time;
-
-uint64_t my_next_id();
+extern ompt_finalize_tool_t critical_ompt_finalize_tool;
 
 void resetMpiClock(THREAD_CLOCK *thread_clock);
 
@@ -390,14 +504,81 @@ void stopTool();
   (cv)->OmpHBefore(__PRETTY_FUNCTION__, GET_FILELINE, ##__VA_ARGS__)
 #define OmpHappensAfter(cv, ...)                                               \
   (cv)->OmpHAfter(__PRETTY_FUNCTION__, GET_FILELINE, ##__VA_ARGS__)
-
-void OmpClockReset(THREAD_CLOCK *cv);
-void OmpClockReset(SYNC_CLOCK *cv);
+#define OmpClockReset(cv) (cv)->OmpCReset()
 
 void startMeasurement(double time = getTime());
 void stopMeasurement(double time = getTime());
 
 void finishMeasurement();
+
+template <class T>
+void syncClock<T>::CheckArc(const char *loc, THREAD_CLOCK *tc_arg) {
+  CheckArc(loc, "", tc_arg);
+}
+
+template <class T>
+void syncClock<T>::CheckArc(const char *loc, const char *fileline,
+                            THREAD_CLOCK *tc_arg) {
+  if (sync_state == STATE_INIT) {
+    sync_state = tc_arg->getState();
+    init_loc = loc;
+    init_fileline = fileline;
+  } else {
+    DCHECK_EQ_VA(tc_arg->getState(), sync_state, "\nInit location: ", init_loc,
+                 "@", init_fileline, "\nCurrent location: ", loc, "@", fileline,
+                 "\n");
+  }
+}
+
+template <class T>
+void syncClock<T>::OmpHBefore(const char *loc, THREAD_CLOCK *tc_arg) {
+  OmpHBefore(loc, 0, tc_arg);
+}
+
+template <class T>
+void syncClock<T>::OmpHBefore(const char *loc, const char *fileline,
+                              THREAD_CLOCK *tc_arg) {
+  if (!analysis_flags->running)
+    return;
+#ifdef DEBUG_HB
+  printf("%s @%s: %p <- %p\n", __PRETTY_FUNCTION__, loc, this, tc_arg);
+#endif
+  UniqLock<T> lock(scMutex);
+  this->CheckArc(loc, fileline, tc_arg);
+  clocks[CLOCK_USEFUL].OmpHBefore(tc_arg->clocks[CLOCK_USEFUL]);
+  clocks[CLOCK_OOMP].OmpHBefore(tc_arg->clocks[CLOCK_OOMP]);
+  clocks[CLOCK_OMPI].OmpHBefore(tc_arg->clocks[CLOCK_OMPI]);
+}
+
+template <class T>
+void syncClock<T>::OmpHAfter(const char *loc, THREAD_CLOCK *tc_arg) {
+  OmpHAfter(loc, "", tc_arg);
+}
+
+template <class T>
+void syncClock<T>::OmpHAfter(const char *loc, const char *fileline,
+                             THREAD_CLOCK *tc_arg) {
+  if (!analysis_flags->running)
+    return;
+#ifdef DEBUG_HB
+  printf("%s @%s: %p -> %p\n", __PRETTY_FUNCTION__, loc, this, tc_arg);
+#endif
+  UniqLock<T> lock(scMutex);
+  this->CheckArc(loc, fileline, tc_arg);
+  clocks[CLOCK_USEFUL].OmpHAfter(tc_arg->clocks[CLOCK_USEFUL]);
+  clocks[CLOCK_OOMP].OmpHAfter(tc_arg->clocks[CLOCK_OOMP]);
+  clocks[CLOCK_OMPI].OmpHAfter(tc_arg->clocks[CLOCK_OMPI]);
+}
+
+template <class T> void syncClock<T>::OmpCReset() {
+  if (!analysis_flags->running)
+    return;
+  UniqLock<T> lock(scMutex);
+  clocks[CLOCK_USEFUL].Reset(-1e50);
+  clocks[CLOCK_OMPI].Reset(-1e50);
+  clocks[CLOCK_OOMP].Reset(-1e50);
+  sync_state = STATE_INIT;
+}
 
 extern "C" void enterOpenMP(const char *loc);
 extern "C" void exitOpenMP(const char *loc);
