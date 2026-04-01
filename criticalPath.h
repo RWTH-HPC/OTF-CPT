@@ -371,7 +371,7 @@ struct omptCounts {
 template <class T> struct threadClock : public syncClock<T>, MPI_COUNTS {
   int thread_id{-1};
   bool openmp_thread{false};
-  Vector<ClockState> clock_state_stack;
+  Vector<Pair<ClockState, const char *>> clock_state_stack;
   using syncClock<T>::clocks;
 
   threadClock(int threadid, double _useful_computation,
@@ -379,12 +379,12 @@ template <class T> struct threadClock : public syncClock<T>, MPI_COUNTS {
       : SYNC_CLOCK(_useful_computation,
                    (!analysis_flags->running) ? 0 : -getTime()),
         thread_id(threadid), openmp_thread(_openmp_thread) {
-    clock_state_stack.PushBack(STATE_INIT);
+    clock_state_stack.PushBack({STATE_INIT, __PRETTY_FUNCTION__});
   }
   threadClock() {}
   threadClock(const threadClock &other) : threadClock(my_next_id(), 0) {
     if (other.GetState() != STATE_INIT)
-      clock_state_stack.PushBack(other.GetState());
+      clock_state_stack.PushBack(other.GetStateEntry());
     clocks[CLOCK_USEFUL] = other.clocks[CLOCK_USEFUL];
     clocks[CLOCK_OMPI] = other.clocks[CLOCK_OMPI];
     clocks[CLOCK_OOMP] = other.clocks[CLOCK_OOMP];
@@ -408,12 +408,13 @@ template <class T> struct threadClock : public syncClock<T>, MPI_COUNTS {
     }
   }
 
-#ifdef DEBUG_CLOCKS
+#if defined(DEBUG_CLOCKS)
   void inline printStateStack(const char *loc = "", const char *prefix = "") {
     fprintf(analysis_flags->output,
             "Thread %i: Clock State Stack at %s%s: ", thread_id, loc, prefix);
     for (auto elem : clock_state_stack) {
-      fprintf(analysis_flags->output, "%s ", STRING_CLOCK_STATE(elem));
+      fprintf(analysis_flags->output, "%s (%s) ",
+              STRING_CLOCK_STATE(elem.first), elem.second);
     }
     fprintf(analysis_flags->output, "[back]\n");
   }
@@ -427,8 +428,8 @@ template <class T> struct threadClock : public syncClock<T>, MPI_COUNTS {
     if (!analysis_flags->running)
       return;
     CLOCK_DEBUG(this, loc, __func__);
-    SwitchState(clock_state_stack.Back(), cs, time, loc);
-    clock_state_stack.PushBack(cs);
+    SwitchState(GetState(), cs, time, loc);
+    clock_state_stack.PushBack({cs, loc});
   }
 
   void exitState(const char *loc = NULL, bool isRunning = true) {
@@ -439,22 +440,22 @@ template <class T> struct threadClock : public syncClock<T>, MPI_COUNTS {
                  bool isRunning = true) {
     if (!analysis_flags->running || !isRunning)
       return;
-    DCHECK_EQ(oldcs, clock_state_stack.Back());
+    DCHECK_EQ(oldcs, GetState());
     exitState(0, loc, isRunning);
-    DCHECK_EQ(nextcs, clock_state_stack.Back());
+    DCHECK_EQ(nextcs, GetState());
   }
 
   void exitState(double time, const char *loc = NULL, bool isRunning = true) {
     if (!analysis_flags->running || !isRunning)
       return;
     CLOCK_DEBUG(this, loc, __func__);
-    ClockState old_cs = clock_state_stack.Back();
+    ClockState old_cs = GetState();
     // Having STATE_INIT as anything but the bottom most element is invalid
     DCHECK_OR(clock_state_stack.Size() > 1, old_cs == STATE_INIT);
     if (old_cs == STATE_INIT)
       return;
     clock_state_stack.PopBack();
-    SwitchState(old_cs, clock_state_stack.Back(), time, loc);
+    SwitchState(old_cs, GetState(), time, loc);
   }
 
   void setState(ClockState cs, const char *loc = NULL) { setState(0, cs, loc); }
@@ -463,8 +464,8 @@ template <class T> struct threadClock : public syncClock<T>, MPI_COUNTS {
     if (!analysis_flags->running)
       return;
     CLOCK_DEBUG(this, loc, __func__);
-    SwitchState(clock_state_stack.Back(), cs, time, loc);
-    clock_state_stack.Back() = cs;
+    SwitchState(GetState(), cs, time, loc);
+    clock_state_stack.Back() = {cs, loc};
   }
 
   void resetState() {
@@ -472,14 +473,17 @@ template <class T> struct threadClock : public syncClock<T>, MPI_COUNTS {
       clocks[i].Reset(0);
 
     clock_state_stack.Reset();
-    clock_state_stack.PushBack(STATE_INIT);
+    clock_state_stack.PushBack({STATE_INIT, __PRETTY_FUNCTION__});
   }
 
-  bool compareState(ClockState cs) const {
-    return clock_state_stack.getBack() == cs;
-  }
+  bool compareState(ClockState cs) const { return GetState() == cs; }
 
-  ClockState GetState() const { return clock_state_stack.getBack(); }
+  const ClockState &GetState() const {
+    return clock_state_stack.getBack().first;
+  }
+  const Pair<ClockState, const char *> &GetStateEntry() const {
+    return clock_state_stack.getBack();
+  }
 
   void *operator new(size_t size) { return malloc(size); }
 
@@ -538,17 +542,11 @@ void syncClock<T>::OmpHBefore(const char *loc, const char *fileline,
 #ifdef DEBUG_HB
   printf("%s @%s: %p <- %p\n", __PRETTY_FUNCTION__, loc, this, tc_arg);
 #endif
-  if (!thread_local_clock->openmp_thread) {
-    thread_local_clock->enterState(STATE_OMP, "OmpHBeforeNonOmpThreadEnter");
-  }
   UniqLock<T> lock(scMutex);
   this->CheckArc(loc, fileline, tc_arg);
   clocks[CLOCK_USEFUL].OmpHBefore(tc_arg->clocks[CLOCK_USEFUL]);
   clocks[CLOCK_OOMP].OmpHBefore(tc_arg->clocks[CLOCK_OOMP]);
   clocks[CLOCK_OMPI].OmpHBefore(tc_arg->clocks[CLOCK_OMPI]);
-  if (!thread_local_clock->openmp_thread) {
-    thread_local_clock->exitState("OmpHBeforeNonOmpThreadExit");
-  }
 }
 
 template <class T>
@@ -564,17 +562,11 @@ void syncClock<T>::OmpHAfter(const char *loc, const char *fileline,
 #ifdef DEBUG_HB
   printf("%s @%s: %p -> %p\n", __PRETTY_FUNCTION__, loc, this, tc_arg);
 #endif
-  if (!thread_local_clock->openmp_thread) {
-    thread_local_clock->enterState(STATE_OMP, "OmpHBeforeNonOmpThreadEnter");
-  }
   UniqLock<T> lock(scMutex);
   this->CheckArc(loc, fileline, tc_arg);
   clocks[CLOCK_USEFUL].OmpHAfter(tc_arg->clocks[CLOCK_USEFUL]);
   clocks[CLOCK_OOMP].OmpHAfter(tc_arg->clocks[CLOCK_OOMP]);
   clocks[CLOCK_OMPI].OmpHAfter(tc_arg->clocks[CLOCK_OMPI]);
-  if (!thread_local_clock->openmp_thread) {
-    thread_local_clock->exitState("OmpHBeforeNonOmpThreadExit");
-  }
 }
 
 template <class T> void syncClock<T>::OmpCReset() {
