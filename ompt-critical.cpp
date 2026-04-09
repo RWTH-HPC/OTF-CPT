@@ -97,14 +97,14 @@ template <typename T> struct DataPool final {
     size_t paddedSize = (((elemSize - 1) / 64) + 1) * 64;
     // number of padded elements to allocate
     int ndatas = pagesize / paddedSize;
+    if(ndatas < 4)
+      ndatas = 4;
     char *datas = (char *)malloc(ndatas * paddedSize);
     memory.PushBack(datas);
     for (int i = 0; i < ndatas; i++) {
       DataPointer.PushBack(new (datas + i * paddedSize) T(this));
     }
     total += ndatas;
-    printf("%s, %li, %li, %i\n", __PRETTY_FUNCTION__, elemSize, paddedSize,
-           ndatas);
   }
 
   // get data from the pool
@@ -830,10 +830,14 @@ static void suspendTask(TaskData *FromTask, TaskData *ToTask) {
     return;
   // Task may be resumed at a later point in time.
   if (FromTask->isUntied()){
-    thread_local_clock->exitState("UntiedSuspend", FromTask->isRunning);
-    OmpHappensBefore(FromTask->GetTaskPtr());
+    if (FromTask->InBarrier){
+      thread_local_clock->enterState(STATE_OMP, "UntiedSuspend");
+    } else {
+      thread_local_clock->exitState("UntiedSuspend", FromTask->isRunning);
+      OmpHappensBefore(FromTask->GetTaskPtr());
+    }
   } else {
-    thread_local_clock->enterState(STATE_OMP,"TiedSuspend");
+    thread_local_clock->enterState(STATE_OMP, "TiedSuspend");
   }
   ToTask->ImplicitTask = FromTask->ImplicitTask;
     DCHECK(ToTask->ImplicitTask != NULL &&
@@ -866,8 +870,12 @@ static void startTask(TaskData *ToTask) {
     OmpHappensAfter(ToTask->GetTaskPtr());
     thread_local_clock->enterState(STATE_USEFUL, "TaskBegin");
   } else if (ToTask->isUntied()){
-    OmpHappensAfter(ToTask->GetTaskPtr());
-    thread_local_clock->enterState(STATE_USEFUL, "TaskContinueUntied");
+    if (ToTask->InBarrier){
+      thread_local_clock->exitState(STATE_OMP, STATE_OMP, "TaskContinueUntied", ToTask->isRunning);
+    } else {
+      OmpHappensAfter(ToTask->GetTaskPtr());
+      thread_local_clock->enterState(STATE_USEFUL, "TaskContinueUntied");
+    }
   } else {
     if(ToTask->InBarrier)
       thread_local_clock->exitState(STATE_OMP, STATE_OMP, "TaskContinue", ToTask->isRunning);
