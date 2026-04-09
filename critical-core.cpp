@@ -152,7 +152,12 @@ void startMeasurement(double time) {
             startProgrammTime - initialStart);
 }
 
-void stopMeasurement(double time) { endProgrammTime = time; }
+void stopMeasurement(double time) {
+  if (analysis_flags->running) {
+    endProgrammTime = time;
+    analysis_flags->running = false;
+  }
+}
 
 template <>
 double atomic_add<double>(std::atomic<double> &operand, double value_to_add) {
@@ -183,13 +188,10 @@ void finishMeasurement() {
   double uc_avg[NUM_SHARED_METRICS] = {0};
   double uc_max[NUM_SHARED_METRICS] = {0};
 
+  stopMeasurement();
+
   // STATE_INIT to stop clock
   thread_local_clock->setState(endProgrammTime, STATE_INIT, __func__);
-
-  if (analysis_flags->running) {
-    endProgrammTime = getTime();
-    analysis_flags->running = false;
-  }
 
   double totalRuntimeReal = endProgrammTime - startProgrammTime;
   printf("runtime flag: %lf, %lf\n", totalRuntimeReal, analysis_flags->runtime);
@@ -496,10 +498,8 @@ void stopTool() {
   if (analysis_flags->running) {
     if (analysis_flags->verbose)
       fprintf(analysis_flags->output, "ending tool\n");
-    double time = getTime();
-    thread_local_clock->setState(STATE_INIT, __func__);
-    analysis_flags->running = false;
-    stopMeasurement(time);
+    stopMeasurement();
+    thread_local_clock->setState(endProgrammTime, STATE_INIT, __func__);
   }
   if (analysis_flags->dump_on_stop) {
     finishMeasurement();

@@ -222,7 +222,6 @@ int MPI_Finalize(void) {
       BaseMetric{max_uc.values[2]});
 
   finishMeasurement();
-  analysis_flags->running = false;
   ipcData::finiIpcData();
   return PMPI_Finalize();
 }

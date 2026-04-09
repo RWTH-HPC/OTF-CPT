@@ -461,7 +461,7 @@ template <class T> struct threadClock : public syncClock<T>, MPI_COUNTS {
   void setState(ClockState cs, const char *loc = NULL) { setState(0, cs, loc); }
 
   void setState(double time, ClockState cs, const char *loc = NULL) {
-    if (!analysis_flags->running)
+    if (!analysis_flags->running && cs != STATE_INIT)
       return;
     CLOCK_DEBUG(this, loc, __func__);
     SwitchState(GetState(), cs, time, loc);
