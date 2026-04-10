@@ -279,16 +279,16 @@ public:
   syncClock(double _useful_computation) {
     clocks[CLOCK_USEFUL].critical = _useful_computation;
   }
-  syncClock(double _useful_computation, double _mpi_start_time) {
-    clocks[CLOCK_USEFUL].critical = _useful_computation;
-    clocks[CLOCK_OMPI].proc = _mpi_start_time;
-    clocks[CLOCK_OMPI].thread = _mpi_start_time;
-    clocks[CLOCK_OMPI].critical = _mpi_start_time;
-  }
+  // syncClock(double _useful_computation, double _mpi_start_time) {
+  //   clocks[CLOCK_USEFUL].critical = _useful_computation;
+  //   clocks[CLOCK_OMPI].proc = _mpi_start_time;
+  //   clocks[CLOCK_OMPI].thread = _mpi_start_time;
+  //   clocks[CLOCK_OMPI].critical = _mpi_start_time;
+  // }
   syncClock() {}
   ClockState GetState() { return sync_state; }
-  void CheckArc(const char *loc, THREAD_CLOCK *tc = thread_local_clock);
-  void CheckArc(const char *loc, const char *fileline,
+  bool CheckArc(const char *loc, THREAD_CLOCK *tc = thread_local_clock);
+  bool CheckArc(const char *loc, const char *fileline,
                 THREAD_CLOCK *tc = thread_local_clock);
   void OmpHBefore(const char *loc, THREAD_CLOCK *tc = thread_local_clock);
   void OmpHBefore(const char *loc, const char *fileline,
@@ -376,9 +376,8 @@ template <class T> struct threadClock : public syncClock<T>, MPI_COUNTS {
 
   threadClock(int threadid, double _useful_computation,
               bool _openmp_thread = false)
-      : SYNC_CLOCK(_useful_computation,
-                   (!analysis_flags->running) ? 0 : -getTime()),
-        thread_id(threadid), openmp_thread(_openmp_thread) {
+      : SYNC_CLOCK(_useful_computation), thread_id(threadid),
+        openmp_thread(_openmp_thread) {
     clock_state_stack.PushBack({STATE_INIT, __PRETTY_FUNCTION__});
   }
   threadClock() {}
@@ -511,22 +510,25 @@ void stopMeasurement(double time = getTime());
 void finishMeasurement();
 
 template <class T>
-void syncClock<T>::CheckArc(const char *loc, THREAD_CLOCK *tc_arg) {
-  CheckArc(loc, "", tc_arg);
+bool syncClock<T>::CheckArc(const char *loc, THREAD_CLOCK *tc_arg) {
+  return CheckArc(loc, "", tc_arg);
 }
 
 template <class T>
-void syncClock<T>::CheckArc(const char *loc, const char *fileline,
+bool syncClock<T>::CheckArc(const char *loc, const char *fileline,
                             THREAD_CLOCK *tc_arg) {
   if (sync_state == STATE_INIT) {
     sync_state = tc_arg->GetState();
     init_loc = loc;
     init_fileline = fileline;
-  } else {
-    DCHECK_EQ_VA(tc_arg->GetState(), sync_state, "\nInit location (",STRING_CLOCK_STATE(sync_state),"): ", init_loc,
-                 "@", init_fileline, "\nCurrent location (",STRING_CLOCK_STATE(tc_arg->GetState()),"): ", loc, "@", fileline,
-                 "\n");
+    return true;
   }
+  DCHECK_EQ_VA(tc_arg->GetState(), sync_state, "\nInit location (",
+               STRING_CLOCK_STATE(sync_state), "): ", init_loc, "@",
+               init_fileline, "\nCurrent location (",
+               STRING_CLOCK_STATE(tc_arg->GetState()), "): ", loc, "@",
+               fileline, "\n");
+  return false;
 }
 
 template <class T>
@@ -543,7 +545,14 @@ void syncClock<T>::OmpHBefore(const char *loc, const char *fileline,
   printf("%s @%s: %p <- %p\n", __PRETTY_FUNCTION__, loc, this, tc_arg);
 #endif
   UniqLock<T> lock(scMutex);
-  this->CheckArc(loc, fileline, tc_arg);
+  // simply copy if freshly initialized
+  // otherwise started clocks are lost
+  if (this->CheckArc(loc, fileline, tc_arg)) {
+    clocks[CLOCK_USEFUL] = tc_arg->clocks[CLOCK_USEFUL];
+    clocks[CLOCK_OOMP] = tc_arg->clocks[CLOCK_OOMP];
+    clocks[CLOCK_OMPI] = tc_arg->clocks[CLOCK_OMPI];
+    return;
+  }
   clocks[CLOCK_USEFUL].OmpHBefore(tc_arg->clocks[CLOCK_USEFUL]);
   clocks[CLOCK_OOMP].OmpHBefore(tc_arg->clocks[CLOCK_OOMP]);
   clocks[CLOCK_OMPI].OmpHBefore(tc_arg->clocks[CLOCK_OMPI]);
@@ -573,9 +582,9 @@ template <class T> void syncClock<T>::OmpCReset() {
   if (!analysis_flags->running)
     return;
   UniqLock<T> lock(scMutex);
-  clocks[CLOCK_USEFUL].Reset(-1e50);
-  clocks[CLOCK_OMPI].Reset(-1e50);
-  clocks[CLOCK_OOMP].Reset(-1e50);
+  clocks[CLOCK_USEFUL].Reset(0);
+  clocks[CLOCK_OMPI].Reset(0);
+  clocks[CLOCK_OOMP].Reset(0);
   sync_state = STATE_INIT;
 }
 
