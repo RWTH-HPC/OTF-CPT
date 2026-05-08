@@ -72,7 +72,7 @@ IF(CMAKE_Fortran_COMPILER)
 ENDIF()
 
 
-add_subdirectory(datastructures)
+add_subdirectory(mpi-handle-tracking)
 add_subdirectory(mpi-only)
 
 add_subdirectory(containers)
