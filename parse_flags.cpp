@@ -173,10 +173,6 @@ void OtfcptFlags::SetDefaults() {
 #undef PARSE_FLAG
 }
 
-void OtfcptFlags::CopyFrom(const OtfcptFlags &other) {
-  memcpy(this, &other, sizeof(*this));
-}
-
 static void RegisterOtfcptFlags(FlagParser *parser, OtfcptFlags *f){
 #define PARSE_FLAG(Type, Name, DefaultValue, Description)                      \
   RegisterFlag(parser, #Name, Description, &f->Name);
