@@ -11,7 +11,7 @@ jobs:
         name: Formatting Check
         runs-on: ubuntu-latest
         steps:
-        - uses: actions/checkout@v4
+        - uses: actions/checkout@v6
         - name: Run clang-format style check for C/C++/Protobuf programs.
           uses: jidicula/clang-format-action@v4.15.0
           with:
@@ -46,7 +46,7 @@ jobs:
                     enable_fortran_tests: true
         steps:
             - name: Checkout code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: Install common packages
               run: |

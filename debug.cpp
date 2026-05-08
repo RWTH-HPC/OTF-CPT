@@ -1,4 +1,6 @@
 #include "debug.h"
+
+#include "containers.h"
 #include "parse_flags.h"
 #include "typedefs.h"
 #include <execinfo.h>
