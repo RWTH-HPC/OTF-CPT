@@ -1,7 +1,6 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
-#include "containers.h"
 #include "typedefs.h"
 #include <initializer_list>
 #include <mutex>
@@ -100,6 +99,7 @@ void CheckFailed(const char *file, int line, const char *cond, u64 v1, u64 v2,
 #define DCHECK_EQ_VA(a, b, ...) CHECK_EQ_VA(a, b, __VA_ARGS__)
 #else
 #define DCHECK(a)
+#define DCHECK_NOT(a)
 #define DCHECK_EQ(a, b)
 #define DCHECK_NE(a, b)
 #define DCHECK_LT(a, b)
