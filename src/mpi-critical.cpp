@@ -143,9 +143,9 @@ void init_timer_offsets() {
   Vector<double> localTimes, allTimes;
   double localTime, endTime, remoteTime;
 
-  timeOffsets.Resize(size);
-  localTimes.Resize(NTIMES);
-  allTimes.Resize(size * NTIMES);
+  timeOffsets.resize(size);
+  localTimes.resize(NTIMES);
+  allTimes.resize(size * NTIMES);
 
   for (int i = 0; i < NTIMES; i++) {
     if (rank == 0) {

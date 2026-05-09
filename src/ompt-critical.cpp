@@ -80,7 +80,7 @@ template <typename T> struct DataPool final {
 #endif
   int getTotal() { return total; }
   int getMissing() {
-    return total - DataPointer.Size() - RemoteDataPointer.Size();
+    return total - DataPointer.size() - RemoteDataPointer.size();
   }
 
   // fill the pool by allocating a page of memory
@@ -88,7 +88,7 @@ template <typename T> struct DataPool final {
     if (remote > 0) {
       const std::lock_guard<std::mutex> lock(DPMutex);
       // DataPointer is empty, so just swap the vectors
-      DataPointer.Swap(RemoteDataPointer);
+      DataPointer.swap(RemoteDataPointer);
       remote = 0;
       return;
     }
@@ -100,9 +100,9 @@ template <typename T> struct DataPool final {
     if (ndatas < 4)
       ndatas = 4;
     char *datas = (char *)malloc(ndatas * paddedSize);
-    memory.PushBack(datas);
+    memory.push_back(datas);
     for (int i = 0; i < ndatas; i++) {
-      DataPointer.PushBack(new (datas + i * paddedSize) T(this));
+      DataPointer.push_back(new (datas + i * paddedSize) T(this));
     }
     total += ndatas;
   }
@@ -110,16 +110,16 @@ template <typename T> struct DataPool final {
   // get data from the pool
   T *getData() {
     T *ret;
-    if (DataPointer.Empty())
+    if (DataPointer.empty())
       newDatas();
-    ret = DataPointer.Back();
-    DataPointer.PopBack();
+    ret = DataPointer.back();
+    DataPointer.pop_back();
     return ret;
   }
 
   // accesses to the thread-local datapool don't need locks
   void returnOwnData(T *data) {
-    DataPointer.PushBack(data);
+    DataPointer.push_back(data);
 #ifdef DEBUG_DATA
     localReturn++;
 #endif
@@ -128,7 +128,7 @@ template <typename T> struct DataPool final {
   // returning to a remote datapool using lock
   void returnData(T *data) {
     const std::lock_guard<std::mutex> lock(DPMutex);
-    RemoteDataPointer.PushBack(data);
+    RemoteDataPointer.push_back(data);
     remote++;
 #ifdef DEBUG_DATA
     remoteReturn++;
@@ -482,8 +482,8 @@ static void ompt_tsan_thread_begin(ompt_thread_t thread_type,
   thread_data->ptr = thread_local_clock;
   {
     const std::lock_guard<std::mutex> lock(tcmutex);
-    thread_clocks->PushBack(thread_local_clock);
-    thread_counts->PushBack(omptThreadCount);
+    thread_clocks->push_back(thread_local_clock);
+    thread_counts->push_back(omptThreadCount);
   }
   if (thread_type == ompt_thread_initial)
     thread_local_clock->enterState(STATE_OMP, __func__);
@@ -986,7 +986,7 @@ static void ompt_tsan_dependences(ompt_data_t *task_data,
         (TaskDependency *)malloc(sizeof(TaskDependency) * ndeps);
     Data->DependencyCount = ndeps;
     for (int i = 0; i < ndeps; i++) {
-      auto ret = Data->Parent->DependencyMap->Insert(
+      auto ret = Data->Parent->DependencyMap->insert(
           Pair<void *, DependencyData *>({deps[i].variable.ptr, nullptr}));
       if (ret.second) {
         ret.first->second = DependencyData::New();
@@ -1018,7 +1018,7 @@ static void ompt_tsan_mutex_acquired(ompt_mutex_t kind, ompt_wait_id_t wait_id,
   // 2. the next acquire doesn't start before we have finished our release.
   LocksMutex.lock();
   auto InsertPair =
-      Locks.Insert(Pair<ompt_wait_id_t, Pair<std::mutex, ompt_tsan_clockid> *>(
+      Locks.insert(Pair<ompt_wait_id_t, Pair<std::mutex, ompt_tsan_clockid> *>(
           {wait_id, nullptr}));
   if (InsertPair.second) { // true on successfull insertion
     InsertPair.first->second = new Pair<std::mutex, ompt_tsan_clockid>();

@@ -6,12 +6,11 @@
 #endif
 
 #include <atomic>
-#include <cstdlib>
-#include <cstring>
 #include <inttypes.h>
 #include <mutex>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/resource.h>
 #include <unistd.h>
 
@@ -378,12 +377,12 @@ template <class T> struct threadClock : public syncClock<T>, MPI_COUNTS {
               bool _openmp_thread = false)
       : SYNC_CLOCK(_useful_computation), thread_id(threadid),
         openmp_thread(_openmp_thread) {
-    clock_state_stack.PushBack({STATE_INIT, __PRETTY_FUNCTION__});
+    clock_state_stack.push_back({STATE_INIT, __PRETTY_FUNCTION__});
   }
   threadClock() {}
   threadClock(const threadClock &other) : threadClock(my_next_id(), 0) {
     if (other.GetState() != STATE_INIT)
-      clock_state_stack.PushBack(other.GetStateEntry());
+      clock_state_stack.push_back(other.GetStateEntry());
     clocks[CLOCK_USEFUL] = other.clocks[CLOCK_USEFUL];
     clocks[CLOCK_OMPI] = other.clocks[CLOCK_OMPI];
     clocks[CLOCK_OOMP] = other.clocks[CLOCK_OOMP];
@@ -428,7 +427,7 @@ template <class T> struct threadClock : public syncClock<T>, MPI_COUNTS {
       return;
     CLOCK_DEBUG(this, loc, __func__);
     SwitchState(GetState(), cs, time, loc);
-    clock_state_stack.PushBack({cs, loc});
+    clock_state_stack.push_back({cs, loc});
   }
 
   void exitState(const char *loc = NULL, bool isRunning = true) {
@@ -450,10 +449,10 @@ template <class T> struct threadClock : public syncClock<T>, MPI_COUNTS {
     CLOCK_DEBUG(this, loc, __func__);
     ClockState old_cs = GetState();
     // Having STATE_INIT as anything but the bottom most element is invalid
-    DCHECK_OR(clock_state_stack.Size() > 1, old_cs == STATE_INIT);
+    DCHECK_OR(clock_state_stack.size() > 1, old_cs == STATE_INIT);
     if (old_cs == STATE_INIT)
       return;
-    clock_state_stack.PopBack();
+    clock_state_stack.pop_back();
     SwitchState(old_cs, GetState(), time, loc);
   }
 
@@ -464,15 +463,15 @@ template <class T> struct threadClock : public syncClock<T>, MPI_COUNTS {
       return;
     CLOCK_DEBUG(this, loc, __func__);
     SwitchState(GetState(), cs, time, loc);
-    clock_state_stack.Back() = {cs, loc};
+    clock_state_stack.back() = {cs, loc};
   }
 
   void resetState() {
     for (int i = CLOCK_USEFUL; i < CLOCK_LAST; i++)
       clocks[i].Reset(0);
 
-    clock_state_stack.Reset();
-    clock_state_stack.PushBack({STATE_INIT, __PRETTY_FUNCTION__});
+    clock_state_stack.reset();
+    clock_state_stack.push_back({STATE_INIT, __PRETTY_FUNCTION__});
   }
 
   bool compareState(ClockState cs) const { return GetState() == cs; }

@@ -114,41 +114,8 @@ if(HAVE_PMPI_ISENDRECV_REPLACE)
     add_definitions(-DHAVE_ISRR)
 endif()
 
-include_directories(${OTFCPT_SOURCE_DIR} ${MPI_C_INCLUDE_PATH} ${MPI_CXX_INCLUDE_PATH})
-
-set(OTFCPT_SOURCES
-    completion-wrappers.cpp
-    critical-core.cpp
-    man-wrappers.cpp
-    mpi-critical.cpp
-    ompt-critical.cpp
-    tracking.cpp
-    gen-nb-wrappers.cpp
-    gen-wrappers.cpp
-    parse_flags.cpp
-    debug.cpp
-)
-
-set(OTFCPT_OMP_SOURCES
-    critical-core.cpp
-    ompt-critical.cpp
-    parse_flags.cpp
-    debug.cpp
-)
-
-if(OTFCPT_ENABLE_FORTRAN_WRAPPERS)
-    add_definitions(-DFORTRAN_SUPPORT)
-    list(APPEND OTFCPT_SOURCES fort-wrappers.c)
-endif()
-
-option(OTFCPT_DEBUG_CLOCKS "Detailed clock printing at every sync point" OFF)
-if (OTFCPT_DEBUG_CLOCKS)
-  add_compile_definitions(-DDEBUG_CLOCKS)
-endif()
-
 list(APPEND GnuCompatible "Clang" "IntelLLVM" "GNU")
 list(APPEND ClangCompatible "Clang" "IntelLLVM")
-option(OTFCPT_USE_BACKWARD "Use Backward-CPP for stacktraces" OFF)
 if ("${CMAKE_CXX_COMPILER_ID}" IN_LIST GnuCompatible)
   set(NOSTDLIB_FLAG "-nostdlib++")
   if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 13)
@@ -163,10 +130,6 @@ if ("${CMAKE_CXX_COMPILER_ID}" IN_LIST GnuCompatible)
       message(STATUS "Building with LLVM libc++ was requested, which might limit portability and compatibility with application/library code compiled with gcc.")
       set(STDCPLUS_COMPILE_FLAGS -stdlib=libc++)
       set(STDCPLUS_LINK_FLAGS -stdlib=libc++)
-      if(OTFCPT_USE_BACKWARD)
-        set(LINK_EXTERNAL_LIBRARIES Backward::Interface)
-        add_compile_definitions(-DUSE_BACKWARD)
-      endif()
       add_compile_definitions(-DUSE_STL)
     else ()
       message(STATUS "For portability, OTF-CPT is built without dependency to a C++ runtime library")
@@ -184,72 +147,22 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   include_directories(external/ompt)
 endif()
 
-option(OTFCPT_USE_GNU_LIBCPP "Use GNU libstdc++, which might reduce portability." OFF)
-if (OTFCPT_USE_GNU_LIBCPP)
-  if (OTFCPT_USE_LLVM_LIBCPP)
-    message(WARNING "OTFCPT_USE_GNU_LIBCPP and OTFCPT_USE_LLVM_LIBCPP are on at the same time, will build with GNU libstdc++")
-  endif()
-  if ("${CMAKE_CXX_COMPILER_ID}" IN_LIST ClangCompatible)
-    set(STDCPLUS_COMPILE_FLAGS -stdlib=libstdc++)
-    set(STDCPLUS_LINK_FLAGS -stdlib=libstdc++)
-  else()
-    set(STDCPLUS_COMPILE_FLAGS "")
-    set(STDCPLUS_LINK_FLAGS "")
-  endif()
-  add_compile_definitions(-DUSE_STL)
-  if (OTFCPT_USE_BACKWARD)
-    add_compile_definitions(-DUSE_BACKWARD)
-    set(LINK_EXTERNAL_LIBRARIES Backward::Interface)
-  endif()
-else()
-  if(OTFCPT_USE_BACKWARD AND NOT OTFCPT_USE_LLVM_LIBCPP)
-    message(WARNING "OTFCPT_USE_GNU_LIBCPP or OTFCPT_USE_LLVM_LIBCPP should be enabled in order to use BackwardCPP, ignoring.")
-  endif()
-endif()
-
 set(WRAP_FLAGS -s -n)
 
 if(OTFCPT_ENABLE_FORTRAN_WRAPPERS)
   set(WRAP_FLAGS -n -f)
 endif()
 
-if (OTFCPT_USE_BACKWARD)
-  add_subdirectory(${CMAKE_SOURCE_DIR}/external/backward-cpp)
+option(OTFCPT_USE_BACKWARD "Use Backward-CPP for stacktraces" OFF)
+if(OTFCPT_USE_BACKWARD)
+  add_subdirectory(external/backward-cpp)
 endif()
-
-add_wrapped_file(gen-nb-wrappers.cpp gen-nb-wrappers.w)
-add_wrapped_file(gen-wrappers.cpp gen-wrappers.w)
-
-add_library(OTFCPT SHARED ${OTFCPT_SOURCES})
-target_link_libraries(OTFCPT PUBLIC MPI::MPI_CXX ${LINK_EXTERNAL_LIBRARIES})
-target_compile_definitions(OTFCPT PUBLIC -DUSE_MPI=1)
-target_link_options(OTFCPT PUBLIC "$<$<COMPILE_LANGUAGE:CXX>:${STDCPLUS_LINK_FLAGS}>" "LINKER:-as-needed")
-target_compile_options(OTFCPT PUBLIC "$<$<COMPILE_LANGUAGE:CXX>:${STDCPLUS_COMPILE_FLAGS}>")
-
-add_library(OTFCPT_omp SHARED ${OTFCPT_OMP_SOURCES})
-target_link_libraries(OTFCPT_omp PUBLIC ${LINK_EXTERNAL_LIBRARIES})
-target_link_options(OTFCPT_omp PUBLIC ${STDCPLUS_LINK_FLAGS} "LINKER:-as-needed")
-target_compile_options(OTFCPT_omp PUBLIC ${STDCPLUS_COMPILE_FLAGS})
-
-add_library(OTFCPT_static STATIC ${OTFCPT_SOURCES})
-target_link_libraries(OTFCPT_static PUBLIC MPI::MPI_CXX ${LINK_EXTERNAL_LIBRARIES})
-target_compile_definitions(OTFCPT_static PUBLIC -DUSE_MPI=1)
-target_link_options(OTFCPT_static PUBLIC ${STDCPLUS_LINK_FLAGS})
-target_compile_options(OTFCPT_static PUBLIC ${STDCPLUS_COMPILE_FLAGS})
-
-add_library(KMPC SHARED kmpc-intercept.c)
 
 if (EXISTS ${CMAKE_CURRENT_LIST_DIR}/external/FileCheck/CMakeLists.txt)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/external/FileCheck EXCLUDE_FROM_ALL)
 endif()
 
+add_subdirectory(src)
 add_subdirectory(tests)
-
-
-install(TARGETS 
-        OTFCPT 
-        OTFCPT_omp
-        OTFCPT_static
-        )
 
 install (PROGRAMS script/CPT-plot.py DESTINATION bin)

@@ -1,4 +1,5 @@
 add_definitions(-DOMPI_SKIP_MPICXX)
+include_directories(../../include)
 
 add_executable(test test.cpp)
 target_link_libraries(test PUBLIC MPI::MPI_CXX)

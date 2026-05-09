@@ -40,6 +40,10 @@ public:
     return false;
   }
 
+  void *operator new(size_t size) { return malloc(size); }
+
+  void operator delete(void *p) { free(p); }
+
 protected:
   ~FlagHandlerBase() {}
 
@@ -48,9 +52,6 @@ protected:
     return num_symbols_should_write < size;
   }
 
-  void *operator new(size_t size) { return malloc(size); }
-
-  void operator delete(void *p) { free(p); }
   friend FlagParser;
 };
 

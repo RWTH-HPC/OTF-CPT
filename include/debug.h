@@ -5,13 +5,6 @@
 #include <initializer_list>
 #include <mutex>
 
-#ifdef USE_BACKWARD
-#define SKIP_FRAMES 5
-#include <external/backward-cpp/backward.hpp>
-#include <ostream>
-#include <sstream>
-#endif
-
 #define CALLSTACK_SIZE 32
 #define DBG_BUFFER_SIZE 12288
 
@@ -26,7 +19,7 @@ inline int Verbosity() {
   return current_verbosity.load(std::memory_order_relaxed);
 }
 
-void print_stack();
+void PrintStack();
 
 void NORETURN Die();
 

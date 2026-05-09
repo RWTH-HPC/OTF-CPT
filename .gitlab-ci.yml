@@ -98,7 +98,7 @@ stages:
     - !reference [.setup-python-env, script]
     - EXIT_CODE=0
     - cmake --build build --verbose -- check || EXIT_CODE=$?
-    - ldd build/libOTFCPT.so | grep -q "libstdc++" && echo -e "\e[1;31mFound libstdc++ dependency, failure\e[0m" && exit 1
+    - ldd build/src/libOTFCPT.so | grep -q "libstdc++" && echo -e "\e[1;31mFound libstdc++ dependency, failure\e[0m" && exit 1
     - exit $EXIT_CODE
 
 ubuntu:
@@ -190,8 +190,8 @@ cluster:
       - !reference [.setup-python-env, script]
       - EXIT_CODE=0
       - time cmake --build build --verbose -- check || EXIT_CODE=$?
-      - ldd build/libOTFCPT.so
-      - ldd build/libOTFCPT.so | grep -q 'libstdc++' && echo "Error libstdc++ linked" && exit 1 || echo "Info No libstdc++ dependency found"
+      - ldd build/src/libOTFCPT.so
+      - ldd build/src/libOTFCPT.so | grep -q 'libstdc++' && echo "Error libstdc++ linked" && exit 1 || echo "Info No libstdc++ dependency found"
       - exit $EXIT_CODE
     artifacts:
       reports:

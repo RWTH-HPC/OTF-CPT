@@ -99,7 +99,7 @@ void FlagParser::parse_flag(const char *env_option_name) {
 
   bool res = run_handler(name, value);
   free(name);
-  pointers.PushBack(value);
+  pointers.push_back(value);
   if (!res)
     fatal_error("Flag parsing failed.");
 }

@@ -76,22 +76,17 @@
 
 #define NOINLINE __attribute__((noinline))
 
+#include "containers.h"
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
 #include <iterator>
 #include <limits>
 #include <new>
-#include <sstream>
-#include <streambuf>
-#include <string>
-#include <vector>
+#include <utility> // for std::swap
 
 #if defined(BACKWARD_SYSTEM_LINUX)
 
@@ -411,13 +406,128 @@ extern "C" uintptr_t _Unwind_GetIPInfo(_Unwind_Context *, int *);
 #include <libunwind.h>
 #endif // BACKWARD_HAS_LIBUNWIND == 1
 
+// 'replaces' cxa_static_guard
+inline std::mutex staticGuard;
+
 #ifdef BACKWARD_ATLEAST_CXX11
-#include <unordered_map>
-#include <utility> // for std::swap
+/**
+ * @brief Reads a line from @p is into @p str, using the stream’s internal
+ * buffer.
+ *
+ * The algorithm mirrors the one used by the standard library:
+ *   1. Obtain the streambuf* of the istream.
+ *   2. Repeatedly inspect the current buffer (sbumpc / sgetc) and look for @p
+ * delim.
+ *   3. When a buffer segment contains the delimiter we copy the whole chunk at
+ * once.
+ *   4. If the buffer is exhausted before the delimiter is found we call
+ * underflow() to fetch the next chunk.
+ *
+ * @param is   Input stream.
+ * @param str  Destination String (cleared before use).
+ * @param delim Delimiter character – default ‘\\n’.
+ * @return Reference to the stream (enables the usual while(getline(...))
+ * idiom).
+ */
+IStream &getline(IStream &is, String &str, char delim = '\n') {
+  str.clear(); // start with an empty string
+
+  // --------------------------------------------------------------
+  // 1. Quick bail‑out if the stream is already in a bad state.
+  // --------------------------------------------------------------
+  if (!is) {
+    is.setstate(std::ios::failbit);
+    return is;
+  }
+
+  // Cast the stream‑buffer to our accessor (the underlying object *is*
+  // still a std::streambuf, we only add a different view on it).
+  StreamBuf *sb = is.rdbuf();
+  std::size_t nread = 0; // number of characters we have stored
+
+  for (;;) {
+    // --------------------------------------------------------------
+    // 2. Get a pointer to the current read area.
+    //    sb->gptr(): pointer to the next character to read.
+    //    sb->egptr(): pointer one‑past‑the‑last character in the buffer.
+    // --------------------------------------------------------------
+    const char *start = sb->gptr();
+    const char *end = sb->egptr();
+
+    // If the buffer is empty we must ask the stream for more data.
+    if (start == end) {
+      // Try to underflow – i.e. fetch a new buffer.
+      int c = sb->sgetc(); // does not consume the character
+      if (c == EOF) {      // nothing left (EOF or error)
+        // No characters have been read at all → failbit
+        if (nread == 0)
+          is.setstate(std::ios::failbit | std::ios::eofbit);
+        else
+          is.setstate(std::ios::eofbit); // we have data, just signal EOF
+        break;
+      }
+      // Underflow succeeded – now we have at least one character in the buffer.
+      // Loop again so that start/end are recomputed.
+      continue;
+    }
+
+    // --------------------------------------------------------------
+    // 3. Scan the current buffer segment for the delimiter.
+    //    std::memchr is a very fast C‑library routine.
+    // --------------------------------------------------------------
+    const std::size_t avail = static_cast<std::size_t>(end - start);
+    const void *loc = std::memchr(start, delim, avail);
+
+    if (loc != nullptr) {
+      // ----------------------------------------------------------
+      //   Delimiter found inside the current buffer.
+      //   We copy everything up to (but not including) the delimiter
+      //   in one go, advance the buffer pointer past the delimiter,
+      //   and finish successfully.
+      // ----------------------------------------------------------
+      const char *delimPos = static_cast<const char *>(loc);
+      const std::size_t toCopy = static_cast<std::size_t>(delimPos - start);
+
+      // Append the whole chunk to MyString in a single operation.
+      // MyString does not have a bulk‑append yet, so we copy manually.
+      for (std::size_t i = 0; i < toCopy; ++i)
+        str.push_back(start[i]);
+      nread += toCopy;
+
+      // Move the get‑pointer past the delimiter.
+      sb->gbump(static_cast<int>(toCopy + 1)); // +1 skips the delim
+      break;                                   // line completed
+    } else {
+      // ----------------------------------------------------------
+      //   No delimiter in this buffer segment.
+      //   Copy the whole segment, then consume it and ask for more.
+      // ----------------------------------------------------------
+      for (const char *p = start; p != end; ++p)
+        str.push_back(*p);
+      nread += avail;
+
+      // Advance the buffer pointer to the end of the segment.
+      sb->gbump(static_cast<int>(avail));
+
+      // Loop again – the next iteration will call underflow() if needed.
+    }
+  }
+
+  // --------------------------------------------------------------
+  // 4. The standard requires that, on success, the stream’s failbit is clear.
+  //    It may already have eofbit set if we stopped because we hit EOF.
+  // --------------------------------------------------------------
+  if (is.good() && !is.eof())
+    is.clear(is.rdstate() & ~std::ios::failbit); // clear possible failbit
+
+  return is;
+}
+
 namespace backward {
 namespace details {
+
 template <typename K, typename V> struct hashtable {
-  typedef std::unordered_map<K, V> type;
+  typedef CompactHashMap<K, V> type;
 };
 using std::move;
 } // namespace details
@@ -524,7 +634,7 @@ template <typename R, typename T, R (*F)(T)> struct deleter {
 };
 
 template <typename T> struct default_delete {
-  void operator()(T &ptr) const { delete ptr; }
+  void operator()(T &ptr) const { free(ptr); }
 };
 
 template <typename T, typename Deleter = deleter<void, void *, &::free>>
@@ -615,15 +725,15 @@ public:
 
 // Default demangler implementation (do nothing).
 template <typename TAG> struct demangler_impl {
-  static std::string demangle(const char *funcname) { return funcname; }
+  static String demangle(const char *funcname) { return funcname; }
 };
 
-#if defined(BACKWARD_SYSTEM_LINUX) || defined(BACKWARD_SYSTEM_DARWIN)
+#if defined(USE_STL) &&                                                        \
+    (defined(BACKWARD_SYSTEM_LINUX) || defined(BACKWARD_SYSTEM_DARWIN))
 
 template <> struct demangler_impl<system_tag::current_tag> {
   demangler_impl() : _demangle_buffer_length(0) {}
-
-  std::string demangle(const char *funcname) {
+  String demangle(const char *funcname) {
     using namespace details;
     char *result = abi::__cxa_demangle(funcname, _demangle_buffer.get(),
                                        &_demangle_buffer_length, nullptr);
@@ -651,12 +761,12 @@ struct demangler : public demangler_impl<system_tag::current_tag> {};
 //   "/a/b/c"        --> ["/a/b/c"]
 //   "/a/b/c:/d/e/f" --> ["/a/b/c","/d/e/f"]
 //   etc.
-inline std::vector<std::string> split_source_prefixes(const std::string &s) {
-  std::vector<std::string> out;
+inline Vector<String> split_source_prefixes(const String &s) {
+  Vector<String> out;
   size_t last = 0;
   size_t next = 0;
   size_t delimiter_size = sizeof(kBackwardPathDelimiter) - 1;
-  while ((next = s.find(kBackwardPathDelimiter, last)) != std::string::npos) {
+  while ((next = s.find(kBackwardPathDelimiter, last)) != String::npos) {
     out.push_back(s.substr(last, next - last));
     last = next + delimiter_size;
   }
@@ -682,8 +792,8 @@ struct Trace {
 struct ResolvedTrace : public Trace {
 
   struct SourceLoc {
-    std::string function;
-    std::string filename;
+    String function;
+    String filename;
     unsigned line;
     unsigned col;
 
@@ -698,11 +808,11 @@ struct ResolvedTrace : public Trace {
   };
 
   // In which binary object this trace is located.
-  std::string object_filename;
+  String object_filename;
 
   // The function in the object that contain the trace. This is not the same
   // as source.function which can be an function inlined in object_function.
-  std::string object_function;
+  String object_function;
 
   // The source location of this trace. It is possible for filename to be
   // empty and for line/col to be invalid (value 0) if this information
@@ -713,7 +823,7 @@ struct ResolvedTrace : public Trace {
   // An optionals list of "inliners". All the successive sources location
   // from where the source location of the trace (the attribute right above)
   // is inlined. It is especially useful when you compiled with optimization.
-  typedef std::vector<SourceLoc> source_locs_t;
+  typedef Vector<SourceLoc> source_locs_t;
   source_locs_t inliners;
 
   ResolvedTrace() : Trace() {}
@@ -803,7 +913,7 @@ public:
   }
 
 protected:
-  std::vector<void *> _stacktrace;
+  Vector<void *> _stacktrace;
 };
 
 #if BACKWARD_HAS_UNWIND == 1
@@ -1264,6 +1374,10 @@ class TraceResolverImplBase {
 public:
   virtual ~TraceResolverImplBase() {}
 
+  static void *operator new(std::size_t n) { return malloc(n); }
+  static void operator delete(void *p) noexcept { free(p); }
+  static void operator delete(void *p, std::size_t) noexcept { free(p); }
+
   virtual void load_addresses(void *const *addresses, int address_count) {
     (void)addresses;
     (void)address_count;
@@ -1276,7 +1390,7 @@ public:
   virtual ResolvedTrace resolve(ResolvedTrace t) { return t; }
 
 protected:
-  std::string demangle(const char *funcname) {
+  String demangle(const char *funcname) {
     return _demangler.demangle(funcname);
   }
 
@@ -1300,10 +1414,10 @@ class TraceResolverLinuxBase : public TraceResolverImplBase {
 public:
   TraceResolverLinuxBase()
       : argv0_(get_argv0()), exec_path_(read_symlink("/proc/self/exe")) {}
-  std::string resolve_exec_path(Dl_info &symbol_info) const {
+  String resolve_exec_path(Dl_info &symbol_info) const {
     // mutates symbol_info.dli_fname to be filename to open and returns filename
     // to display
-    if (symbol_info.dli_fname == argv0_) {
+    if (argv0_ == symbol_info.dli_fname) {
       // dladdr returns argv[0] in dli_fname for symbols contained in
       // the main executable, which is not a valid path if the
       // executable was found by a search of the PATH environment
@@ -1324,18 +1438,18 @@ public:
   }
 
 private:
-  std::string argv0_;
-  std::string exec_path_;
+  String argv0_;
+  String exec_path_;
 
-  static std::string get_argv0() {
-    std::string argv0;
-    std::ifstream ifs("/proc/self/cmdline");
-    std::getline(ifs, argv0, '\0');
+  static String get_argv0() {
+    String argv0;
+    IFStream ifs("/proc/self/cmdline");
+    getline(ifs, argv0, '\0');
     return argv0;
   }
 
-  static std::string read_symlink(std::string const &symlink_path) {
-    std::string path;
+  static String read_symlink(String const &symlink_path) {
+    String path;
     path.resize(100);
 
     while (true) {
@@ -1347,7 +1461,7 @@ private:
       if (static_cast<size_t>(len) == path.size()) {
         path.resize(path.size() * 2);
       } else {
-        path.resize(static_cast<std::string::size_type>(len));
+        path.resize(static_cast<String::size_type>(len));
         break;
       }
     }
@@ -1608,10 +1722,10 @@ private:
     bfd_symtab_t dynamic_symtab;
   };
 
-  typedef details::hashtable<std::string, bfd_fileobject>::type fobj_bfd_map_t;
+  typedef details::hashtable<String, bfd_fileobject>::type fobj_bfd_map_t;
   fobj_bfd_map_t _fobj_bfd_map;
 
-  bfd_fileobject *load_object_with_bfd(const std::string &filename_object) {
+  bfd_fileobject *load_object_with_bfd(const String &filename_object) {
     using namespace details;
 
     if (!_bfd_loaded) {
@@ -1825,7 +1939,7 @@ public:
 
     if (!_dwfl_handle_initialized) {
       // initialize dwfl...
-      _dwfl_cb.reset(new Dwfl_Callbacks);
+      _dwfl_cb.reset(new (malloc(sizeof(Dwfl_Callbacks))) Dwfl_Callbacks);
       _dwfl_cb->find_elf = &dwfl_linux_proc_find_elf;
       _dwfl_cb->find_debuginfo = &dwfl_standard_find_debuginfo;
       _dwfl_cb->debuginfo_path = 0;
@@ -2231,7 +2345,7 @@ public:
     // allocates a copy for the caller. We keep that copy alive in a cache
     // and we deallocate it later when it's no longer required.
     die_cache_entry &die_object = get_die_cache(fobj, die);
-    if (die_object.isEmpty())
+    if (die_object.isempty())
       return trace; // We have no line section for this DIE
 
     die_linemap_t::iterator it = die_object.line_section.lower_bound(address);
@@ -2258,7 +2372,7 @@ public:
 
     char *filename;
     if (dwarf_linesrc(line, &filename, &error) == DW_DLV_OK) {
-      trace.source.filename = std::string(filename);
+      trace.source.filename = String(filename);
       dwarf_dealloc(fobj.dwarf_handle.get(), filename, DW_DLA_STRING);
     }
 
@@ -2275,7 +2389,7 @@ public:
       trace.source.col = 0;
     }
 
-    std::vector<std::string> namespace_stack;
+    Vector<String> namespace_stack;
     deep_first_search_by_pc(fobj, die, address, namespace_stack,
                             inliners_search_cb(trace, fobj, die));
 
@@ -2313,7 +2427,7 @@ private:
     Dwarf_Signed line_count;
     Dwarf_Line_Context line_context;
 
-    inline bool isEmpty() {
+    inline bool isempty() {
       return line_buffer == NULL || line_count == 0 || line_context == NULL ||
              line_section.empty();
     }
@@ -2329,7 +2443,7 @@ private:
 
   typedef std::map<Dwarf_Off, die_cache_entry> die_cache_t;
 
-  typedef std::map<uintptr_t, std::string> symbol_cache_t;
+  typedef std::map<uintptr_t, String> symbol_cache_t;
 
   struct dwarf_fileobject {
     dwarf_file_t file_handle;
@@ -2342,8 +2456,7 @@ private:
     die_cache_entry *current_cu;
   };
 
-  typedef details::hashtable<std::string, dwarf_fileobject>::type
-      fobj_dwarf_map_t;
+  typedef details::hashtable<String, dwarf_fileobject>::type fobj_dwarf_map_t;
   fobj_dwarf_map_t _fobj_dwarf_map;
 
   static bool cstrings_eq(const char *a, const char *b) {
@@ -2353,7 +2466,7 @@ private:
     return strcmp(a, b) == 0;
   }
 
-  dwarf_fileobject &load_object_with_dwarf(const std::string &filename_object) {
+  dwarf_fileobject &load_object_with_dwarf(const String &filename_object) {
 
     if (!_dwarf_loaded) {
       // Set the ELF library operating version
@@ -2402,7 +2515,7 @@ private:
       return r;
     }
 
-    std::string debuglink;
+    String debuglink;
     // Iterate through the ELF sections to try to get a gnu_debuglink
     // note and also to cache the symbol table.
     // We go the preprocessor way to avoid having to create templated
@@ -2432,8 +2545,7 @@ private:
     if (cstrings_eq(section_name, ".gnu_debuglink")) {                         \
       elf_data = elf_getdata(elf_section, NULL);                               \
       if (elf_data && elf_data->d_size > 0) {                                  \
-        debuglink =                                                            \
-            std::string(reinterpret_cast<const char *>(elf_data->d_buf));      \
+        debuglink = String(reinterpret_cast<const char *>(elf_data->d_buf));   \
       }                                                                        \
     }                                                                          \
                                                                                \
@@ -2461,7 +2573,7 @@ private:
     for (size_t i = 0; i < symbol_count; ++i) {                                \
       int type = ELF##ARCH##_ST_TYPE(symbol->st_info);                         \
       if (type == STT_FUNC && symbol->st_value > 0) {                          \
-        r.symbol_cache[symbol->st_value] = std::string(                        \
+        r.symbol_cache[symbol->st_value] = String(                             \
             elf_strptr(elf_handle.get(), symbol_strings, symbol->st_name));    \
       }                                                                        \
       ++symbol;                                                                \
@@ -2661,10 +2773,10 @@ private:
     return found_die;
   }
 
-  static std::string get_referenced_die_name(Dwarf_Debug dwarf, Dwarf_Die die,
-                                             Dwarf_Half attr, bool global) {
+  static String get_referenced_die_name(Dwarf_Debug dwarf, Dwarf_Die die,
+                                        Dwarf_Half attr, bool global) {
     Dwarf_Error error = DW_DLE_NE;
-    std::string value;
+    String value;
 
     Dwarf_Die found_die = get_referenced_die(dwarf, die, attr, global);
 
@@ -2672,7 +2784,7 @@ private:
       char *name;
       if (dwarf_diename(found_die, &name, &error) == DW_DLV_OK) {
         if (name) {
-          value = std::string(name);
+          value = String(name);
         }
         dwarf_dealloc(dwarf, name, DW_DLA_STRING);
       }
@@ -2794,7 +2906,7 @@ private:
     return result;
   }
 
-  static void get_type(Dwarf_Debug dwarf, Dwarf_Die die, std::string &type) {
+  static void get_type(Dwarf_Debug dwarf, Dwarf_Die die, String &type) {
     Dwarf_Error error = DW_DLE_NE;
 
     Dwarf_Die child = 0;
@@ -2809,14 +2921,14 @@ private:
 
     char *name;
     if (dwarf_diename(die, &name, &error) == DW_DLV_OK) {
-      type.insert(0, std::string(name));
+      type.insert(0, String(name));
       dwarf_dealloc(dwarf, name, DW_DLA_STRING);
     } else {
       type.insert(0, "<unknown>");
     }
   }
 
-  static std::string get_type_by_signature(Dwarf_Debug dwarf, Dwarf_Die die) {
+  static String get_type_by_signature(Dwarf_Debug dwarf, Dwarf_Die die) {
     Dwarf_Error error = DW_DLE_NE;
 
     Dwarf_Sig8 signature;
@@ -2826,7 +2938,7 @@ private:
         Dwarf_Attribute attr_mem;
         if (dwarf_attr(die, DW_AT_signature, &attr_mem, &error) == DW_DLV_OK) {
           if (dwarf_formsig8(attr_mem, &signature, &error) != DW_DLV_OK) {
-            return std::string("<no type signature>");
+            return String("<no type signature>");
           }
         }
         dwarf_dealloc(dwarf, attr_mem, DW_DLA_ATTR);
@@ -2835,7 +2947,7 @@ private:
 
     Dwarf_Unsigned next_cu_header;
     Dwarf_Sig8 tu_signature;
-    std::string result;
+    String result;
     bool found = false;
 
     while (dwarf_next_cu_header_d(dwarf, 0, 0, 0, 0, 0, 0, 0, &tu_signature, 0,
@@ -2865,10 +2977,10 @@ private:
       }
     } else {
       // If we couldn't resolve the type just print out the signature
-      std::ostringstream string_stream;
+      StringStream string_stream;
       string_stream << "<0x" << std::hex << std::setfill('0');
       for (int i = 0; i < 8; ++i) {
-        string_stream << std::setw(2) << std::hex
+        string_stream << __otfcpt::setw(2) << std::hex
                       << (int)(unsigned char)(signature.signature[i]);
       }
       string_stream << ">";
@@ -2882,7 +2994,7 @@ private:
     bool is_typedef;
     bool has_type;
     bool has_name;
-    std::string text;
+    String text;
 
     type_context_t()
         : is_const(false), is_typedef(false), has_type(false), has_name(false) {
@@ -2905,7 +3017,7 @@ private:
         if (!context.text.empty()) {
           context.text.insert(0, " ");
         }
-        context.text.insert(0, std::string(name));
+        context.text.insert(0, String(name));
         dwarf_dealloc(fobj.dwarf_handle.get(), name, DW_DLA_STRING);
       }
     } else {
@@ -2935,8 +3047,7 @@ private:
           // in .debug_types, so we need to load the DIE pointed
           // at by the signature and resolve it
           if (has_attr) {
-            std::string type =
-                get_type_by_signature(fobj.dwarf_handle.get(), die);
+            String type = get_type_by_signature(fobj.dwarf_handle.get(), die);
             if (context.is_const)
               type.insert(0, "const ");
 
@@ -3007,13 +3118,12 @@ private:
   }
 
   // Resolve the function return type and parameters
-  static void set_function_parameters(std::string &function_name,
-                                      std::vector<std::string> &ns,
+  static void set_function_parameters(String &function_name, Vector<String> &ns,
                                       dwarf_fileobject &fobj, Dwarf_Die die) {
     Dwarf_Debug dwarf = fobj.dwarf_handle.get();
     Dwarf_Error error = DW_DLE_NE;
     Dwarf_Die current_die = 0;
-    std::string parameters;
+    String parameters;
     bool has_spec = true;
     // Check if we have a spec DIE. If we do we use it as it contains
     // more information, like parameter names.
@@ -3023,8 +3133,8 @@ private:
       spec_die = die;
     }
 
-    std::vector<std::string>::const_iterator it = ns.begin();
-    std::string ns_name;
+    Vector<String>::const_iterator it = ns.begin();
+    String ns_name;
     for (it = ns.begin(); it < ns.end(); ++it) {
       ns_name.append(*it).append("::");
     }
@@ -3035,8 +3145,7 @@ private:
 
     // See if we have a function return type. It can be either on the
     // current die or in its spec one (usually true for inlined functions)
-    std::string return_type =
-        get_referenced_die_name(dwarf, die, DW_AT_type, true);
+    String return_type = get_referenced_die_name(dwarf, die, DW_AT_type, true);
     if (return_type.empty()) {
       return_type = get_referenced_die_name(dwarf, spec_die, DW_AT_type, true);
     }
@@ -3107,7 +3216,7 @@ private:
   // defined here because in C++98, template function cannot take locally
   // defined types... grrr.
   struct inliners_search_cb {
-    void operator()(Dwarf_Die die, std::vector<std::string> &ns) {
+    void operator()(Dwarf_Die die, Vector<String> &ns) {
       Dwarf_Error error = DW_DLE_NE;
       Dwarf_Half tag_value;
       Dwarf_Attribute attr_mem;
@@ -3121,7 +3230,7 @@ private:
         if (!trace.source.function.empty())
           break;
         if (dwarf_diename(die, &name, &error) == DW_DLV_OK) {
-          trace.source.function = std::string(name);
+          trace.source.function = String(name);
           dwarf_dealloc(dwarf, name, DW_DLA_STRING);
         } else {
           // We don't have a function name in this DIE.
@@ -3169,7 +3278,7 @@ private:
         ResolvedTrace::SourceLoc sloc;
 
         if (dwarf_diename(die, &name, &error) == DW_DLV_OK) {
-          sloc.function = std::string(name);
+          sloc.function = String(name);
           dwarf_dealloc(dwarf, name, DW_DLA_STRING);
         } else {
           // We don't have a name for this inlined DIE, it could
@@ -3182,7 +3291,7 @@ private:
 
         set_function_parameters(sloc.function, ns, fobj, die);
 
-        std::string file = die_call_file(dwarf, die, cu_die);
+        String file = die_call_file(dwarf, die, cu_die);
         if (!file.empty())
           sloc.filename = file;
 
@@ -3280,7 +3389,7 @@ private:
   template <typename CB>
   static bool deep_first_search_by_pc(dwarf_fileobject &fobj,
                                       Dwarf_Die parent_die, Dwarf_Addr pc,
-                                      std::vector<std::string> &ns, CB cb) {
+                                      Vector<String> &ns, CB cb) {
     Dwarf_Die current_die = 0;
     Dwarf_Debug dwarf = fobj.dwarf_handle.get();
     Dwarf_Error error = DW_DLE_NE;
@@ -3300,7 +3409,7 @@ private:
           char *ns_name = NULL;
           if (dwarf_diename(current_die, &ns_name, &error) == DW_DLV_OK) {
             if (ns_name) {
-              ns.push_back(std::string(ns_name));
+              ns.push_back(String(ns_name));
             } else {
               ns.push_back("<unknown>");
             }
@@ -3365,13 +3474,13 @@ private:
     return branch_has_pc;
   }
 
-  static std::string die_call_file(Dwarf_Debug dwarf, Dwarf_Die die,
-                                   Dwarf_Die cu_die) {
+  static String die_call_file(Dwarf_Debug dwarf, Dwarf_Die die,
+                              Dwarf_Die cu_die) {
     Dwarf_Attribute attr_mem;
     Dwarf_Error error = DW_DLE_NE;
     Dwarf_Unsigned file_index;
 
-    std::string file;
+    String file;
 
     if (dwarf_attr(die, DW_AT_call_file, &attr_mem, &error) == DW_DLV_OK) {
       if (dwarf_formudata(attr_mem, &file_index, &error) != DW_DLV_OK) {
@@ -3388,7 +3497,7 @@ private:
       if (dwarf_srcfiles(cu_die, &srcfiles, &file_count, &error) == DW_DLV_OK) {
         if (file_count > 0 &&
             file_index <= static_cast<Dwarf_Unsigned>(file_count)) {
-          file = std::string(srcfiles[file_index - 1]);
+          file = String(srcfiles[file_index - 1]);
         }
 
         // Deallocate all strings!
@@ -3609,8 +3718,8 @@ class TraceResolverImpl<system_tag::darwin_tag>
 // https://stackoverflow.com/questions/6205981/windows-c-stack-trace-from-a-running-app/28276227#28276227
 
 struct module_data {
-  std::string image_name;
-  std::string module_name;
+  String image_name;
+  String module_name;
   void *base_address;
   DWORD load_size;
 };
@@ -3635,8 +3744,8 @@ public:
     ret.image_name = temp;
     GetModuleBaseNameA(process, module, temp, sizeof(temp));
     ret.module_name = temp;
-    std::vector<char> img(ret.image_name.begin(), ret.image_name.end());
-    std::vector<char> mod(ret.module_name.begin(), ret.module_name.end());
+    Vector<char> img(ret.image_name.begin(), ret.image_name.end());
+    Vector<char> mod(ret.module_name.begin(), ret.module_name.end());
     SymLoadModule64(process, 0, &img[0], &mod[0], (DWORD64)ret.base_address,
                     ret.load_size);
     return ret;
@@ -3651,9 +3760,9 @@ public:
 
     HANDLE process = GetCurrentProcess();
 
-    std::vector<module_data> modules;
+    Vector<module_data> modules;
     DWORD cbNeeded;
-    std::vector<HMODULE> module_handles(1);
+    Vector<HMODULE> module_handles(1);
     SymInitialize(process, NULL, false);
     DWORD symOptions = SymGetOptions();
     symOptions |= SYMOPT_LOAD_LINES | SYMOPT_UNDNAME;
@@ -3737,24 +3846,24 @@ class TraceResolver : public TraceResolverImpl<system_tag::current_tag> {};
 
 class SourceFile {
 public:
-  typedef std::vector<std::pair<unsigned, std::string>> lines_t;
+  typedef Vector<std::pair<unsigned, String>> lines_t;
 
   SourceFile() {}
-  SourceFile(const std::string &path) {
+  SourceFile(const String &path) {
     // 1. If BACKWARD_CXX_SOURCE_PREFIXES is set then assume it contains
     //    a colon-separated list of path prefixes.  Try prepending each
     //    to the given path until a valid file is found.
-    const std::vector<std::string> &prefixes = get_paths_from_env_variable();
+    const Vector<String> &prefixes = get_paths_from_env_variable();
     for (size_t i = 0; i < prefixes.size(); ++i) {
       // Double slashes (//) should not be a problem.
-      std::string new_path = prefixes[i] + '/' + path;
-      _file.reset(new std::ifstream(new_path.c_str()));
+      String new_path = prefixes[i] + '/' + path;
+      _file.reset(new IFStream(new_path.c_str()));
       if (is_open())
         break;
     }
     // 2. If no valid file found then fallback to opening the path as-is.
     if (!_file || !is_open()) {
-      _file.reset(new std::ifstream(path.c_str()));
+      _file.reset(new IFStream(path.c_str()));
     }
   }
   bool is_open() const { return _file->is_open(); }
@@ -3772,11 +3881,11 @@ public:
 
     _file->clear();
     _file->seekg(0);
-    string line;
+    String line;
     unsigned line_idx;
 
     for (line_idx = 1; line_idx < line_start; ++line_idx) {
-      std::getline(*_file, line);
+      getline(*_file, line);
       if (!*_file) {
         return lines;
       }
@@ -3852,16 +3961,15 @@ public:
   // loading the library; this can be useful when the library is loaded when the
   // locations are unknown Warning: Because this edits the static paths
   // variable, it is *not* intrinsiclly thread safe
-  static void add_paths_to_env_variable_impl(const std::string &to_add) {
+  static void add_paths_to_env_variable_impl(const String &to_add) {
     get_mutable_paths_from_env_variable().push_back(to_add);
   }
 
 private:
-  details::handle<std::ifstream *, details::default_delete<std::ifstream *>>
-      _file;
+  details::handle<IFStream *, details::default_delete<IFStream *>> _file;
 
-  static std::vector<std::string> get_paths_from_env_variable_impl() {
-    std::vector<std::string> paths;
+  static Vector<String> get_paths_from_env_variable_impl() {
+    Vector<String> paths;
     const char *prefixes_str = std::getenv("BACKWARD_CXX_SOURCE_PREFIXES");
     if (prefixes_str && prefixes_str[0]) {
       paths = details::split_source_prefixes(prefixes_str);
@@ -3869,13 +3977,20 @@ private:
     return paths;
   }
 
-  static std::vector<std::string> &get_mutable_paths_from_env_variable() {
-    static volatile std::vector<std::string> paths =
-        get_paths_from_env_variable_impl();
-    return const_cast<std::vector<std::string> &>(paths);
+  static Vector<String> &get_mutable_paths_from_env_variable() {
+    static volatile Vector<String> *paths = nullptr;
+    if (!paths) {
+      std::unique_lock<std::mutex> sg(staticGuard);
+      if (!paths) {
+        paths = new Vector<String>(get_paths_from_env_variable_impl());
+      }
+    }
+    // static volatile Vector<String> paths =
+    // get_paths_from_env_variable_impl();
+    return const_cast<Vector<String> &>(*paths);
   }
 
-  static const std::vector<std::string> &get_paths_from_env_variable() {
+  static const Vector<String> &get_paths_from_env_variable() {
     return get_mutable_paths_from_env_variable();
   }
 
@@ -3889,7 +4004,7 @@ class SnippetFactory {
 public:
   typedef SourceFile::lines_t lines_t;
 
-  lines_t get_snippet(const std::string &filename, unsigned line_start,
+  lines_t get_snippet(const String &filename, unsigned line_start,
                       unsigned context_size) {
 
     SourceFile &src_file = get_src_file(filename);
@@ -3897,8 +4012,8 @@ public:
     return src_file.get_lines(start, context_size);
   }
 
-  lines_t get_combined_snippet(const std::string &filename_a, unsigned line_a,
-                               const std::string &filename_b, unsigned line_b,
+  lines_t get_combined_snippet(const String &filename_a, unsigned line_a,
+                               const String &filename_b, unsigned line_b,
                                unsigned context_size) {
     SourceFile &src_file_a = get_src_file(filename_a);
     SourceFile &src_file_b = get_src_file(filename_b);
@@ -3909,7 +4024,7 @@ public:
     return lines;
   }
 
-  lines_t get_coalesced_snippet(const std::string &filename, unsigned line_a,
+  lines_t get_coalesced_snippet(const String &filename, unsigned line_a,
                                 unsigned line_b, unsigned context_size) {
     SourceFile &src_file = get_src_file(filename);
 
@@ -3928,10 +4043,10 @@ public:
   }
 
 private:
-  typedef details::hashtable<std::string, SourceFile>::type src_files_t;
+  typedef details::hashtable<String, SourceFile>::type src_files_t;
   src_files_t _src_files;
 
-  SourceFile &get_src_file(const std::string &filename) {
+  SourceFile &get_src_file(const String &filename) {
     src_files_t::iterator it = _src_files.find(filename);
     if (it != _src_files.end()) {
       return it->second;
@@ -3948,7 +4063,8 @@ namespace ColorMode {
 enum type { automatic, never, always };
 }
 
-class cfile_streambuf : public std::streambuf {
+using cfile_streambuf = FileBuf;
+/*class cfile_streambuf : public FileBuf {
 public:
   cfile_streambuf(FILE *_sink) : sink(_sink) {}
   int_type underflow() override { return traits_type::eof(); }
@@ -3976,8 +4092,8 @@ private:
 
 private:
   FILE *sink;
-  std::vector<char> buffer;
-};
+  Vector<char> buffer;
+};*/
 
 #ifdef BACKWARD_SYSTEM_LINUX
 
@@ -3987,7 +4103,7 @@ enum type { yellow = 33, purple = 35, reset = 39 };
 
 class Colorize {
 public:
-  Colorize(std::ostream &os) : _os(os), _reset(false), _enabled(false) {}
+  Colorize(OStream &os) : _os(os), _reset(false), _enabled(false) {}
 
   void activate(ColorMode::type mode) { _enabled = mode == ColorMode::always; }
 
@@ -4015,7 +4131,7 @@ private:
                                                         : mode);
   }
 
-  std::ostream &_os;
+  OStream &_os;
   bool _reset;
   bool _enabled;
 };
@@ -4028,7 +4144,7 @@ enum type { yellow = 0, purple = 0, reset = 0 };
 
 class Colorize {
 public:
-  Colorize(std::ostream &) {}
+  Colorize(OStream &) {}
   void activate(ColorMode::type) {}
   void activate(ColorMode::type, FILE *) {}
   void set_color(Color::type) {}
@@ -4053,14 +4169,14 @@ public:
 
   template <typename ST> FILE *print(ST &st, FILE *fp = stderr) {
     cfile_streambuf obuf(fp);
-    std::ostream os(&obuf);
+    OStream os(&obuf);
     Colorize colorize(os);
     colorize.activate(color_mode, fp);
     print_stacktrace(st, os, colorize);
     return fp;
   }
 
-  template <typename ST> std::ostream &print(ST &st, std::ostream &os) {
+  template <typename ST> OStream &print(ST &st, OStream &os) {
     Colorize colorize(os);
     colorize.activate(color_mode);
     print_stacktrace(st, os, colorize);
@@ -4070,7 +4186,7 @@ public:
   template <typename IT>
   FILE *print(IT begin, IT end, FILE *fp = stderr, size_t thread_id = 0) {
     cfile_streambuf obuf(fp);
-    std::ostream os(&obuf);
+    OStream os(&obuf);
     Colorize colorize(os);
     colorize.activate(color_mode, fp);
     print_stacktrace(begin, end, os, thread_id, colorize);
@@ -4078,8 +4194,7 @@ public:
   }
 
   template <typename IT>
-  std::ostream &print(IT begin, IT end, std::ostream &os,
-                      size_t thread_id = 0) {
+  OStream &print(IT begin, IT end, OStream &os, size_t thread_id = 0) {
     Colorize colorize(os);
     colorize.activate(color_mode);
     print_stacktrace(begin, end, os, thread_id, colorize);
@@ -4093,7 +4208,7 @@ private:
   SnippetFactory _snippets;
 
   template <typename ST>
-  void print_stacktrace(ST &st, std::ostream &os, Colorize &colorize) {
+  void print_stacktrace(ST &st, OStream &os, Colorize &colorize) {
     print_header(os, st.thread_id());
     _resolver.load_stacktrace(st);
     if (reverse) {
@@ -4108,7 +4223,7 @@ private:
   }
 
   template <typename IT>
-  void print_stacktrace(IT begin, IT end, std::ostream &os, size_t thread_id,
+  void print_stacktrace(IT begin, IT end, OStream &os, size_t thread_id,
                         Colorize &colorize) {
     print_header(os, thread_id);
     for (; begin != end; ++begin) {
@@ -4116,7 +4231,7 @@ private:
     }
   }
 
-  void print_header(std::ostream &os, size_t thread_id) {
+  void print_header(OStream &os, size_t thread_id) {
     os << "Stack trace (most recent call last)";
     if (thread_id) {
       os << " in thread " << thread_id;
@@ -4124,9 +4239,9 @@ private:
     os << ":\n";
   }
 
-  void print_trace(std::ostream &os, const ResolvedTrace &trace,
+  void print_trace(OStream &os, const ResolvedTrace &trace,
                    Colorize &colorize) {
-    os << "#" << std::left << std::setw(2) << trace.idx << std::right;
+    os << "#" << std::left << __otfcpt::setw(2) << trace.idx << std::right;
     bool already_indented = true;
 
     if (!trace.source.filename.size() || object) {
@@ -4162,7 +4277,7 @@ private:
     }
   }
 
-  void print_snippet(std::ostream &os, const char *indent,
+  void print_snippet(OStream &os, const char *indent,
                      const ResolvedTrace::SourceLoc &source_loc,
                      Colorize &colorize, Color::type color_code,
                      int context_size) {
@@ -4179,14 +4294,14 @@ private:
       } else {
         os << indent << " ";
       }
-      os << std::setw(4) << it->first << ": " << it->second << "\n";
+      os << __otfcpt::setw(4) << it->first << ": " << it->second << "\n";
       if (it->first == source_loc.line) {
         colorize.set_color(Color::reset);
       }
     }
   }
 
-  void print_source_loc(std::ostream &os, const char *indent,
+  void print_source_loc(OStream &os, const char *indent,
                         const ResolvedTrace::SourceLoc &source_loc,
                         void *addr = nullptr) {
     os << indent << "Source \"" << source_loc.filename << "\", line "
@@ -4205,7 +4320,7 @@ private:
 
 class SignalHandling {
 public:
-  static std::vector<int> make_default_signals() {
+  static Vector<int> make_default_signals() {
     const int posix_signals[] = {
         // Signals for which the default action is "Core".
         SIGABRT, // Abort signal from abort(3)
@@ -4223,12 +4338,12 @@ public:
         SIGEMT, // emulation instruction executed
 #endif
     };
-    return std::vector<int>(posix_signals,
-                            posix_signals +
-                                sizeof posix_signals / sizeof posix_signals[0]);
+    return Vector<int>(posix_signals,
+                       posix_signals +
+                           sizeof posix_signals / sizeof posix_signals[0]);
   }
 
-  SignalHandling(const std::vector<int> &posix_signals = make_default_signals())
+  SignalHandling(const Vector<int> &posix_signals = make_default_signals())
       : _loaded(false) {
     bool success = true;
 
@@ -4354,7 +4469,7 @@ private:
 
 class SignalHandling {
 public:
-  SignalHandling(const std::vector<int> & = std::vector<int>())
+  SignalHandling(const Vector<int> & = Vector<int>())
       : reporter_thread_([]() {
           /* We handle crashes in a utility thread:
             backward structures and some Windows functions called here
@@ -4404,30 +4519,64 @@ public:
 
 private:
   static CONTEXT *ctx() {
-    static CONTEXT data;
-    return &data;
+    static CONTEXT *data = nullptr;
+    if (!data) {
+      std::unique_lock<std::mutex> sg(staticGuard);
+      if (!data) {
+        data = (CONTEXT *)malloc(sizeof(CONTEXT));
+        memset(data, 0, sizeof(CONTEXT)); // optional, depends on type
+      }
+    }
+    return data;
   }
 
   enum class crash_status { running, crashed, normal_exit, ending };
 
   static crash_status &crashed() {
-    static crash_status data;
-    return data;
+    static crash_status *data = nullptr;
+    if (!data) {
+      std::unique_lock<std::mutex> sg(staticGuard);
+      if (!data) {
+        data = (crash_status *)malloc(sizeof(crash_status));
+        *data = crash_status::running;
+      }
+    }
+    return *data;
   }
 
   static std::mutex &mtx() {
-    static std::mutex data;
-    return data;
+    static std::mutex *data = nullptr;
+    if (!data) {
+      std::unique_lock<std::mutex> sg(staticGuard);
+      if (!data) {
+        data = new (malloc(sizeof(std::mutex))) std::mutex();
+      }
+    }
+    return *data;
   }
 
   static std::condition_variable &cv() {
-    static std::condition_variable data;
-    return data;
+    static std::condition_variable *data = nullptr;
+    if (!data) {
+      std::unique_lock<std::mutex> sg(staticGuard);
+      if (!data) {
+        data = new (malloc(sizeof(std::condition_variable)))
+            std::condition_variable();
+      }
+    }
+    return *data;
   }
 
   static HANDLE &thread_handle() {
-    static HANDLE handle;
-    return handle;
+    static HANDLE *data = nullptr;
+    if (!data) {
+      std::unique_lock<std::mutex> sg(staticGuard);
+      if (!data) {
+        data = (HANDLE *)malloc(sizeof(HANDLE));
+        *data = nullptr;
+      }
+    }
+    return *data;
   }
 
   std::thread reporter_thread_;
@@ -4526,7 +4675,7 @@ private:
 
 class SignalHandling {
 public:
-  SignalHandling(const std::vector<int> & = std::vector<int>()) {}
+  SignalHandling(const Vector<int> & = Vector<int>()) {}
   bool init() { return false; }
   bool loaded() { return false; }
 };

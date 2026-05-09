@@ -62,7 +62,7 @@ endif()
 
 # set CXX standard
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 if (${COMPILER_IS_NVCC})
   # GNU CXX extensions are not supported by nvcc
   set(CMAKE_CXX_EXTENSIONS OFF)
@@ -84,6 +84,9 @@ add_library(backward_interface INTERFACE)
 set_target_properties(backward_interface PROPERTIES EXPORT_NAME Interface)
 target_compile_definitions(backward_interface INTERFACE ${BACKWARD_DEFINITIONS})
 target_include_directories(backward_interface INTERFACE ${BACKWARD_INCLUDE_DIRS})
+# OTFCPT use STL reimplementation for improved compatibility
+target_include_directories(backward_interface INTERFACE "${CMAKE_SOURCE_DIR}/include")
+# OTFCPT
 if(BACKWARD_HAS_EXTERNAL_LIBRARIES)
     target_link_libraries(backward_interface INTERFACE ${BACKWARD_LIBRARIES})
 endif()

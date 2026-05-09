@@ -5,11 +5,21 @@
 #include "typedefs.h"
 #include <execinfo.h>
 
+#ifdef USE_BACKWARD
+#define SKIP_FRAMES 4
+#include <backward.hpp>
+#include <ostream>
+#include <sstream>
+#endif
+
 using namespace __otfcpt;
 
 std::atomic<uint32_t> current_verbosity{0};
 
-void print_stack(CptStreamBuffer &stream) {
+// fast and safe way to print a stacktrace
+void PrintStack() {
+  FILE *out =
+      (get_otfcpt_flags()->output ? get_otfcpt_flags()->output : stderr);
 #ifdef USE_BACKWARD
   using namespace backward;
   StackTrace st;
@@ -17,10 +27,30 @@ void print_stack(CptStreamBuffer &stream) {
   st.skip_n_firsts(SKIP_FRAMES);
   Printer p;
   p.object = true;
-  p.color_mode = ColorMode::always;
+  p.color_mode = ColorMode::automatic;
+  p.address = true;
+  p.print(st, out);
+#else
+  size_t size;
+  void *array[CALLSTACK_SIZE];
+  size = backtrace(array, CALLSTACK_SIZE);
+  backtrace_symbols_fd(array, size, fileno(out));
+#endif
+}
+
+// compose error message with stacktrace in a single buffer
+void PrintStackBuffered(StackStreamBuffer &stream) {
+#ifdef USE_BACKWARD
+  using namespace backward;
+  StackTrace st;
+  st.load_here(CALLSTACK_SIZE);
+  st.skip_n_firsts(SKIP_FRAMES);
+  Printer p;
+  p.object = true;
+  p.color_mode = ColorMode::automatic;
   p.address = true;
 
-  std::stringstream stringbuffer;
+  StringStream stringbuffer;
   p.print(st, stringbuffer);
   stream << stringbuffer.str().c_str() << "\n";
 #else
@@ -39,15 +69,6 @@ void print_stack(CptStreamBuffer &stream) {
 #endif
 }
 
-void print_stack() {
-  char buffer[DBG_BUFFER_SIZE];
-  CptStreamBuffer stream(buffer, DBG_BUFFER_SIZE);
-  FILE *out =
-      (get_otfcpt_flags()->output ? get_otfcpt_flags()->output : stderr);
-  print_stack(stream);
-  stream.fflush(out);
-}
-
 void NORETURN Die() {
   if (get_otfcpt_flags()->abort_on_error)
     abort();
@@ -57,7 +78,7 @@ void NORETURN Die() {
 void CheckFailed(const char *file, int line, const char *cond, u64 v1, u64 v2,
                  std::initializer_list<const char *> msgs) {
   char buffer[DBG_BUFFER_SIZE];
-  CptStreamBuffer stream(buffer, DBG_BUFFER_SIZE);
+  StackStreamBuffer stream(buffer, DBG_BUFFER_SIZE);
   FILE *out =
       (get_otfcpt_flags()->output ? get_otfcpt_flags()->output : stderr);
 
@@ -69,7 +90,7 @@ void CheckFailed(const char *file, int line, const char *cond, u64 v1, u64 v2,
     stream << m;
   }
 
-  print_stack(stream);
+  PrintStackBuffered(stream);
   stream.fflush(out);
 
   if (!get_otfcpt_flags()->continue_on_error) {

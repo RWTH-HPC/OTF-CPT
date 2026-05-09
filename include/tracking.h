@@ -92,7 +92,7 @@ protected:
   CompactHashMap<M, T *> predefHandles{};
   virtual bool isPredefined(A handle) { return handle == T::nullHandle; }
   virtual T *findPredefinedData(A handle) {
-    auto iter = predefHandles.Find(handle);
+    auto iter = predefHandles.find(handle);
     if (iter == predefHandles.end())
       return nullptr;
     return (iter->second);
@@ -103,7 +103,7 @@ protected:
     return findPredefinedDataF(handle) != nullptr;
   }
   virtual T *findPredefinedDataF(MPI_Fint handle) {
-    auto iter = predefFHandles.Find(handle);
+    auto iter = predefFHandles.find(handle);
     if (iter == predefFHandles.end())
       return nullptr;
     return iter->second;
@@ -161,24 +161,24 @@ private:
     DCHECK_EQ(sizeof(T) % 64, 0);
     int ndatas = 4096 / sizeof(T);
     char *datas = (char *)malloc(ndatas * sizeof(T));
-    memory.PushBack(datas);
+    memory.push_back(datas);
     for (int i = 0; i < ndatas; i++) {
-      dataPointer.PushBack(new (datas + i * sizeof(T)) T());
+      dataPointer.push_back(new (datas + i * sizeof(T)) T());
     }
   }
 
 public:
   virtual T *getData() {
     std::unique_lock<std::shared_mutex> lock(DPMutex);
-    if (dataPointer.Empty())
+    if (dataPointer.empty())
       newDatas();
-    T *ret = dataPointer.Back();
-    dataPointer.PopBack();
+    T *ret = dataPointer.back();
+    dataPointer.pop_back();
     return ret;
   }
   virtual void returnData(T *data) {
     std::unique_lock<std::shared_mutex> lock(DPMutex);
-    dataPointer.PushBack(data);
+    dataPointer.push_back(data);
   }
   virtual ~DataPool() {
     for (auto i : this->dataPointer)
@@ -234,19 +234,19 @@ protected:
 
   void newAH() {
     int ndatas = 4096 / 64;
-    size_t oldSize = dataTable.Size(), newSize = oldSize + ndatas;
+    size_t oldSize = dataTable.size(), newSize = oldSize + ndatas;
     {
       // Only the resize actually modifies the vector and
       // can lead to a reallocation of the elements
       std::unique_lock<std::shared_mutex> lock(DTMutex);
-      dataTable.Resize(newSize);
+      dataTable.resize(newSize);
     }
     // Getting the lock here is not necessary:
     // unique_lock can only be taken while having unique AHMutex
     // std::shared_lock<std::shared_mutex> lock(DTMutex);
     for (size_t i = oldSize, j = 0; i < newSize; i++, j++) {
       dataTable[i] = nullptr;
-      availableHandles.PushBack((MPI_Fint)(i));
+      availableHandles.push_back((MPI_Fint)(i));
     }
   }
 #endif
@@ -278,10 +278,10 @@ public:
     MPI_Fint fId;
     {
       std::unique_lock<std::shared_mutex> lock(AHMutex);
-      if (availableHandles.Empty())
+      if (availableHandles.empty())
         newAH();
-      fId = availableHandles.Back();
-      availableHandles.PopBack();
+      fId = availableHandles.back();
+      availableHandles.pop_back();
       // Getting the lock here is not necessary:
       // unique_lock can only be taken while having unique AHMutex
       // std::shared_lock<std::shared_mutex> lock(DTMutex);
@@ -300,7 +300,7 @@ public:
     {
       auto fId = ((T *)(uintptr_t)(handle))->fHandle;
       std::unique_lock<std::shared_mutex> lock(AHMutex);
-      availableHandles.PushBack(fId);
+      availableHandles.push_back(fId);
     }
 #endif
     ((T *)(uintptr_t)(handle))->fini();
@@ -313,7 +313,7 @@ public:
     {
       auto fId = ((T *)(uintptr_t)(handle))->fHandle;
       std::unique_lock<std::shared_mutex> lock(AHMutex);
-      availableHandles.PushBack(fId);
+      availableHandles.push_back(fId);
     }
 #endif
     return (T *)(uintptr_t)(handle);
@@ -352,10 +352,10 @@ class RequestFactoryInst<MI *>
     MPI_Fint fId;
     {
       std::unique_lock<std::shared_mutex> lock(this->AHMutex);
-      if (this->availableHandles.Empty())
+      if (this->availableHandles.empty())
         this->newAH();
-      fId = this->availableHandles.Back();
-      this->availableHandles.PopBack();
+      fId = this->availableHandles.back();
+      this->availableHandles.pop_back();
       // Getting the lock here is not necessary:
       // unique_lock can only be taken while having unique AHMutex
       // std::shared_lock<std::shared_mutex> lock(DTMutex);
@@ -379,10 +379,10 @@ public:
     MPI_Fint fId;
     {
       std::unique_lock<std::shared_mutex> lock(this->AHMutex);
-      if (this->availableHandles.Empty())
+      if (this->availableHandles.empty())
         this->newAH();
-      fId = this->availableHandles.Back();
-      this->availableHandles.PopBack();
+      fId = this->availableHandles.back();
+      this->availableHandles.pop_back();
       // Getting the lock here is not necessary:
       // unique_lock can only be taken while having unique AHMutex
       // std::shared_lock<std::shared_mutex> lock(DTMutex);
@@ -411,7 +411,7 @@ public:
     {
       auto fId = ((RequestData *)(uintptr_t)(req))->fHandle;
       std::unique_lock<std::shared_mutex> lock(this->AHMutex);
-      this->availableHandles.PushBack(fId);
+      this->availableHandles.push_back(fId);
     }
 #endif
     ((RequestData *)(uintptr_t)(req))->fini(status);
@@ -447,19 +447,19 @@ protected:
 
   void newAH() {
     int ndatas = 4096 / 64;
-    size_t oldSize = dataTable.Size(), newSize = oldSize + ndatas;
+    size_t oldSize = dataTable.size(), newSize = oldSize + ndatas;
     {
       // Only the resize actually modifies the vector and
       // can lead to a reallocation of the elements
       std::unique_lock<std::shared_mutex> lock(DTMutex);
-      dataTable.Resize(newSize);
+      dataTable.resize(newSize);
     }
     // Getting the lock here is not necessary:
     // unique_lock can only be taken while having unique AHMutex
     // std::shared_lock<std::shared_mutex> lock(DTMutex);
     for (size_t i = oldSize, j = 0; i < newSize; i++, j++) {
       dataTable[i] = nullptr;
-      availableHandles.PushBack((M)(i));
+      availableHandles.push_back((M)(i));
     }
   }
 
@@ -479,10 +479,10 @@ public:
     M ret;
     {
       std::unique_lock<std::shared_mutex> lock(AHMutex);
-      if (availableHandles.Empty())
+      if (availableHandles.empty())
         newAH();
-      ret = availableHandles.Back();
-      availableHandles.PopBack();
+      ret = availableHandles.back();
+      availableHandles.pop_back();
       // Getting the lock here is not necessary:
       // unique_lock can only be taken while having unique AHMutex
       // std::shared_lock<std::shared_mutex> lock(DTMutex);
@@ -499,7 +499,7 @@ public:
     {
       std::unique_lock<std::shared_mutex> lock(AHMutex);
       ret = dataTable[(size_t)(handle)];
-      availableHandles.PushBack(handle);
+      availableHandles.push_back(handle);
     }
     ret->fini();
     this->returnData(ret);
@@ -511,7 +511,7 @@ public:
     {
       std::unique_lock<std::shared_mutex> lock(AHMutex);
       ret = dataTable[(size_t)(handle)];
-      availableHandles.PushBack(handle);
+      availableHandles.push_back(handle);
     }
     return ret;
   }
@@ -550,10 +550,10 @@ class RequestFactoryInst<int>
     RequestData *dp = this->getData();
     {
       std::unique_lock<std::shared_mutex> lock(AHMutex);
-      if (availableHandles.Empty())
+      if (availableHandles.empty())
         newAH();
-      ret = availableHandles.Back();
-      availableHandles.PopBack();
+      ret = availableHandles.back();
+      availableHandles.pop_back();
       dataTable[(size_t)(ret)] = dp;
     }
     dp->init(req, persistent);
@@ -568,10 +568,10 @@ public:
     data->init(req, persistent);
     MPI_Request ret;
     std::unique_lock<std::shared_mutex> lock(AHMutex);
-    if (availableHandles.Empty())
+    if (availableHandles.empty())
       newAH();
-    ret = availableHandles.Back();
-    availableHandles.PopBack();
+    ret = availableHandles.back();
+    availableHandles.pop_back();
     dataTable[(size_t)(ret)] = data;
     return ret;
   }
@@ -590,7 +590,7 @@ public:
       ret = dataTable[(size_t)(req)];
       persistent = ret->isPersistent();
       if (!persistent) {
-        availableHandles.PushBack(req);
+        availableHandles.push_back(req);
       }
     }
     if (persistent) {
@@ -612,7 +612,7 @@ public:
       ret = dataTable[(size_t)(req)];
       persistent = ret->isPersistent();
       if (!persistent) {
-        availableHandles.PushBack(req);
+        availableHandles.push_back(req);
       }
     }
     ret->handle = mpi_req;
