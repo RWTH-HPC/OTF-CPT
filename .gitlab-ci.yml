@@ -178,9 +178,9 @@ debian:
     extends: .cluster-template
     script:
       - mkdir build
-      - cmake -S ./ -B build -DCMAKE_INSTALL_PREFIX=$PWD/install -DCMAKE_BUILD_TYPE=RelWithDebInfo ${ADD_CMAKE_OPTIONS}
-      - cmake --build build --parallel ${SLURM_CPUS_PER_TASK} -v
-      - cmake --install build
+      - time cmake -S ./ -B build -DCMAKE_INSTALL_PREFIX=$PWD/install -DCMAKE_BUILD_TYPE=RelWithDebInfo ${ADD_CMAKE_OPTIONS}
+      - time cmake --build build --parallel ${SLURM_CPUS_PER_TASK} -v
+      - time cmake --install build
 
 cluster:
     stage: test
@@ -189,7 +189,7 @@ cluster:
       - !reference [.cluster-build, script]
       - !reference [.setup-python-env, script]
       - EXIT_CODE=0
-      - cmake --build build --verbose -- check || EXIT_CODE=$?
+      - time cmake --build build --verbose -- check || EXIT_CODE=$?
       - ldd build/libOTFCPT.so
       - ldd build/libOTFCPT.so | grep -q 'libstdc++' && echo "Error libstdc++ linked" && exit 1 || echo "Info No libstdc++ dependency found"
       - exit $EXIT_CODE
