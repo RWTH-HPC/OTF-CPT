@@ -126,8 +126,7 @@ debian:
       SLURM_PARAM_PARTITION: "-p c23ms"
       SLURM_DPARAM_ACCOUNT: "-A rwth1282"
       SLURM_DPARAM_PARTITION: "-p c23ms"
-      CI_MODE: "SingleSlurmJobAcrossStages"
-      END_SINGLE_SLURM_JOB: "1"
+      CI_MODE: "Slurm"
 
     before_script:
       - module purge
