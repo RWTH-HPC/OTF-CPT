@@ -97,7 +97,7 @@ template <typename T> struct DataPool final {
     size_t paddedSize = (((elemSize - 1) / 64) + 1) * 64;
     // number of padded elements to allocate
     int ndatas = pagesize / paddedSize;
-    if(ndatas < 4)
+    if (ndatas < 4)
       ndatas = 4;
     char *datas = (char *)malloc(ndatas * paddedSize);
     memory.PushBack(datas);
@@ -829,8 +829,8 @@ static void suspendTask(TaskData *FromTask, TaskData *ToTask) {
   if (!FromTask)
     return;
   // Task may be resumed at a later point in time.
-  if (FromTask->isUntied()){
-    if (FromTask->InBarrier){
+  if (FromTask->isUntied()) {
+    if (FromTask->InBarrier) {
       thread_local_clock->enterState(STATE_OMP, "UntiedSuspend");
     } else {
       thread_local_clock->exitState("UntiedSuspend", FromTask->isRunning);
@@ -840,19 +840,19 @@ static void suspendTask(TaskData *FromTask, TaskData *ToTask) {
     thread_local_clock->enterState(STATE_OMP, "TiedSuspend");
   }
   ToTask->ImplicitTask = FromTask->ImplicitTask;
-    DCHECK(ToTask->ImplicitTask != NULL &&
-           "A task belongs to a team and has an implicit task on the stack");
+  DCHECK(ToTask->ImplicitTask != NULL &&
+         "A task belongs to a team and has an implicit task on the stack");
 }
 
 static void suspendTaskEnd(TaskData *FromTask, TaskData *ToTask) {
   if (!FromTask)
     return;
   // Task may be resumed at a later point in time.
-  thread_local_clock->exitState(STATE_USEFUL, STATE_OMP, "TaskEnd",FromTask->isRunning);
+  thread_local_clock->exitState(STATE_USEFUL, STATE_OMP, "TaskEnd",
+                                FromTask->isRunning);
 }
 
-static void switchTasks(TaskData *FromTask, TaskData *ToTask) {
-}
+static void switchTasks(TaskData *FromTask, TaskData *ToTask) {}
 
 static void startTask(TaskData *ToTask) {
   if (!ToTask)
@@ -869,18 +869,21 @@ static void startTask(TaskData *ToTask) {
   if (startingTask) {
     OmpHappensAfter(ToTask->GetTaskPtr());
     thread_local_clock->enterState(STATE_USEFUL, "TaskBegin");
-  } else if (ToTask->isUntied()){
-    if (ToTask->InBarrier){
-      thread_local_clock->exitState(STATE_OMP, STATE_OMP, "TaskContinueUntied", ToTask->isRunning);
+  } else if (ToTask->isUntied()) {
+    if (ToTask->InBarrier) {
+      thread_local_clock->exitState(STATE_OMP, STATE_OMP, "TaskContinueUntied",
+                                    ToTask->isRunning);
     } else {
       OmpHappensAfter(ToTask->GetTaskPtr());
       thread_local_clock->enterState(STATE_USEFUL, "TaskContinueUntied");
     }
   } else {
-    if(ToTask->InBarrier)
-      thread_local_clock->exitState(STATE_OMP, STATE_OMP, "TaskContinue", ToTask->isRunning);
+    if (ToTask->InBarrier)
+      thread_local_clock->exitState(STATE_OMP, STATE_OMP, "TaskContinue",
+                                    ToTask->isRunning);
     else
-      thread_local_clock->exitState(STATE_OMP, STATE_USEFUL, "TaskContinue", ToTask->isRunning);
+      thread_local_clock->exitState(STATE_OMP, STATE_USEFUL, "TaskContinue",
+                                    ToTask->isRunning);
   }
 }
 
@@ -916,23 +919,20 @@ static void ompt_tsan_task_schedule(ompt_data_t *first_task_data,
   TaskData *ToTask = second_task_data ? ToTaskData(second_task_data) : nullptr;
 
   switch (prior_task_status) {
-  case ompt_task_early_fulfill:
-  {
+  case ompt_task_early_fulfill: {
     ompTimer ot{"EarlyFulfill"};
     OmpHappensBefore(FromTask->GetTaskPtr());
     FromTask->setFulfilled();
     return;
   }
-  case ompt_task_late_fulfill:
-  {
+  case ompt_task_late_fulfill: {
     ompTimer ot{"LateFulfill"};
     OmpHappensAfter(FromTask->GetTaskPtr());
     completeTask(FromTask);
     freeTask(FromTask);
     return;
   }
-  case ompt_taskwait_complete:
-  {
+  case ompt_taskwait_complete: {
     ompTimer ot{"TaskwaitNowaitDepend"};
     acquireDependencies(FromTask);
     freeTask(FromTask);

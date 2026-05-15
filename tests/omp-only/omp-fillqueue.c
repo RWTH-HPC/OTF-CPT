@@ -19,15 +19,13 @@ int main() {
   omp_control_tool(omp_control_tool_start, 0, NULL);
 #pragma omp parallel
   {
-  #pragma omp master
+#pragma omp master
     {
-      for(int i=0; i<300; i++){
-        #pragma omp task shared(a)
-        {
-          OMPT_SIGNAL(a);
-        }
+      for (int i = 0; i < 300; i++) {
+#pragma omp task shared(a)
+        { OMPT_SIGNAL(a); }
       }
-      #pragma omp taskwait
+#pragma omp taskwait
     }
     OMPT_WAIT(a, 300);
   }

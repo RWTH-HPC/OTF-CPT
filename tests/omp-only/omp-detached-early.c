@@ -5,7 +5,8 @@
 // RUN: %t | %FileCheck %s
 // clang-format on
 
-// UNSUPPORTED: GNU,icc-2021.6,icc-2021.7,icc-2021.9,intelllvm-2022.1,intelllvm-2022.2,intelllvm-2023.1
+// UNSUPPORTED:
+// GNU,icc-2021.6,icc-2021.7,icc-2021.9,intelllvm-2022.1,intelllvm-2022.2,intelllvm-2023.1
 
 // Note: adapted from task_early_fulfill.c test from LLVM
 
