@@ -485,7 +485,10 @@ static void ompt_tsan_thread_begin(ompt_thread_t thread_type,
     thread_clocks->PushBack(thread_local_clock);
     thread_counts->PushBack(omptThreadCount);
   }
-  thread_local_clock->enterState(startProgrammTime, STATE_OMP, __func__);
+  if (thread_type == ompt_thread_initial)
+    thread_local_clock->enterState(STATE_OMP, __func__);
+  else
+    thread_local_clock->enterState(startProgrammTime, STATE_OMP, __func__);
 }
 
 static void ompt_tsan_thread_end(ompt_data_t *thread_data) {
