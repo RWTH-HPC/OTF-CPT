@@ -232,7 +232,6 @@ struct OtfcptFlags {
   FlagParser parser;
 
   void SetDefaults();
-  void CopyFrom(const OtfcptFlags &other);
 
   void *operator new(size_t size) { return malloc(size); }
 
