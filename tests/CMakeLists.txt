@@ -64,6 +64,9 @@ add_dependencies(build-hybrid-tests OTFCPT OTFCPT_omp)
 add_dependencies(build-tests build-mpi-only-tests build-omp-only-tests build-hybrid-tests build-container-tests)
 if (TARGET FileCheck_Standalone AND BUILD_FILECHECK)
     add_dependencies(build-tests FileCheck_Standalone)
+    add_dependencies(build-omp-only-tests FileCheck_Standalone)
+    add_dependencies(build-mpi-only-tests FileCheck_Standalone)
+    add_dependencies(build-hybrid-tests FileCheck_Standalone)
 endif()
 IF(CMAKE_Fortran_COMPILER)
     add_custom_target(build-fortran-tests)
@@ -72,7 +75,7 @@ IF(CMAKE_Fortran_COMPILER)
 ENDIF()
 
 
-add_subdirectory(datastructures)
+add_subdirectory(mpi-handle-tracking)
 add_subdirectory(mpi-only)
 
 add_subdirectory(containers)
@@ -95,6 +98,27 @@ set(OTFCPT_OMP_LIB $<TARGET_FILE:OTFCPT_omp>)
 
 set(LIT_TEST_WORKERS 1 CACHE STRING "Sets the amount of workers when running tests. (Note that this only sets the amount of lit workers of which each might spawn more processes.)")
 
+set(TEST_C_COMPILER ${CMAKE_C_COMPILER} CACHE STRING "C Compiler to use for tests")
+set(TEST_CXX_COMPILER ${CMAKE_CXX_COMPILER} CACHE STRING "C++ Compiler to use for tests")
+set(TEST_Fortran_COMPILER ${CMAKE_Fortran_COMPILER} CACHE STRING "Fortran Compiler to use for tests")
+set(TEST_OPENMP_FLAGS ${OpenMP_C_FLAGS})
+mark_as_advanced(TEST_C_COMPILER TEST_CXX_COMPILER TEST_Fortran_COMPILER)
+
+list(TRANSFORM MPI_C_INCLUDE_DIRS PREPEND "-I" OUTPUT_VARIABLE _incs)
+list(TRANSFORM MPI_C_COMPILE_DEFINITIONS PREPEND "-D" OUTPUT_VARIABLE _defs)
+string(JOIN " " MPI_C_FLAGS ${_incs} ${_defs} ${MPI_C_COMPILE_OPTIONS} ${MPI_C_LIBRARIES})
+set(TEST_MPI_C_FLAGS ${MPI_C_FLAGS})
+
+list(TRANSFORM MPI_CXX_INCLUDE_DIRS PREPEND "-I" OUTPUT_VARIABLE _incs)
+list(TRANSFORM MPI_CXX_COMPILE_DEFINITIONS PREPEND "-D" OUTPUT_VARIABLE _defs)
+string(JOIN " " MPI_CXX_FLAGS ${_incs} ${_defs} ${MPI_CXX_COMPILE_OPTIONS} ${MPI_CXX_LIBRARIES})
+set(TEST_MPI_CXX_FLAGS ${MPI_CXX_FLAGS})
+
+list(TRANSFORM MPI_Fortran_INCLUDE_DIRS PREPEND "-I" OUTPUT_VARIABLE _incs)
+list(TRANSFORM MPI_Fortran_COMPILE_DEFINITIONS PREPEND "-D" OUTPUT_VARIABLE _defs)
+string(JOIN " " MPI_Fortran_FLAGS ${_incs} ${_defs} ${MPI_Fortran_COMPILE_OPTIONS} ${MPI_Fortran_LIBRARIES})
+set(TEST_MPI_Fortran_FLAGS ${MPI_Fortran_FLAGS})
+
 pythonize_bool(OpenMP_FOUND)
 pythonize_bool(LIT_FORWARD_FULL_ENV)
 pythonize_bool(OTFCPT_HAVE_Fortran)
@@ -108,5 +132,6 @@ file(GENERATE
 
 
 add_check_target(NAME check SUITES . COMMENT "Run all OTF-CPT tests" DEPENDS build-tests)
-add_check_target(NAME check-omp SUITES omp-only COMMENT "Run omp-tests tests" DEPENDS build-omp-only-tests)
-
+add_check_target(NAME check-omp SUITES omp-only COMMENT "Run omp tests" DEPENDS build-omp-only-tests)
+add_check_target(NAME check-mpi SUITES mpi-only COMMENT "Run mpi tests" DEPENDS build-mpi-only-tests)
+add_check_target(NAME check-hybrid SUITES hybrid COMMENT "Run hyrbid tests" DEPENDS build-hybrid-tests)

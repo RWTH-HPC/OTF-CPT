@@ -1,4 +1,5 @@
 // ALLOW_RETRIES: 1
+// RUN: %compile_mpi_c
 // RUN: %mpirunnp 2 %load_otfcpt %otfcpt_options_dump_stopped %t | \
 // RUN: %FileCheck --check-prefixes=CHECK2,CHECK %metricfile
 // RUN: %mpirunnp 4 %load_otfcpt %otfcpt_options_dump_stopped %t | \

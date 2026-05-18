@@ -1,5 +1,6 @@
 // clang-format off
 // ALLOW_RETRIES: 1
+// RUN: %compile_c
 // RUN: env OMP_NUM_THREADS=2 %load_otfcpt %otfcpt_options_dump_stopped \
 // RUN: %t | %FileCheck --check-prefixes=CHECK2,CHECK %metricfile
 // RUN: env OMP_NUM_THREADS=4 %load_otfcpt %otfcpt_options_dump_stopped \

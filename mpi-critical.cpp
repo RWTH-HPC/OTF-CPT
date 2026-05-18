@@ -18,7 +18,7 @@ void MpiHappensAfter(ipcData &uc, int remote) { MpiHappensAfter(&uc, remote); }
 void MpiHappensAfter(ipcData *uc, int remote) {
   if (!analysis_flags->running)
     return;
-  DCHECK_EQ(thread_local_clock->getState(), STATE_MPI);
+  DCHECK_EQ(thread_local_clock->GetState(), STATE_MPI);
   DCHECK(remote >= -1);
   thread_local_clock->clocks[CLOCK_USEFUL].critical.maxUpdate(
       BaseMetric{uc->values[0]});
@@ -208,9 +208,9 @@ extern "C" {
 int MPI_Finalize(void) {
   mpiTimer mt{false, __func__};
   if (analysis_flags->running)
-    DCHECK_EQ(thread_local_clock->getState(), STATE_MPI);
+    DCHECK_EQ(thread_local_clock->GetState(), STATE_MPI);
   else
-    DCHECK_EQ(thread_local_clock->getState(), STATE_INIT);
+    DCHECK_EQ(thread_local_clock->GetState(), STATE_INIT);
   ipcData max_uc;
   MpiHappensBefore(max_uc, REF_RANK);
   max_uc.Allreduce(cf.findData(MPI_COMM_WORLD));
@@ -222,7 +222,6 @@ int MPI_Finalize(void) {
       BaseMetric{max_uc.values[2]});
 
   finishMeasurement();
-  analysis_flags->running = false;
   ipcData::finiIpcData();
   return PMPI_Finalize();
 }

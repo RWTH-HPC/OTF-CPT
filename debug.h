@@ -13,7 +13,7 @@
 #endif
 
 #define CALLSTACK_SIZE 32
-#define DBG_BUFFER_SIZE 4096
+#define DBG_BUFFER_SIZE 12288
 
 using namespace __otfcpt;
 
