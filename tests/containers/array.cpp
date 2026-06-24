@@ -2,7 +2,8 @@
 // RUN: %t
 // clang-format on
 
-#include "containers.h"
+// #include "containers.h"
+#include "containers/Array.h"
 
 int main() {
   Array<int, 5> A = {{1, 2, 3, 4, 5}}, B{};

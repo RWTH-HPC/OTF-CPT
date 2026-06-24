@@ -293,8 +293,8 @@ public:
   CommData *comm{nullptr};
 
   static MPI_Request nullHandle;
-  RequestData() {}
-  ~RequestData() {}
+  RequestData() = default;
+  ~RequestData() = default;
   /* NOTE: We explictly define this since implicit definition might use memcpy
    * which causes a segfault when triggered in mpiRecvPB(MPI_Message...) because
    * the memory might be registered with UCX. In this case, the generated memcpy

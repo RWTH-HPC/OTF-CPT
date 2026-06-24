@@ -49,16 +49,16 @@ void mySignalHandler(int signum) {
   disable_signalhandlers();
   printf("pid %i caught signal nr %i\n", getpid(), signum);
   if (signum == SIGINT || signum == SIGKILL) {
-    print_stack();
+    PrintStack();
     _exit(signum + 128);
   }
   if (signum == SIGTERM || signum == SIGUSR2) {
-    print_stack();
+    PrintStack();
     fflush(stdout);
     sleep(1);
     _exit(signum + 128);
   }
-  print_stack();
+  PrintStack();
 
   printf("Waiting up to %i seconds to attach with a debugger.\n", 20);
   sleep(20);
@@ -181,7 +181,7 @@ void finishMeasurement() {
   int total_threads = 0;
   int num_threads = 0;
   if (thread_clocks)
-    total_threads = num_threads = thread_clocks->Size();
+    total_threads = num_threads = thread_clocks->size();
 
   double avgComputation[NUM_SHARED_METRICS] = {0};
   double maxComputation[NUM_SHARED_METRICS] = {0};
@@ -218,7 +218,7 @@ void finishMeasurement() {
       uc_avg[2] += curr_oot;
     }
     if (thread_counts)
-      for (int i = 1; i < thread_counts->Size(); i++)
+      for (int i = 1; i < thread_counts->size(); i++)
         (*thread_counts)[0]->add(*(*thread_counts)[i]);
   } else {
     num_threads = 1;
@@ -543,7 +543,7 @@ __attribute__((constructor)) void onLibraryLoad() {
     // Create a dummy thread clock
     if (!thread_local_clock)
       thread_local_clock = new THREAD_CLOCK(my_next_id(), 0);
-    thread_clocks->PushBack(thread_local_clock);
+    thread_clocks->push_back(thread_local_clock);
 
 #ifdef USE_ERRHANDLER
     init_signalhandlers();

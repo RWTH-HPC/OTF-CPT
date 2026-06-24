@@ -5,11 +5,14 @@ set(CMAKE_EXECUTABLE_SUFFIX_CXX .cpp.tmp)
 
 set(containerTests
     array
+    vector
+    string
+    compacthashmap
 )
 
-include_directories(../../)
+include_directories(../../include)
 
 FOREACH(tests ${containerTests})
-    add_executable(${tests} ${tests}.cpp ../../debug.cpp ../../parse_flags.cpp)
+    add_executable(${tests} ${tests}.cpp ../../src/debug.cpp ../../src/parse_flags.cpp)
     add_dependencies(build-container-tests ${tests})
 ENDFOREACH()
