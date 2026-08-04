@@ -14,12 +14,13 @@
 #include <string.h>
 #include <unistd.h>
 
-#define ANALYSIS_FLAGS "OTFCPT_OPTIONS"
-#define analysis_flags get_otfcpt_flags()
+#define ANALYSIS_FLAGS "CPT_OPTIONS"
+#define LEGACY_ANALYSIS_FLAGS "OTFCPT_OPTIONS"
+#define analysis_flags get_cpt_flags()
 #define analysis_flag_output                                                   \
-  (get_otfcpt_flags()->output ? get_otfcpt_flags()->output : stderr)
+  (get_cpt_flags()->output ? get_cpt_flags()->output : stderr)
 
-namespace __otfcpt {
+namespace __cpt {
 
 enum HandleSignalMode {
   kHandleSignalNo,
@@ -223,7 +224,7 @@ void ReportUnrecognizedFlags();
 
 extern const char *SanitizerToolName;
 
-struct OtfcptFlags {
+struct CptFlags {
 #define PARSE_FLAG(Type, Name, DefaultValue, Description) Type Name;
 #include "parse_flags.inc"
 #undef PARSE_FLAG
@@ -239,17 +240,17 @@ struct OtfcptFlags {
   void operator delete(void *p) { free(p); }
 };
 
-extern OtfcptFlags *otfcpt_flags_dont_use;
+extern CptFlags *cpt_flags_dont_use;
 
-void InitializeOtfcptFlags();
+void InitializeCptFlags();
 
-inline OtfcptFlags *get_otfcpt_flags() {
-  if (!otfcpt_flags_dont_use)
-    InitializeOtfcptFlags();
-  return otfcpt_flags_dont_use;
+inline CptFlags *get_cpt_flags() {
+  if (!cpt_flags_dont_use)
+    InitializeCptFlags();
+  return cpt_flags_dont_use;
 }
 
-} // namespace __otfcpt
+} // namespace __cpt
 
 // NOLINTEND
 #endif

@@ -84,9 +84,9 @@ add_library(backward_interface INTERFACE)
 set_target_properties(backward_interface PROPERTIES EXPORT_NAME Interface)
 target_compile_definitions(backward_interface INTERFACE ${BACKWARD_DEFINITIONS})
 target_include_directories(backward_interface INTERFACE ${BACKWARD_INCLUDE_DIRS})
-# OTFCPT use STL reimplementation for improved compatibility
+# CPT use STL reimplementation for improved compatibility
 target_include_directories(backward_interface INTERFACE "${CMAKE_SOURCE_DIR}/include")
-# OTFCPT
+# CPT
 if(BACKWARD_HAS_EXTERNAL_LIBRARIES)
     target_link_libraries(backward_interface INTERFACE ${BACKWARD_LIBRARIES})
 endif()

@@ -8,7 +8,7 @@
 #include <ios>     // for std::ios_base::fmtflags (if we need more)
 #include <ostream> // for std::endl
 
-namespace __otfcpt {
+namespace __cpt {
 class OStream {
 public:
   explicit OStream(StreamBuf *buf) : buf_(buf), width_(0), left_align_(false) {}
@@ -153,4 +153,4 @@ private:
   bool left_align_; // true → left‑justified, false → right‑justified
   iostate state_ = std::ios_base::goodbit;
 };
-} // namespace __otfcpt
+} // namespace __cpt

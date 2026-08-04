@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.13.4...3.27.4)
 
-project(OTFCPT C CXX)
+project(CPT C CXX)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "Installation directory" FORCE)
-  message(WARNING "No build type selected. OTF-CPT will be built as Release.
+  message(WARNING "No build type selected. CPT will be built as Release.
 Available options are:
   * -DCMAKE_BUILD_TYPE=Release - For an optimized build with no assertions or debug info.
   * -DCMAKE_BUILD_TYPE=Debug - For an unoptimized build with assertions and debug info.
@@ -29,38 +29,38 @@ include(CheckLanguage)
 set(MPI_CXX_SKIP_MPICXX TRUE)
 add_definitions(-DOMPI_SKIP_MPICXX)
 
-set(OTFCPT_HAVE_Fortran False)
-set(OTFCPT_USE_Fortran_WRAPPERS False)
+set(CPT_HAVE_Fortran False)
+set(CPT_USE_Fortran_WRAPPERS False)
 
 check_language(Fortran)
 if(CMAKE_Fortran_COMPILER)
-  set(OTFCPT_HAVE_Fortran True)
+  set(CPT_HAVE_Fortran True)
   if("${TEST_MPI_FEATURES}" MATCHES "ompi")
-    set(OTFCPT_USE_Fortran_WRAPPERS True)
+    set(CPT_USE_Fortran_WRAPPERS True)
     # We don't test for OpenMPI 4 with <4.1.6, because MPI_F_STATUS_IGNORE 
     # is broken with some of these versions
     if("${TEST_MPI_FEATURES}" MATCHES "ompi-4.0" OR 
        "${TEST_MPI_FEATURES}" MATCHES "ompi-4.1.[0-5]")
-      set(OTFCPT_HAVE_Fortran False)
-      set(OTFCPT_USE_Fortran_WRAPPERS False)
+      set(CPT_HAVE_Fortran False)
+      set(CPT_USE_Fortran_WRAPPERS False)
     endif()
   endif()
   if("${TEST_MPI_FEATURES}" MATCHES "\\[\\]")
     message(STATUS "Detection of MPI implementation failed, disabling Fortran support")
-    set(OTFCPT_HAVE_Fortran False)
-    set(OTFCPT_USE_Fortran_WRAPPERS False)
+    set(CPT_HAVE_Fortran False)
+    set(CPT_USE_Fortran_WRAPPERS False)
   endif()
 endif()
 
-option(OTFCPT_ENABLE_FORTRAN_WRAPPERS "Build OTF-CPT with pmpi Fortran wrappers" ${OTFCPT_USE_Fortran_WRAPPERS})
+option(CPT_ENABLE_FORTRAN_WRAPPERS "Build CPT with pmpi Fortran wrappers" ${CPT_USE_Fortran_WRAPPERS})
 
-if(OTFCPT_ENABLE_FORTRAN_WRAPPERS)
-  if(NOT OTFCPT_HAVE_Fortran)
-      message(ERROR "No Fortran support available, but requested with OTFCPT_ENABLE_FORTRAN_WRAPPERS")
+if(CPT_ENABLE_FORTRAN_WRAPPERS)
+  if(NOT CPT_HAVE_Fortran)
+      message(ERROR "No Fortran support available, but requested with CPT_ENABLE_FORTRAN_WRAPPERS")
   endif()
   enable_language(Fortran)
   find_package(MPI REQUIRED)
-elseif(OTFCPT_HAVE_Fortran AND NOT OTFCPT_USE_Fortran_WRAPPERS)
+elseif(CPT_HAVE_Fortran AND NOT CPT_USE_Fortran_WRAPPERS)
   message(STATUS "Assuming native Fortran support for MPICH-3 and IntelMPI")
 else()
   message(STATUS "No Fortran support")
@@ -68,8 +68,8 @@ endif()
 
 find_package(OpenMP REQUIRED)
 
-set(WRAP ${OTFCPT_SOURCE_DIR}/external/wrap/wrap.py)
-include(${OTFCPT_SOURCE_DIR}/external/wrap/WrapConfig.cmake)
+set(WRAP ${CPT_SOURCE_DIR}/external/wrap/wrap.py)
+include(${CPT_SOURCE_DIR}/external/wrap/WrapConfig.cmake)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 
@@ -78,7 +78,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 SET(CMAKE_MODULE_PATH
-    "${OTFCPT_SOURCE_DIR}/external/CMake-MPIhelper/cmake"
+    "${CPT_SOURCE_DIR}/external/CMake-MPIhelper/cmake"
     ${CMAKE_MODULE_PATH}
     )
 
@@ -125,14 +125,14 @@ if ("${CMAKE_CXX_COMPILER_ID}" IN_LIST GnuCompatible)
   set(STDCPLUS_LINK_FLAGS -fno-rtti -fno-exceptions ${NOSTDLIB_FLAG} -Wl,--gc-sections)
 
   if ("${CMAKE_CXX_COMPILER_ID}" IN_LIST ClangCompatible)
-    option(OTFCPT_USE_LLVM_LIBCPP "Use LLVM libc++, which might reduce portability." OFF)
-    if (OTFCPT_USE_LLVM_LIBCPP)
+    option(CPT_USE_LLVM_LIBCPP "Use LLVM libc++, which might reduce portability." OFF)
+    if (CPT_USE_LLVM_LIBCPP)
       message(STATUS "Building with LLVM libc++ was requested, which might limit portability and compatibility with application/library code compiled with gcc.")
       set(STDCPLUS_COMPILE_FLAGS -stdlib=libc++)
       set(STDCPLUS_LINK_FLAGS -stdlib=libc++)
       add_compile_definitions(-DUSE_STL)
     else ()
-      message(STATUS "For portability, OTF-CPT is built without dependency to a C++ runtime library")
+      message(STATUS "For portability, CPT is built without dependency to a C++ runtime library")
       set(STDCPLUS_COMPILE_FLAGS ${STDCPLUS_COMPILE_FLAGS} -stdlib=libstdc++)
       set(STDCPLUS_LINK_FLAGS ${STDCPLUS_LINK_FLAGS} -stdlib=libstdc++)
     endif ()
@@ -149,12 +149,12 @@ endif()
 
 set(WRAP_FLAGS -s -n)
 
-if(OTFCPT_ENABLE_FORTRAN_WRAPPERS)
+if(CPT_ENABLE_FORTRAN_WRAPPERS)
   set(WRAP_FLAGS -n -f)
 endif()
 
-option(OTFCPT_USE_BACKWARD "Use Backward-CPP for stacktraces" OFF)
-if(OTFCPT_USE_BACKWARD)
+option(CPT_USE_BACKWARD "Use Backward-CPP for stacktraces" OFF)
+if(CPT_USE_BACKWARD)
   add_subdirectory(external/backward-cpp)
 endif()
 

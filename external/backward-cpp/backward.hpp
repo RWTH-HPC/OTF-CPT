@@ -2980,7 +2980,7 @@ private:
       StringStream string_stream;
       string_stream << "<0x" << std::hex << std::setfill('0');
       for (int i = 0; i < 8; ++i) {
-        string_stream << __otfcpt::setw(2) << std::hex
+        string_stream << __cpt::setw(2) << std::hex
                       << (int)(unsigned char)(signature.signature[i]);
       }
       string_stream << ">";
@@ -4241,7 +4241,7 @@ private:
 
   void print_trace(OStream &os, const ResolvedTrace &trace,
                    Colorize &colorize) {
-    os << "#" << std::left << __otfcpt::setw(2) << trace.idx << std::right;
+    os << "#" << std::left << __cpt::setw(2) << trace.idx << std::right;
     bool already_indented = true;
 
     if (!trace.source.filename.size() || object) {
@@ -4294,7 +4294,7 @@ private:
       } else {
         os << indent << " ";
       }
-      os << __otfcpt::setw(4) << it->first << ": " << it->second << "\n";
+      os << __cpt::setw(4) << it->first << ": " << it->second << "\n";
       if (it->first == source_loc.line) {
         colorize.set_color(Color::reset);
       }

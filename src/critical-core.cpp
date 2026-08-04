@@ -518,7 +518,7 @@ void exitHandler() {
 }
 
 __attribute__((constructor)) void onLibraryLoad() {
-  InitializeOtfcptFlags();
+  InitializeCptFlags();
   startTimeOffset = (long long)startProgrammTime;
   startProgrammTime -= startTimeOffset;
 
@@ -531,8 +531,7 @@ __attribute__((constructor)) void onLibraryLoad() {
     }
 
     if (analysis_flags->verbose)
-      fprintf(analysis_flags->output,
-              "Starting OTF-CPT in library constructor\n");
+      fprintf(analysis_flags->output, "Starting CPT in library constructor\n");
 
     // pagesize = getpagesize();
 

@@ -7,7 +7,7 @@
 #include <cstring>
 #include <ios> // std::ios_base::iostate, openmode, etc.
 
-namespace __otfcpt {
+namespace __cpt {
 class IStream {
 public:
   /*-------------------------------------------------------------
@@ -218,4 +218,4 @@ private:
   StreamBuf *buf_{}; // non‑owning pointer to the underlying buffer
   iostate state_ = std::ios_base::goodbit; // stream state (fail/eof/bad)
 };
-} // namespace __otfcpt
+} // namespace __cpt

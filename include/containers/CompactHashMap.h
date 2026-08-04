@@ -9,7 +9,7 @@
 
 #include "Hash.h"
 
-namespace __otfcpt {
+namespace __cpt {
 
 template <typename K, typename V> class Pair {
 public:
@@ -180,4 +180,4 @@ private:
     return true;
   }
 };
-} // namespace __otfcpt
+} // namespace __cpt

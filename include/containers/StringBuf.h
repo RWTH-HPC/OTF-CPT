@@ -2,7 +2,7 @@
 #include "StreamBuf.h"
 #include "String.h"
 
-namespace __otfcpt {
+namespace __cpt {
 class StringBuf : public StreamBuf {
 public:
   explicit StringBuf(String &storage) : str_(storage) {}
@@ -91,4 +91,4 @@ private:
   String &str_;
   std::size_t readPos_ = 0; // index inside `str_` for the next read
 };
-} // namespace __otfcpt
+} // namespace __cpt

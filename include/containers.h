@@ -19,7 +19,7 @@
 #include "containers/StringStream.h"
 #include "containers/Vector.h"
 
-namespace __otfcpt {
+namespace __cpt {
 
 struct StackStreamBuffer {
   char *buf;
@@ -72,6 +72,6 @@ struct StackStreamBuffer {
   }
 };
 
-} // namespace __otfcpt
+} // namespace __cpt
 
 #endif

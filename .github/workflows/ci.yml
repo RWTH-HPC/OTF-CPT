@@ -1,4 +1,4 @@
-name: OTF-CPT CI
+name: CPT CI
 
 on:
   push:
@@ -184,7 +184,7 @@ jobs:
                 echo "I_MPI_F90=$F90" >> $GITHUB_ENV
                 echo "MPIEXEC=mpiexec" >> $GITHUB_ENV
             
-            - name: Build OTF-CPT
+            - name: Build CPT
               run: |
                 cmake -S ./ -B build \
                     -DCMAKE_BUILD_TYPE=Debug \
@@ -192,19 +192,19 @@ jobs:
                     -DCMAKE_CXX_COMPILER=$MPICXX \
                     -DCMAKE_Fortran_COMPILER=${{matrix.enable_fortran_tests && '$MPIFORT' || '""'}} \
                     -DMPIEXEC_EXECUTABLE="${MPIEXEC}" \
-                    -DOTFCPT_TEST_LB=.8 \
-                    -DOTFCPT_TEST_UB=1.05 \
-                    -DOTFCPT_TEST_WORK=300000
+                    -DCPT_TEST_LB=.8 \
+                    -DCPT_TEST_UB=1.05 \
+                    -DCPT_TEST_WORK=300000
                 cmake --build build
 
             - name: Check for libstdc++ in library
               run: |
-                if ldd build/src/libOTFCPT.so | grep -q "libstdc++"; then
+                if ldd build/src/libCPT.so | grep -q "libstdc++"; then
                   echo "Found libstdc++ dependency"
                   exit 1
                 fi
 
-            - name: Install OTF-CPT
+            - name: Install CPT
               run: cmake --install build
 
             - name: Run tests

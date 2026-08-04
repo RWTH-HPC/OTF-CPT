@@ -12,14 +12,13 @@
 #include <sstream>
 #endif
 
-using namespace __otfcpt;
+using namespace __cpt;
 
 std::atomic<uint32_t> current_verbosity{0};
 
 // fast and safe way to print a stacktrace
 void PrintStack() {
-  FILE *out =
-      (get_otfcpt_flags()->output ? get_otfcpt_flags()->output : stderr);
+  FILE *out = (get_cpt_flags()->output ? get_cpt_flags()->output : stderr);
 #ifdef USE_BACKWARD
   using namespace backward;
   StackTrace st;
@@ -70,17 +69,16 @@ void PrintStackBuffered(StackStreamBuffer &stream) {
 }
 
 void NORETURN Die() {
-  if (get_otfcpt_flags()->abort_on_error)
+  if (get_cpt_flags()->abort_on_error)
     abort();
-  exit(get_otfcpt_flags()->exitcode);
+  exit(get_cpt_flags()->exitcode);
 }
 
 void CheckFailed(const char *file, int line, const char *cond, u64 v1, u64 v2,
                  std::initializer_list<const char *> msgs) {
   char buffer[DBG_BUFFER_SIZE];
   StackStreamBuffer stream(buffer, DBG_BUFFER_SIZE);
-  FILE *out =
-      (get_otfcpt_flags()->output ? get_otfcpt_flags()->output : stderr);
+  FILE *out = (get_cpt_flags()->output ? get_cpt_flags()->output : stderr);
 
   stream << "\nCheck failed in " << file << ":" << line << " "
          << (unsigned long long)v1 << " " << cond << " "
@@ -93,7 +91,7 @@ void CheckFailed(const char *file, int line, const char *cond, u64 v1, u64 v2,
   PrintStackBuffered(stream);
   stream.fflush(out);
 
-  if (!get_otfcpt_flags()->continue_on_error) {
+  if (!get_cpt_flags()->continue_on_error) {
     Die();
   }
 }

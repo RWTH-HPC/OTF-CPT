@@ -10,7 +10,7 @@
 #include <cstdio> // FILE* (required for the ctor that takes a FILE*)
 #include <ios>    // std::ios_base::openmode, std::ios_base::seekdir
 
-namespace __otfcpt {
+namespace __cpt {
 class IFStream : public IStream {
 public:
   /*-------------------------------------------------------------
@@ -160,4 +160,4 @@ public:
 private:
   FileBuf buf_; // owns the C file + internal buffers
 };
-} // namespace __otfcpt
+} // namespace __cpt

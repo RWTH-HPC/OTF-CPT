@@ -10,7 +10,7 @@
 #include "Hash.h"
 #include "Vector.h"
 
-namespace __otfcpt {
+namespace __cpt {
 class String {
 public:
   // -----------------------------------------------------------------
@@ -194,4 +194,4 @@ template <> struct Hash<String> {
   }
 };
 
-} // namespace __otfcpt
+} // namespace __cpt
