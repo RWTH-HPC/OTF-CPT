@@ -6,7 +6,7 @@
 #include <cstring>
 #include <ios> // Required for std::streamoff and std::streamsize
 
-namespace __otfcpt {
+namespace __cpt {
 class StreamBuf {
 public:
   using char_type = char;
@@ -123,4 +123,4 @@ protected:
   char_type *writePtr_ = nullptr;
   char_type *writeEnd_ = nullptr;
 };
-} // namespace __otfcpt
+} // namespace __cpt

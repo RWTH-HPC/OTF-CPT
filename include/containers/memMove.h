@@ -2,7 +2,7 @@
 
 #include <cstring>
 
-namespace __otfcpt {
+namespace __cpt {
 class memMove {
 public:
   template <typename T> void moveItems(T *dest, T *src, size_t n) {
@@ -51,4 +51,4 @@ public:
       *dest = v;
   }
 };
-} // namespace __otfcpt
+} // namespace __cpt

@@ -8,7 +8,7 @@
 #define CALLSTACK_SIZE 32
 #define DBG_BUFFER_SIZE 12288
 
-using namespace __otfcpt;
+using namespace __cpt;
 
 extern std::atomic<uint32_t> current_verbosity;
 

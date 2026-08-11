@@ -5,7 +5,7 @@
 #include <initializer_list>
 #include <type_traits>
 
-namespace __otfcpt {
+namespace __cpt {
 
 template <typename T, std::size_t N> class Array {
 protected:
@@ -98,4 +98,4 @@ public:
     return lhs; // Return‑By‑Value (RVO / NRVO)
   }
 };
-} // namespace __otfcpt
+} // namespace __cpt

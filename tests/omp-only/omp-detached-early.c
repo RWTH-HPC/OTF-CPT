@@ -1,7 +1,7 @@
 // clang-format off
 // ALLOW_RETRIES: 1
 // RUN: %compile_c
-// RUN: env OMP_NUM_THREADS=2 %load_otfcpt %otfcpt_options_dump_stopped \
+// RUN: env OMP_NUM_THREADS=2 %load_cpt %cpt_options_dump_stopped \
 // RUN: %t | %FileCheck %s
 // UNSUPPORTED: GNU,icc-2021.6,icc-2021.7,icc-2021.9
 // UNSUPPORTED: intelllvm-2022.1,intelllvm-2022.2,intelllvm-2023.1

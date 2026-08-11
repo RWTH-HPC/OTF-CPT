@@ -1,6 +1,6 @@
 #pragma once
 
-namespace __otfcpt {
+namespace __cpt {
 template <typename T> struct Hash {
   size_t operator()(T __val) const noexcept {
     auto tmp = static_cast<size_t>(__val);
@@ -13,4 +13,4 @@ template <typename T> struct Hash<T *> {
     return tmp + (tmp >> 5);
   }
 };
-} // namespace __otfcpt
+} // namespace __cpt

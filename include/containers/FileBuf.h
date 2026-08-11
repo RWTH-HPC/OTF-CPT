@@ -8,7 +8,7 @@
 #include <cstring>
 #include <ios> // std::ios_base::openmode, SEEK_*
 
-namespace __otfcpt {
+namespace __cpt {
 class FileBuf : public StreamBuf {
 public:
   /*-----------------------  ctors / dtor  ---------------------------*/
@@ -266,4 +266,4 @@ private:
      argument to setp). */
   char *writeBase_ = nullptr;
 };
-} // namespace __otfcpt
+} // namespace __cpt

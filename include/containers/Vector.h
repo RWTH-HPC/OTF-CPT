@@ -13,7 +13,7 @@
 #define PRINT_DTOR 1
 #define PRINT_ASSIGN 1*/
 
-namespace __otfcpt {
+namespace __cpt {
 template <typename T> class Vector : memMove {
 public:
   using iterator = T *;
@@ -411,4 +411,4 @@ private:
     last_ = begin_ + cap;
   }
 };
-} // namespace __otfcpt
+} // namespace __cpt

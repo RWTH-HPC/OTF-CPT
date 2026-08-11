@@ -6,7 +6,7 @@
 #include "mpi-critical.h"
 
 {{fn fn_name MPI_Init MPI_Init_thread}}
-  InitializeOtfcptFlags();
+  InitializeCptFlags();
   if (analysis_flags->verbose)
      printf("Starting critPathAnalysis tool\n");
   useMpi = true;

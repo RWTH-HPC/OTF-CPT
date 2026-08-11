@@ -4,7 +4,7 @@
 #include "String.h"
 #include "StringBuf.h"
 
-namespace __otfcpt {
+namespace __cpt {
 class StringStream : public IOStream {
 public:
   StringStream() : IOStream(&buf_), buf_(storage_) {}
@@ -21,4 +21,4 @@ private:
   String storage_; // holds the characters
   StringBuf buf_;  // memory‑backed buffer
 };
-} // namespace __otfcpt
+} // namespace __cpt

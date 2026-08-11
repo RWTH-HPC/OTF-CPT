@@ -1,5 +1,5 @@
 # On-the-fly critical-path tool
-<img src="media/OTF-CPT.png" hspace="5" vspace="5" height="45%" width="45%" alt="OTF-CPT Logo" title="OTF-CPT" align="right" />
+<img src="media/CPT.png" hspace="5" vspace="5" height="45%" width="45%" alt="CPT Logo" title="CPT" align="right" />
 
 Tool to collect and report model factors (aka. fundamental performance factors) for hybrid MPI + OpenMP applications on-the-fly.
 
@@ -25,13 +25,13 @@ make -j8
 
 ### Using libc++ with Clang-based compilers
 For broad compatibility with applications and libraries built with mixed
-compiler setups (e.g. gfortran + clang++), OTF-CPT tries to avoid dependency 
+compiler setups (e.g. gfortran + clang++), CPT tries to avoid dependency 
 to a C++ runtime library. If GNU C++ headers are available, they are 
-preferred for building OTF-CPT (which is also the default). 
+preferred for building CPT (which is also the default). 
 
-If no GNU C++ headers are available, OTF-CPT can be built by explicitly using
-LLVM's C++ runtime library (libc++) by configuring OTF-CPT with the cmake
-flag `-DOTFCPT_USE_LLVM_LIBCPP=ON`.
+If no GNU C++ headers are available, CPT can be built by explicitly using
+LLVM's C++ runtime library (libc++) by configuring CPT with the cmake
+flag `-DCPT_USE_LLVM_LIBCPP=ON`.
 
 ### Building with MPICH + Clang on Ubuntu
 The MPICH compiler wrapper on Ubuntu bricks MPI detection in cmake, work-around as following:
@@ -53,9 +53,9 @@ make -j8
 ```
 
 ## Using the tool with an application
-Depending on the system and how libomp.so is built, LD_PRELOAD and OMP_TOOL_LIBRARIES might both be necessary. Assuming a cmake build as described above, an application with OTF-CPT is executed like:
+Depending on the system and how libomp.so is built, LD_PRELOAD and OMP_TOOL_LIBRARIES might both be necessary. Assuming a cmake build as described above, an application with CPT is executed like:
 ```
-$(MPIRUN) -np 2 env OMP_NUM_THREADS=4 LD_PRELOAD=./BUILD/libOTFCPT.so OMP_TOOL_LIBRARIES=./BUILD/libOTFCPT.so ./app
+$(MPIRUN) -np 2 env OMP_NUM_THREADS=4 LD_PRELOAD=./BUILD/libCPT.so OMP_TOOL_LIBRARIES=./BUILD/libCPT.so ./app
 ```
 
 At the moment, the tool supports selective instrumentation with a single pair of start/stop markers:
@@ -74,13 +74,13 @@ omp_control_tool(omp_control_tool_end, 0, NULL); // stop
 In both cases the runtime option `stopped=1` should be used, see below.
 
 ### Runtime options
-The behavior of OTF-CPT can be changed with different runtime options. All
+The behavior of CPT can be changed with different runtime options. All
 runtime options are exported as a space separated string assigned to
-`OTFCPT_OPTIONS`. For a full list of runtime options refer to the `help` option.
+`CPT_OPTIONS`. For a full list of runtime options refer to the `help` option.
 
 E.g.:
 ```
-export OTFCPT_OPTIONS="verbose=1 stopped=1 help=1"
+export CPT_OPTIONS="verbose=1 stopped=1 help=1"
 ```
 
 <table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
@@ -138,7 +138,7 @@ encountered.</td>
 <tr>
 <td class="org-left">enable</td>
 <td class="org-right">1</td>
-<td class="org-left">Use OTF-CPT during execution.</td>
+<td class="org-left">Use CPT during execution.</td>
 </tr>
 </tbody>
 </table>
@@ -153,7 +153,7 @@ Fortran support of the tool is tested with OpenMPI, MPICH and IntelMPI. For Open
 
 ## Plotting results of a scaling experiment
 
-The script `CPT-plot.py` expects all OTF-CPT output files for a scaling experiment in a single directory.
+The script `CPT-plot.py` expects all CPT output files for a scaling experiment in a single directory.
 The script expects the relative or absolute path of this directory as an argument. The directory name 
 will be used as experiment name when generating the output.
 The individual output files should follow the naming convention `<prefix>-<nprocs>x<nthreads>.<suffix>`.
@@ -180,10 +180,10 @@ data_graph.pdf  data_graph.png  data_metrics.pdf  data_metrics.png
 - gen-wrappers.cpp     - Generated MPI wrappers with simple IN or OUT semantics regarding handles
 - tracking.cpp         - implementation of some class functions defined in handle-data.h and tracking.h 
 
-### OTF-CPT
-- critical-core.cpp  - OTF-CPT core functions
-- ompt-critical.cpp  - OMPT specific code for OTF-CPT
-- mpi-critical.cpp   - MPI specific code for OTF-CPT
+### CPT
+- critical-core.cpp  - CPT core functions
+- ompt-critical.cpp  - OMPT specific code for CPT
+- mpi-critical.cpp   - MPI specific code for CPT
 
 ### wrap.py Templates
 - gen-nb-wrappers.w

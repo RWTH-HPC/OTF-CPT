@@ -303,7 +303,7 @@ struct TaskData;
 typedef DataPool<TaskData> TaskDataPool;
 template <> __thread TaskDataPool *TaskDataPool::ThreadDataPool = nullptr;
 
-enum OtfCptTaskFlag { OtfCptTaskFulfilled = 0x00010000 };
+enum CptTaskFlag { CptTaskFulfilled = 0x00010000 };
 
 /// Data structure to store additional information for tasks.
 struct TaskData final : DataPoolEntry<TaskData> {
@@ -374,8 +374,8 @@ struct TaskData final : DataPoolEntry<TaskData> {
   bool isInitial() { return TaskType & ompt_task_initial; }
   bool isTarget() { return TaskType & ompt_task_target; }
 
-  bool isFulfilled() { return TaskType & OtfCptTaskFulfilled; }
-  void setFulfilled() { TaskType |= OtfCptTaskFulfilled; }
+  bool isFulfilled() { return TaskType & CptTaskFulfilled; }
+  void setFulfilled() { TaskType |= CptTaskFulfilled; }
 
   ompt_tsan_clockid *GetTaskPtr() { return &Task; }
 
@@ -1126,7 +1126,7 @@ static void ompt_tsan_finalize(ompt_data_t *tool_data) {
 
 extern "C" __attribute__((visibility("default"))) ompt_start_tool_result_t *
 ompt_start_tool(unsigned int omp_version, const char *runtime_version) {
-  InitializeOtfcptFlags();
+  InitializeCptFlags();
   if (!analysis_flags->enabled) {
     if (analysis_flags->verbose)
       fprintf(stderr, "Tool disabled, stopping operation\n");

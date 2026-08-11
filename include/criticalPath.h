@@ -26,7 +26,7 @@
 #include "handle-data.h"
 #include "parse_flags.h"
 
-using namespace __otfcpt;
+using namespace __cpt;
 
 #ifdef DEBUG_CLOCKS
 #define BUILD_DEBUG_CLOCKS(c) c

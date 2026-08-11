@@ -1,7 +1,7 @@
 // clang-format off
 // ALLOW_RETRIES: 1
 // RUN: %compile_c
-// RUN: env OMP_NUM_THREADS=2 %load_otfcpt %otfcpt_options_dump_stopped \
+// RUN: env OMP_NUM_THREADS=2 %load_cpt %cpt_options_dump_stopped \
 // RUN: %t | %FileCheck %s
 // clang-format on
 
